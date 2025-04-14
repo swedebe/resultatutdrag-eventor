@@ -1,3 +1,4 @@
+
 /**
  * Utilities for extracting class information
  */
@@ -12,14 +13,25 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   
   for (const header of classHeaders) {
     if (header.textContent) {
-      // Only get the text content of the H3 element itself, not its children
-      const headerText = header.textContent.trim();
-      console.log("Found class header:", headerText);
+      // Get ONLY the direct text content of the H3, not including child elements
+      // This is crucial to avoid picking up additional text outside of the actual class name
+      let headerText = "";
       
-      // Extract just the class name part (e.g. "Mycket lätt 2 Dam" without additional info)
-      // Common patterns for class names
+      // Manually get only the text nodes that are direct children of this H3 element
+      for (let i = 0; i < header.childNodes.length; i++) {
+        const node = header.childNodes[i];
+        if (node.nodeType === Node.TEXT_NODE) {
+          headerText += node.textContent;
+        }
+      }
+      
+      headerText = headerText.trim();
+      console.log("Raw H3 text content:", headerText);
+      
+      // Extract just the class name part using common patterns
       const classNameMatch = headerText.match(/^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr)|[HD]\d+|Öppen\s+\d+)/i);
       const classText = classNameMatch ? classNameMatch[1] : headerText;
+      console.log("Extracted class name:", classText);
       
       // Find if this class header is related to the current results row
       const headerContainer = header.closest('div.eventClassHeader');
