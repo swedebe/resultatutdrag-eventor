@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import * as XLSX from 'xlsx';
 import ResultsTable from "@/components/ResultsTable";
-import ResultsStatistics from "@/components/ResultsStatistics";
 import { extractClassInfo } from "@/lib/eventor-parser/class-utils";
 import { findCourseLength } from "@/lib/eventor-parser/course-utils";
 
@@ -21,9 +20,13 @@ interface ResultRow {
   position: number;
   organizer: string;
   timeInSeconds: number;
-  diffInSeconds: number;
+  timeAfterWinner: string;
   length?: number;
   totalParticipants?: number;
+  eventType?: string;       // Arrangemangstyp
+  personId?: string | number; // Person-id
+  birthYear?: string | number; // Födelseår
+  started?: string | boolean;  // Startat
   [key: string]: any;
 }
 
@@ -96,25 +99,15 @@ const FileUploader = () => {
           name: `${row["Förnamn"] || ""} ${row["Efternamn"] || ""}`.trim() || row.name || "",
           position: parseInt(row["Placering"] || "0", 10) || 0,
           time: row["Tid"] || row.time || "",
-          diffInSeconds: 0,
+          timeAfterWinner: row["Tid efter segraren"] || "",
           timeInSeconds: 0,
           length: 0,
-          totalParticipants: 0
+          totalParticipants: 0,
+          eventType: row["Arrangemangstyp"] || "",
+          personId: row["Person-id"] || "",
+          birthYear: row["Födelseår"] || "",
+          started: row["Startat"] || ""
         };
-        
-        // Beräkna tidsskillnad om den finns
-        const diffString = row["Tid efter segraren"] || "";
-        if (diffString && diffString.startsWith("+")) {
-          // Konvertera tidsformat (+MM:SS) till sekunder
-          const parts = diffString.substring(1).split(":");
-          let seconds = 0;
-          if (parts.length === 2) {
-            seconds = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-          } else if (parts.length === 3) {
-            seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
-          }
-          resultRow.diffInSeconds = seconds;
-        }
         
         // Konvertera tid till sekunder
         const timeParts = resultRow.time.split(":");
@@ -366,6 +359,11 @@ const FileUploader = () => {
                     <TableHead>Antal startande</TableHead>
                     <TableHead>Placering</TableHead>
                     <TableHead>Tid</TableHead>
+                    <TableHead>Tid efter segraren</TableHead>
+                    <TableHead>Arrangemangstyp</TableHead>
+                    <TableHead>Person-id</TableHead>
+                    <TableHead>Födelseår</TableHead>
+                    <TableHead>Startat</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -381,6 +379,11 @@ const FileUploader = () => {
                       <TableCell>{result.totalParticipants || "—"}</TableCell>
                       <TableCell>{result.position}</TableCell>
                       <TableCell>{result.time}</TableCell>
+                      <TableCell>{result.timeAfterWinner}</TableCell>
+                      <TableCell>{result.eventType || "—"}</TableCell>
+                      <TableCell>{result.personId || "—"}</TableCell>
+                      <TableCell>{result.birthYear || "—"}</TableCell>
+                      <TableCell>{result.started || "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -393,7 +396,6 @@ const FileUploader = () => {
             </CardContent>
           </Card>
           
-          <ResultsStatistics results={results} />
           <ResultsTable results={results} />
         </>
       )}

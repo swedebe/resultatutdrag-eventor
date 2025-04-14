@@ -50,6 +50,10 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
       case "class":
       case "eventName":
       case "organizer":
+      case "eventType":
+      case "personId":
+      case "birthYear":
+      case "started":
         valueA = a[sortColumn]?.toLowerCase() || "";
         valueB = b[sortColumn]?.toLowerCase() || "";
         break;
@@ -57,9 +61,9 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
         valueA = a.timeInSeconds || Number.MAX_VALUE;
         valueB = b.timeInSeconds || Number.MAX_VALUE;
         break;
-      case "diff":
-        valueA = a.diffInSeconds || 0;
-        valueB = b.diffInSeconds || 0;
+      case "timeAfterWinner":
+        valueA = a.timeAfterWinner || "";
+        valueB = b.timeAfterWinner || "";
         break;
       case "position":
       case "totalParticipants":
@@ -124,8 +128,17 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
               <TableHead role="button" onClick={() => handleSort("eventName")} className="whitespace-nowrap">
                 Tävling <SortIcon column="eventName" />
               </TableHead>
+              <TableHead role="button" onClick={() => handleSort("eventType")} className="whitespace-nowrap">
+                Typ <SortIcon column="eventType" />
+              </TableHead>
               <TableHead role="button" onClick={() => handleSort("name")} className="whitespace-nowrap">
                 Namn <SortIcon column="name" />
+              </TableHead>
+              <TableHead role="button" onClick={() => handleSort("personId")} className="whitespace-nowrap">
+                Person-id <SortIcon column="personId" />
+              </TableHead>
+              <TableHead role="button" onClick={() => handleSort("birthYear")} className="whitespace-nowrap">
+                Födelseår <SortIcon column="birthYear" />
               </TableHead>
               <TableHead role="button" onClick={() => handleSort("class")} className="whitespace-nowrap">
                 Klass <SortIcon column="class" />
@@ -136,14 +149,17 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
               <TableHead role="button" onClick={() => handleSort("time")} className="whitespace-nowrap">
                 Tid <SortIcon column="time" />
               </TableHead>
-              <TableHead role="button" onClick={() => handleSort("diff")} className="whitespace-nowrap">
-                Diff <SortIcon column="diff" />
+              <TableHead role="button" onClick={() => handleSort("timeAfterWinner")} className="whitespace-nowrap">
+                Tid efter segraren <SortIcon column="timeAfterWinner" />
               </TableHead>
               <TableHead role="button" onClick={() => handleSort("position")} className="whitespace-nowrap">
                 Plac <SortIcon column="position" />
               </TableHead>
               <TableHead role="button" onClick={() => handleSort("totalParticipants")} className="whitespace-nowrap">
                 Antal <SortIcon column="totalParticipants" />
+              </TableHead>
+              <TableHead role="button" onClick={() => handleSort("started")} className="whitespace-nowrap">
+                Startat <SortIcon column="started" />
               </TableHead>
               <TableHead role="button" onClick={() => handleSort("organizer")} className="whitespace-nowrap">
                 Arrangör <SortIcon column="organizer" />
@@ -153,7 +169,7 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
           <TableBody>
             {sortedResults.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-4">
+                <TableCell colSpan={14} className="text-center py-4">
                   Inga resultat hittades
                 </TableCell>
               </TableRow>
@@ -162,13 +178,17 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
                 <TableRow key={`${result.eventName}-${result.name}-${index}`}>
                   <TableCell>{displayValue(result.date)}</TableCell>
                   <TableCell>{displayValue(result.eventName)}</TableCell>
+                  <TableCell>{displayValue(result.eventType)}</TableCell>
                   <TableCell>{displayValue(result.name)}</TableCell>
+                  <TableCell>{displayValue(result.personId)}</TableCell>
+                  <TableCell>{displayValue(result.birthYear)}</TableCell>
                   <TableCell>{displayValue(result.class)}</TableCell>
                   <TableCell>{result.length ? `${result.length} m` : "-"}</TableCell>
                   <TableCell>{displayValue(result.time)}</TableCell>
-                  <TableCell>{displayValue(result.diff)}</TableCell>
+                  <TableCell>{displayValue(result.timeAfterWinner)}</TableCell>
                   <TableCell>{displayValue(result.position)}</TableCell>
                   <TableCell>{displayValue(result.totalParticipants)}</TableCell>
+                  <TableCell>{displayValue(result.started)}</TableCell>
                   <TableCell>{displayValue(result.organizer)}</TableCell>
                 </TableRow>
               ))
