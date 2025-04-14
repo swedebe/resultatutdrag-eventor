@@ -1,3 +1,4 @@
+
 /**
  * Parser för att extrahera resultat från Eventor HTML.
  * 
@@ -28,12 +29,25 @@ const timeToSeconds = (timeString: string): number => {
  * Extraherar information från placeringskolumnen, t.ex. "1 (av 24)"
  */
 const extractPositionInfo = (positionText: string): { position: number; total: number } => {
-  const match = positionText.match(/(\d+).*?(\d+)/);
+  // Ta bort alla icke-numeriska tecken och dela upp i siffror
+  if (!positionText) return { position: 0, total: 0 };
   
-  if (match && match.length >= 3) {
+  // Eventor har olika format: "1 (av 24)", "1/24", "1 av 24" etc.
+  const match = positionText.match(/(\d+)(?:\s*(?:av|\/|\(av\)|\(of\)|\()\s*(\d+))?/i);
+  
+  if (match && match.length >= 2) {
     return {
-      position: parseInt(match[1], 10),
-      total: parseInt(match[2], 10)
+      position: parseInt(match[1], 10) || 0,
+      total: match[2] ? parseInt(match[2], 10) : 0
+    };
+  }
+  
+  // Om det bara är en siffra, anta att det är placeringen
+  const justNumber = positionText.match(/^(\d+)$/);
+  if (justNumber) {
+    return {
+      position: parseInt(justNumber[1], 10),
+      total: 0
     };
   }
   
@@ -174,6 +188,49 @@ const extractEventName = (html: string): string => {
 };
 
 /**
+ * Försök hitta arrangör på många olika sätt
+ */
+const extractOrganizer = (doc: Document): string => {
+  // Metod 1: Leta efter specifikt element med arrangör klass
+  const organizerElement = doc.querySelector(".organiser") || 
+                         doc.querySelector(".organizer") || 
+                         doc.querySelector("[id*='organiser']") || 
+                         doc.querySelector("[id*='organizer']");
+  
+  if (organizerElement && organizerElement.textContent) {
+    return organizerElement.textContent.trim();
+  }
+  
+  // Metod 2: Sök efter text som innehåller "arrangör:" eller "organizer:"
+  const arrangerLabels = Array.from(doc.querySelectorAll("label, th, dt, strong, b"));
+  for (const label of arrangerLabels) {
+    if (label.textContent && 
+        (label.textContent.toLowerCase().includes("arrangör") || 
+         label.textContent.toLowerCase().includes("organizer"))) {
+      const nextSibling = label.nextElementSibling;
+      if (nextSibling && nextSibling.textContent) {
+        return nextSibling.textContent.trim();
+      }
+      
+      // Kolla om det finns text efter kolon
+      const colonText = label.textContent.split(":");
+      if (colonText.length > 1) {
+        return colonText[1].trim();
+      }
+    }
+  }
+  
+  // Metod 3: Leta i metataggarna
+  const metaOrg = doc.querySelector('meta[name="organization"]') || 
+                doc.querySelector('meta[property="og:site_name"]');
+  if (metaOrg && metaOrg.getAttribute("content")) {
+    return metaOrg.getAttribute("content") || "";
+  }
+  
+  return "";
+};
+
+/**
  * Huvudfunktion för att parsa HTML från Eventor
  */
 export const parseEventorResults = (html: string, clubName: string): any[] => {
@@ -190,12 +247,8 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
     // Använd förbättrad datumextrahering
     const eventDate = extractDate(html);
     
-    // Leta efter arrangör
-    let organizer = "";
-    const organizerElement = doc.querySelector(".organiser") || doc.querySelector(".organizer");
-    if (organizerElement) {
-      organizer = organizerElement.textContent?.trim() || "";
-    }
+    // Leta efter arrangör med förbättrad metod
+    const organizer = extractOrganizer(doc);
     
     // Hitta resultat för den angivna klubben
     const tables = doc.querySelectorAll("table");
@@ -209,19 +262,41 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
       
       // Försök hitta klassinformation
       let currentClass = "";
+      
+      // Metod 1: Kolla föregående element för klassinformation
       const prevElement = table.previousElementSibling;
-      if (prevElement && (prevElement.tagName === "H2" || prevElement.tagName === "H3")) {
+      if (prevElement && (prevElement.tagName === "H2" || prevElement.tagName === "H3" || prevElement.tagName === "H4")) {
         currentClass = prevElement.textContent?.trim() || "";
+        // Ta bort prefix som "Klass " eller "Resultat "
+        currentClass = currentClass.replace(/^(Klass|Resultat|Class)\s+/i, "");
       }
       
-      // Om vi inte hittade klassen, försök hitta den från tabellens rubrik
+      // Metod 2: Kolla om det finns klass-information i tabellen själv
       if (!currentClass) {
         const firstRow = rows[0];
-        const firstCell = firstRow.querySelector("th");
-        if (firstCell && firstCell.textContent?.includes("Klass")) {
-          const classCell = firstRow.querySelectorAll("th")[1];
-          if (classCell) {
-            currentClass = classCell.textContent?.trim() || "";
+        if (firstRow) {
+          const cells = firstRow.querySelectorAll("th");
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const cellText = cell?.textContent?.trim() || "";
+            if (cellText.toLowerCase() === "klass" || cellText.toLowerCase() === "class") {
+              const nextCell = cells[i+1];
+              if (nextCell) {
+                currentClass = nextCell.textContent?.trim() || "";
+              }
+            }
+          }
+        }
+      }
+      
+      // Metod 3: Leta efter klass i tabellcaption
+      if (!currentClass) {
+        const caption = table.querySelector("caption");
+        if (caption && caption.textContent) {
+          const captionText = caption.textContent.trim();
+          const classMatch = captionText.match(/\b(H\d+|D\d+|U\d+|Öppen \d+|Open \d+)\b/);
+          if (classMatch) {
+            currentClass = classMatch[1];
           }
         }
       }
@@ -232,7 +307,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
         const cells = row.querySelectorAll("td");
         
         // Hoppa över rader med för få celler
-        if (cells.length < 5) continue;
+        if (cells.length < 3) continue;
         
         const rowText = row.textContent || "";
         
@@ -245,6 +320,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           let time = "";
           let diff = "";
           let length = 0;
+          let classValue = currentClass; // Använd den hittade klassen
           
           // Förbättrad namnhämtning
           // Leta efter klubbnamnet och använd cellen till vänster för namn
@@ -279,20 +355,28 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           for (let j = 0; j < cells.length; j++) {
             const cellText = cells[j].textContent?.trim() || "";
             
+            // Leta specifikt efter placering i första kolumnen
             if (j === 0 && cellText.match(/^\d+/)) {
               // Första kolumnen antas vara placering
               const posInfo = extractPositionInfo(cellText);
               position = posInfo.position;
               totalParticipants = posInfo.total;
-            } else if (cellText.match(/^\d+:\d+/)) {
-              // Ser ut som en tid (HH:MM:SS eller MM:SS)
+            } 
+            // Leta efter tid (format: MM:SS eller HH:MM:SS)
+            else if (cellText.match(/^\d+:\d+/)) {
               time = cellText;
-            } else if (cellText.startsWith("+")) {
-              // Ser ut som en tidsdifferens
+            } 
+            // Leta efter tidsdifferens (börjar med +)
+            else if (cellText.startsWith("+")) {
               diff = cellText;
-            } else if (cellText.includes("km") || cellText.includes("m")) {
-              // Kan vara banlängd
+            } 
+            // Leta efter banlängd
+            else if (cellText.includes("km") || (cellText.includes("m") && !cellText.includes("min"))) {
               length = extractCourseLength(cellText);
+            }
+            // Leta efter klass (om inte redan hittad)
+            else if (!classValue && (cellText.match(/^[HD]\d+/) || cellText.match(/^Öppen \d+/) || cellText.match(/^Open \d+/))) {
+              classValue = cellText;
             }
           }
           
@@ -304,7 +388,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           // Lägg till resultat
           results.push({
             name,
-            class: currentClass,
+            class: classValue,
             length,
             time,
             diff,

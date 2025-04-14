@@ -156,12 +156,12 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
                   <TableCell>{result.eventName}</TableCell>
                   <TableCell>{result.name}</TableCell>
                   <TableCell>{result.class}</TableCell>
-                  <TableCell>{result.length} m</TableCell>
+                  <TableCell>{result.length ? `${result.length} m` : "-"}</TableCell>
                   <TableCell>{result.time}</TableCell>
                   <TableCell>{result.diff}</TableCell>
-                  <TableCell>{result.position}</TableCell>
-                  <TableCell>{result.totalParticipants}</TableCell>
-                  <TableCell>{result.organizer}</TableCell>
+                  <TableCell>{result.position || "-"}</TableCell>
+                  <TableCell>{result.totalParticipants || "-"}</TableCell>
+                  <TableCell>{result.organizer || "-"}</TableCell>
                 </TableRow>
               ))
             )}
