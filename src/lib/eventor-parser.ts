@@ -1,4 +1,3 @@
-
 /**
  * Parser för att extrahera resultat från Eventor HTML.
  * 
@@ -130,6 +129,43 @@ const extractDate = (html: string): string => {
 };
 
 /**
+ * Extraherar tävlingsnamn från HTML
+ */
+const extractEventName = (html: string): string => {
+  // Försöka hitta tävlingsnamnet i URL-parameter
+  const eventNameMatch = html.match(/Tävlingens namn:\s*([^<\n]+)/i);
+  if (eventNameMatch && eventNameMatch[1]) {
+    return eventNameMatch[1].trim();
+  }
+
+  // Försök hitta tävlingsnamnet i en rubrik
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  
+  // Kolla om det finns en huvudrubrik
+  const h1 = doc.querySelector("h1");
+  if (h1 && h1.textContent) {
+    return h1.textContent.trim();
+  }
+  
+  // Kolla meta-titel
+  const titleTag = doc.querySelector("title");
+  if (titleTag && titleTag.textContent) {
+    // Ta bort "Eventor -" från titeln om det finns
+    return titleTag.textContent.replace(/Eventor\s*[-:]\s*/i, "").trim();
+  }
+  
+  // Kolla eventuella meta-taggar
+  const metaDescription = doc.querySelector('meta[name="description"]');
+  if (metaDescription && metaDescription.getAttribute("content")) {
+    return metaDescription.getAttribute("content") || "Okänd tävling";
+  }
+  
+  // Om inget namn hittades
+  return "Okänd tävling";
+};
+
+/**
  * Huvudfunktion för att parsa HTML från Eventor
  */
 export const parseEventorResults = (html: string, clubName: string): any[] => {
@@ -140,8 +176,8 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     
-    // Hitta tävlingens namn och datum
-    const eventName = doc.querySelector("h1")?.textContent?.trim() || "Okänd tävling";
+    // Hitta tävlingens namn med vår nya metod
+    const eventName = extractEventName(html);
     
     // Använd förbättrad datumextrahering
     const eventDate = extractDate(html);

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -34,7 +33,6 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
     }
   };
 
-  // Statistik för placeringar (topp 3, topp 10)
   const calculatePlacementStats = () => {
     const yearStats: Record<string, { top3: number; top10: number; total: number }> = {};
     
@@ -63,7 +61,6 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       .sort((a, b) => a.year.localeCompare(b.year));
   };
 
-  // Statistik för genomsnittsplacering per år
   const calculateAveragePlacements = () => {
     const yearStats: Record<string, { totalPosition: number; count: number }> = {};
     
@@ -88,7 +85,6 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       .sort((a, b) => a.year.localeCompare(b.year));
   };
 
-  // Statistik för antal starter per år
   const calculateParticipations = () => {
     const yearStats: Record<string, number> = {};
     
@@ -133,7 +129,6 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       break;
   }
 
-  // Funktion för att skapa rätt BarCharts baserat på statistiktyp
   const renderChart = () => {
     switch (statType) {
       case "placements":
