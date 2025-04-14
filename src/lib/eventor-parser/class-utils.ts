@@ -14,6 +14,7 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   for (const header of classHeaders) {
     if (header.textContent) {
       const headerText = header.textContent.trim();
+      console.log("Found class header:", headerText);
       
       // Find if this class header is related to the current results row
       const headerContainer = header.closest('div.eventClassHeader');

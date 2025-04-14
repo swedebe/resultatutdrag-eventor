@@ -21,9 +21,16 @@ export const extractEventAndOrganizerInfo = (html: string): { eventName: string;
   const titleElement = doc.querySelector("title");
   if (titleElement && titleElement.textContent) {
     const titleText = titleElement.textContent;
-    const matchForText = titleText.match(/för\s+(.*?)$/i);
+    
+    // Use a more robust regex that handles "för" with any case and following spaces
+    // Using unicode flag to properly handle Swedish characters
+    const matchForText = titleText.match(/f[öo]r\s+(.*?)$/iu);
+    
     if (matchForText && matchForText[1]) {
       eventName = matchForText[1].trim();
+      console.log("Found event name:", eventName);
+    } else {
+      console.log("No match for 'för' pattern in title:", titleText);
     }
   }
   
