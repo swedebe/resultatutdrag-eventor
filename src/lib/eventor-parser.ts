@@ -135,7 +135,7 @@ const extractEventName = (html: string): string => {
   // Försöka hitta tävlingsnamnet i URL-parameter "Tävlingens namn:"
   const eventNameMatch = html.match(/Tävlingens namn:\s*([^<\n]+)/i);
   if (eventNameMatch && eventNameMatch[1]) {
-    return eventNameMatch[1].trim();
+    return eventNameMatch[1].trim().replace(/^Officiell resultatlista för\s*/i, "");
   }
 
   // Försök hitta tävlingsnamnet i en rubrik
