@@ -1,4 +1,3 @@
-
 /**
  * Utilities for extracting class information
  */
@@ -13,8 +12,14 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   
   for (const header of classHeaders) {
     if (header.textContent) {
+      // Only get the text content of the H3 element itself, not its children
       const headerText = header.textContent.trim();
       console.log("Found class header:", headerText);
+      
+      // Extract just the class name part (e.g. "Mycket lätt 2 Dam" without additional info)
+      // Common patterns for class names
+      const classNameMatch = headerText.match(/^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr)|[HD]\d+|Öppen\s+\d+)/i);
+      const classText = classNameMatch ? classNameMatch[1] : headerText;
       
       // Find if this class header is related to the current results row
       const headerContainer = header.closest('div.eventClassHeader');
@@ -31,7 +36,7 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
           
           // If we reached the row's table, this is the correct class
           if (currentNode === rowTable) {
-            return headerText;
+            return classText;
           }
         }
       }
@@ -46,7 +51,7 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
       const headerText = header.textContent.trim();
       
       // Check for common class patterns
-      if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(headerText) ||
+      if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/i.test(headerText) ||
           /^[HD]\d+/.test(headerText) ||
           /^Öppen \d+/i.test(headerText)) {
         
