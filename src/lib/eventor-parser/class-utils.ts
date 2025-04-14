@@ -12,23 +12,31 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   
   for (const header of classHeaders) {
     if (header.textContent) {
-      // Extract ONLY the direct text from the H3 element itself
-      let headerText = "";
+      // Extract ONLY the class name using regex patterns directly
+      const fullText = header.textContent.trim();
+      console.log("Full H3 content:", fullText);
       
-      // Get only the direct text content, not including any child elements
-      for (const node of header.childNodes) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          headerText += node.textContent || "";
+      // Extract only the class name using specific patterns for orienteering classes
+      const classPatterns = [
+        /^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr))/i,  // e.g. "Mycket lätt 2 Dam"
+        /^([HD]\d+)/,  // e.g. "H21", "D45"
+        /^(Öppen\s+\d+)/i,  // e.g. "Öppen 7"
+      ];
+      
+      let classText = null;
+      for (const pattern of classPatterns) {
+        const match = fullText.match(pattern);
+        if (match && match[1]) {
+          classText = match[1];
+          break;
         }
       }
       
-      headerText = headerText.trim();
-      console.log("Raw H3 text content:", headerText);
+      // If no pattern matched, use the first part of the text up to any special characters
+      if (!classText) {
+        classText = fullText.split(/[,\(\d]/)[0].trim();
+      }
       
-      // Take only the class name part without any additional information
-      // Common patterns for orienteering classes
-      const classNameMatch = headerText.match(/^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr)|[HD]\d+|Öppen\s+\d+)/i);
-      const classText = classNameMatch ? classNameMatch[1] : headerText;
       console.log("Extracted class name:", classText);
       
       // Find if this class header is related to the current results row
@@ -46,7 +54,7 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
           
           // If we reached the row's table, this is the correct class
           if (currentNode === rowTable) {
-            return classText;
+            return classText || "";
           }
         }
       }
@@ -75,7 +83,20 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
           }
           
           if (testNode === rowTable) {
-            return headerText;
+            // Extract just the class part
+            const classPatterns = [
+              /^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr))/i,
+              /^([HD]\d+)/,
+              /^(Öppen\s+\d+)/i,
+            ];
+            
+            for (const pattern of classPatterns) {
+              const match = headerText.match(pattern);
+              if (match && match[1]) {
+                return match[1];
+              }
+            }
+            return headerText.split(/[,\(\d]/)[0].trim();
           }
         }
       }
