@@ -132,10 +132,14 @@ const extractDate = (html: string): string => {
  * Extraherar tävlingsnamn från HTML och tar bort eventuell "Officiell resultatlista för"-prefix
  */
 const extractEventName = (html: string): string => {
+  // Remove "Officiell resultatlista för" as a prefix for all methods
+  const cleanEventName = (name: string) => 
+    name.replace(/^Officiell resultatlista för\s*/i, "").trim();
+
   // Försöka hitta tävlingsnamnet i URL-parameter "Tävlingens namn:"
   const eventNameMatch = html.match(/Tävlingens namn:\s*([^<\n]+)/i);
   if (eventNameMatch && eventNameMatch[1]) {
-    return eventNameMatch[1].trim().replace(/^Officiell resultatlista för\s*/i, "");
+    return cleanEventName(eventNameMatch[1]);
   }
 
   // Försök hitta tävlingsnamnet i en rubrik
@@ -145,25 +149,24 @@ const extractEventName = (html: string): string => {
   // Kolla om det finns en huvudrubrik
   const h1 = doc.querySelector("h1");
   if (h1 && h1.textContent) {
-    // Ta bort "Officiell resultatlista för" från början av namnet
-    return h1.textContent.replace(/^Officiell resultatlista för\s*/i, "").trim();
+    return cleanEventName(h1.textContent);
   }
   
   // Kolla meta-titel
   const titleTag = doc.querySelector("title");
   if (titleTag && titleTag.textContent) {
-    // Ta bort "Eventor -" och "Officiell resultatlista för" från titeln
-    return titleTag.textContent
-      .replace(/Eventor\s*[-:]\s*/i, "")
-      .replace(/^Officiell resultatlista för\s*/i, "")
-      .trim();
+    return cleanEventName(
+      titleTag.textContent
+        .replace(/Eventor\s*[-:]\s*/i, "")
+        .trim()
+    );
   }
   
   // Kolla eventuella meta-taggar
   const metaDescription = doc.querySelector('meta[name="description"]');
   if (metaDescription && metaDescription.getAttribute("content")) {
     const content = metaDescription.getAttribute("content") || "";
-    return content.replace(/^Officiell resultatlista för\s*/i, "").trim() || "Okänd tävling";
+    return cleanEventName(content);
   }
   
   // Om inget namn hittades
