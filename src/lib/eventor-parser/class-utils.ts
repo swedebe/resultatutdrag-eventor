@@ -1,3 +1,4 @@
+
 /**
  * Utilities for extracting class information
  */
@@ -77,7 +78,8 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
         // Try to determine if this header is related to our row
         const rowTable = row.closest('table');
         if (rowTable) {
-          let testNode = header;
+          // Fix: Explicitly specify Element type instead of treating it as HTMLHeadingElement
+          let testNode: Element | null = header;
           while (testNode && testNode !== rowTable) {
             testNode = testNode.nextElementSibling;
             if (!testNode) break;
