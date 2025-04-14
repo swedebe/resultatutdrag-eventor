@@ -1,4 +1,3 @@
-
 /**
  * Parser för att extrahera resultat från Eventor HTML.
  * 
@@ -28,7 +27,7 @@ const timeToSeconds = (timeString: string): number => {
 /**
  * Extraherar information från placeringskolumnen, t.ex. "1 (av 24)"
  */
-const extractPositionInfo = (positionText: string): { position: number; total: number } => {
+const extractBasicPositionInfo = (positionText: string): { position: number; total: number } => {
   // Ta bort alla icke-numeriska tecken och dela upp i siffror
   if (!positionText) return { position: 0, total: 0 };
   
@@ -408,7 +407,7 @@ const findCourseLength = (row: Element, doc: Document, html: string): number => 
 /**
  * Improved extraction of position and total participants
  */
-const extractPositionInfo = (positionText: string, doc: Document, row: Element): { position: number; total: number } => {
+const extractEnhancedPositionInfo = (positionText: string, doc: Document, row: Element): { position: number; total: number } => {
   // If position text is provided and valid, use it
   if (positionText && /^\d+/.test(positionText)) {
     // Remove all non-numeric characters and split into numbers
@@ -544,9 +543,9 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             console.log("Extracted length:", length);
           }
           
-          // Improved position extraction
+          // Improved position extraction - Use the renamed function
           const firstCellText = cells[0]?.textContent?.trim() || '';
-          const posInfo = extractPositionInfo(firstCellText, doc, row);
+          const posInfo = extractEnhancedPositionInfo(firstCellText, doc, row);
           position = posInfo.position;
           
           // If no total participants from position info, use table row count

@@ -86,7 +86,7 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
     return sortDirection === "asc" ? <ArrowUp className="h-4 w-4 inline ml-1" /> : <ArrowDown className="h-4 w-4 inline ml-1" />;
   };
 
-  // Helper function to display dash for empty values
+  // Helper function to display dash for empty or zero values
   const displayValue = (value: any, suffix: string = ''): string => {
     if (value === null || value === undefined || value === '' || value === 0) {
       return "-";
