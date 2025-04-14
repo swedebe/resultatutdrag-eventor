@@ -130,7 +130,7 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       break;
   }
 
-  // Create a component to wrap the chart content to fix the TypeScript error
+  // Create a component to render different chart types
   const renderChartContent = () => {
     switch (statType) {
       case "placements":
@@ -195,11 +195,13 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
 
           <div className="h-[300px] mt-2">
             <ChartContainer className="h-full" config={chartConfig}>
+              {/* Fix: Ensure we render only a single element, not an array */}
               {renderChartContent()}
-              <ChartLegend verticalAlign="bottom">
-                <ChartLegendContent />
-              </ChartLegend>
             </ChartContainer>
+            {/* Move the ChartLegend outside of the ChartContainer */}
+            <ChartLegend verticalAlign="bottom">
+              <ChartLegendContent />
+            </ChartLegend>
           </div>
         </div>
       </CardContent>
