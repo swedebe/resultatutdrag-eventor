@@ -148,87 +148,117 @@ const extractDate = (html: string): string => {
 };
 
 /**
- * Extraherar tävlingsnamn från HTML och tar bort eventuell "Officiell resultatlista för"-prefix
+ * Extraherar tävlingsnamn och organisatör från HTML enligt bildens gröna ruta
+ * Arrangörens namn har alltid "Tävlingens namn:" som prefix
  */
-const extractEventName = (html: string): string => {
-  // Remove "Officiell resultatlista för" as a prefix for all methods
-  const cleanEventName = (name: string) => 
-    name.replace(/^Officiell resultatlista för\s*/i, "").trim();
-
-  // Försöka hitta tävlingsnamnet i URL-parameter "Tävlingens namn:"
-  const eventNameMatch = html.match(/Tävlingens namn:\s*([^<\n]+)/i);
-  if (eventNameMatch && eventNameMatch[1]) {
-    return cleanEventName(eventNameMatch[1]);
-  }
-
-  // Check for "Tävlingens namn:" label in the page
-  const nameMatch = html.match(/Tävlingens namn:[\s\n]*([^<\r\n]+)/i);
-  if (nameMatch && nameMatch[1]) {
-    return cleanEventName(nameMatch[1].trim());
-  }
-
-  // Försök hitta tävlingsnamnet i en rubrik
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
+const extractEventAndOrganizerInfo = (html: string): { eventName: string; organizer: string } => {
+  // Standardvärden om inget hittas
+  let eventName = "Okänd tävling";
+  let organizer = "";
   
-  // Kolla om det finns en huvudrubrik
-  const h1 = doc.querySelector("h1");
-  if (h1 && h1.textContent) {
-    return cleanEventName(h1.textContent);
+  // Leta efter "Tävlingens namn:" i sidan (enligt den gröna ramen i bilden)
+  const eventMatch = html.match(/Tävlingens namn:[^\n<]*([^<\n]+)/i);
+  if (eventMatch && eventMatch[1]) {
+    eventName = eventMatch[1].trim();
   }
   
-  // Kolla meta-titel
-  const titleTag = doc.querySelector("title");
-  if (titleTag && titleTag.textContent) {
-    return cleanEventName(
-      titleTag.textContent
-        .replace(/Eventor\s*[-:]\s*/i, "")
-        .trim()
-    );
+  // Leta efter organisatören i närheten av tävlingsnamnet
+  // Enligt bilden finns arrangören oftast under eller nära tävlingsnamnet
+  const organizerMatch = html.match(/Arrangör(?:sorganisation)?:[^\n<]*([^<\n]+)/i);
+  if (organizerMatch && organizerMatch[1]) {
+    organizer = organizerMatch[1].trim();
   }
   
-  // Kolla eventuella meta-taggar
-  const metaDescription = doc.querySelector('meta[name="description"]');
-  if (metaDescription && metaDescription.getAttribute("content")) {
-    const content = metaDescription.getAttribute("content") || "";
-    return cleanEventName(content);
+  // Om vi fortfarande inte har en organisatör, leta efter andra mönster
+  if (!organizer) {
+    const altOrganizerMatch = html.match(/Arrangerad av[^\n<]*([^<\n]+)/i);
+    if (altOrganizerMatch && altOrganizerMatch[1]) {
+      organizer = altOrganizerMatch[1].trim();
+    }
   }
   
-  // Om inget namn hittades
-  return "Okänd tävling";
-};
-
-/**
- * Improved extraction of class names from the page
- */
-const extractClassInfo = (doc: Document, row: Element): string => {
-  // Method 1: Find class headers that appear before result tables
-  // Look for DOM structure like the one in the image
-  const classHeadings = doc.querySelectorAll('h2, h3, strong');
-  for (const heading of classHeadings) {
-    const headingText = heading.textContent?.trim() || "";
-    // Check if the heading matches common orienteering class patterns
-    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(headingText) ||
-        /^[HD]\d+/.test(headingText) ||
-        /^Öppen \d+/i.test(headingText)) {
+  // Om inget av ovanstående fungerar, leta i dokumentets struktur
+  if (!eventName || !organizer) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    
+    // Sök efter element som innehåller "Tävlingens namn:" eller "Arrangör:"
+    const allElements = Array.from(doc.querySelectorAll("div, p, span, h1, h2, h3, h4, h5"));
+    
+    for (const element of allElements) {
+      const text = element.textContent || "";
       
-      // Check if this heading is related to the current row
-      // Either by being just before the table or having some other connection
-      const headingParent = heading.parentElement;
-      const rowTable = row.closest('table');
+      if (!eventName && text.includes("Tävlingens namn:")) {
+        const match = text.match(/Tävlingens namn:(.*?)(?:Arrangör|$)/i);
+        if (match && match[1]) {
+          eventName = match[1].trim();
+        }
+      }
       
-      if (headingParent && rowTable && 
-          (headingParent.nextElementSibling === rowTable || 
-           headingParent.contains(rowTable) ||
-           headingParent.previousElementSibling === rowTable)) {
-        return headingText;
+      if (!organizer && text.includes("Arrangör")) {
+        const match = text.match(/Arrangör(?:sorganisation)?:(.*)/i);
+        if (match && match[1]) {
+          organizer = match[1].trim();
+        }
       }
     }
   }
   
-  // Method 2: Look for class info in table header cells
+  return { eventName, organizer };
+};
+
+/**
+ * Extraherar klassnamn från dokumentet baserat på bildens röda ruta (blå text)
+ */
+const extractClassInfo = (doc: Document, row: Element): string => {
+  // Leta först efter element med blå text (CSS class med storlek/färg som i bilden)
+  const blueTitles = Array.from(doc.querySelectorAll(".eventheader, .classheader, h1, h2, h3"));
+  
+  for (const title of blueTitles) {
+    const titleText = title.textContent?.trim() || "";
+    // Vanliga klassmönster för orientering
+    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(titleText) ||
+        /^[HD]\d+/.test(titleText) ||
+        /^Öppen \d+/i.test(titleText)) {
+      
+      // Kontrollera om denna rubrik är relaterad till tabellen/raden vi tittar på
+      const titleContainer = title.closest('div, section, article');
+      const rowTable = row.closest('table');
+      
+      if (titleContainer && rowTable && 
+          (titleContainer.contains(rowTable) || 
+          titleContainer.nextElementSibling === rowTable)) {
+        return titleText;
+      }
+    }
+  }
+  
+  // Om ingen blå titel hittades, prova med tabellrubriker
   const table = row.closest('table');
   if (table) {
+    // Kolla tabellens caption först, det används ofta för klass
+    const tableCaption = table.querySelector('caption');
+    if (tableCaption && tableCaption.textContent) {
+      const captionText = tableCaption.textContent.trim();
+      if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(captionText) ||
+          /^[HD]\d+/.test(captionText) ||
+          /^Öppen \d+/i.test(captionText)) {
+        return captionText;
+      }
+    }
+    
+    // Kolla element precis före tabellen
+    const prevSibling = table.previousElementSibling;
+    if (prevSibling && prevSibling.textContent) {
+      const prevText = prevSibling.textContent.trim();
+      if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(prevText) ||
+          /^[HD]\d+/.test(prevText) ||
+          /^Öppen \d+/i.test(prevText)) {
+        return prevText;
+      }
+    }
+    
+    // Kolla om det finns en kolumn med klassinfo
     const headers = Array.from(table.querySelectorAll('th'));
     const classIndex = headers.findIndex(header => 
       header.textContent?.toLowerCase().includes('klass'));
@@ -244,32 +274,24 @@ const extractClassInfo = (doc: Document, row: Element): string => {
     }
   }
   
-  // Method 3: Look for a class identifier in the page content
-  // This matches patterns like "Mycket lätt 2 Dam", "H21", etc.
-  const tableCaption = table?.querySelector('caption');
-  if (tableCaption && tableCaption.textContent) {
-    const captionText = tableCaption.textContent.trim();
-    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(captionText) ||
-        /^[HD]\d+/.test(captionText) ||
-        /^Öppen \d+/i.test(captionText)) {
-      return captionText;
+  // Sök efter starka element nära raden som kan vara klassrubriker
+  const rowParent = row.closest('tbody') || row.closest('table');
+  const nearbyHeaders = rowParent ? 
+    Array.from(rowParent.querySelectorAll('strong, b, h3, h4')) : [];
+    
+  for (const header of nearbyHeaders) {
+    const headerText = header.textContent?.trim() || "";
+    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(headerText) ||
+        /^[HD]\d+/.test(headerText) ||
+        /^Öppen \d+/i.test(headerText)) {
+      return headerText;
     }
   }
   
-  // Method 4: Check if there's text right above the table with class info
-  const prevElement = table?.previousElementSibling;
-  if (prevElement && prevElement.textContent) {
-    const text = prevElement.textContent.trim();
-    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(text) ||
-        /^[HD]\d+/.test(text) ||
-        /^Öppen \d+/i.test(text)) {
-      return text;
-    }
-  }
-
-  // Method 5: Try to find class name in URL or document location
-  const pageUrl = doc.URL || '';
-  const classMatch = pageUrl.match(/[?&]class=([^&]+)/i);
+  // Om inget annat fungerar, leta i URL efter klassnamn
+  const pageUrl = doc.URL || window.location.href;
+  const classMatch = pageUrl.match(/[?&]class=([^&]+)/i) || 
+                    pageUrl.match(/[?&]className=([^&]+)/i);
   if (classMatch && classMatch[1]) {
     return decodeURIComponent(classMatch[1]);
   }
@@ -278,64 +300,7 @@ const extractClassInfo = (doc: Document, row: Element): string => {
 };
 
 /**
- * Improved extraction of the organizer from the page
- */
-const extractOrganizer = (html: string): string => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  
-  // Method 1: Look for organizer in labeled fields (as shown in the image)
-  const organizerLabelMatch = html.match(/Arrangörsorganisation:[\s\n]*([^<\r\n]+)/i);
-  if (organizerLabelMatch && organizerLabelMatch[1]) {
-    return organizerLabelMatch[1].trim();
-  }
-  
-  // Method 2: Look for specific element with organizer class
-  const organizerElement = doc.querySelector(".organiser") || 
-                         doc.querySelector(".organizer") || 
-                         doc.querySelector("[id*='organiser']") || 
-                         doc.querySelector("[id*='organizer']");
-  
-  if (organizerElement && organizerElement.textContent) {
-    return organizerElement.textContent.trim();
-  }
-  
-  // Method 3: Look for table rows with organizer info
-  const allTables = doc.querySelectorAll('table');
-  for (const table of allTables) {
-    const rows = table.querySelectorAll('tr');
-    for (const row of rows) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 2) {
-        const firstCellText = cells[0].textContent?.toLowerCase() || '';
-        if (firstCellText.includes('arrangör') || 
-            firstCellText.includes('organiser') || 
-            firstCellText.includes('organiz')) {
-          return cells[1].textContent?.trim() || '';
-        }
-      }
-    }
-  }
-  
-  // Method 4: Look for elements containing "Arrangör:" or similar
-  const allText = doc.body.innerText;
-  const organizerMatches = [
-    allText.match(/\barrangör\s*:?\s*([^.,\n]+)/i),
-    allText.match(/\barrangörsorganisation\s*:?\s*([^.,\n]+)/i),
-    allText.match(/\borganiser\s*:?\s*([^.,\n]+)/i)
-  ];
-  
-  for (const match of organizerMatches) {
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-  }
-  
-  return "";
-};
-
-/**
- * Improved extraction of course length
+ * Extracts the course length from various sources
  */
 const findCourseLength = (row: Element, doc: Document, html: string): number => {
   // Method 1: Look for the length in headers or sub-headers (as shown in the image)
@@ -460,15 +425,13 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     
-    // Hitta tävlingens namn
-    const eventName = extractEventName(html);
+    // Hitta tävlingens namn och arrangör med förbättrad metod
+    const { eventName, organizer } = extractEventAndOrganizerInfo(html);
+    console.log("Extracted event:", eventName);
+    console.log("Extracted organizer:", organizer);
     
     // Använd förbättrad datumextrahering
     const eventDate = extractDate(html);
-    
-    // Leta efter arrangör med förbättrad metod
-    const organizer = extractOrganizer(html);
-    console.log("Extracted organizer:", organizer);
     
     // Hitta resultat för den angivna klubben
     const tables = doc.querySelectorAll("table");
@@ -543,7 +506,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             console.log("Extracted length:", length);
           }
           
-          // Improved position extraction - Use the renamed function
+          // Improved position extraction
           const firstCellText = cells[0]?.textContent?.trim() || '';
           const posInfo = extractEnhancedPositionInfo(firstCellText, doc, row);
           position = posInfo.position;
