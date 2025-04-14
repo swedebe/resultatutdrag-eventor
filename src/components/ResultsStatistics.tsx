@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -129,7 +130,8 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       break;
   }
 
-  const renderChart = () => {
+  // Create a component to wrap the chart content to fix the TypeScript error
+  const renderChartContent = () => {
     switch (statType) {
       case "placements":
         return (
@@ -193,7 +195,7 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
 
           <div className="h-[300px] mt-2">
             <ChartContainer className="h-full" config={chartConfig}>
-              {renderChart()}
+              {renderChartContent()}
               <ChartLegend verticalAlign="bottom">
                 <ChartLegendContent />
               </ChartLegend>
