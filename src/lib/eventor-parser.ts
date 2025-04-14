@@ -129,7 +129,7 @@ const extractDate = (html: string): string => {
 };
 
 /**
- * Extraherar tävlingsnamn från HTML
+ * Extraherar tävlingsnamn från HTML och tar bort eventuell "Officiell resultatlista för"-prefix
  */
 const extractEventName = (html: string): string => {
   // Försöka hitta tävlingsnamnet i URL-parameter
@@ -145,20 +145,25 @@ const extractEventName = (html: string): string => {
   // Kolla om det finns en huvudrubrik
   const h1 = doc.querySelector("h1");
   if (h1 && h1.textContent) {
-    return h1.textContent.trim();
+    // Ta bort "Officiell resultatlista för" från början av namnet
+    return h1.textContent.replace(/^Officiell resultatlista för\s*/i, "").trim();
   }
   
   // Kolla meta-titel
   const titleTag = doc.querySelector("title");
   if (titleTag && titleTag.textContent) {
-    // Ta bort "Eventor -" från titeln om det finns
-    return titleTag.textContent.replace(/Eventor\s*[-:]\s*/i, "").trim();
+    // Ta bort "Eventor -" och "Officiell resultatlista för" från titeln
+    return titleTag.textContent
+      .replace(/Eventor\s*[-:]\s*/i, "")
+      .replace(/^Officiell resultatlista för\s*/i, "")
+      .trim();
   }
   
   // Kolla eventuella meta-taggar
   const metaDescription = doc.querySelector('meta[name="description"]');
   if (metaDescription && metaDescription.getAttribute("content")) {
-    return metaDescription.getAttribute("content") || "Okänd tävling";
+    const content = metaDescription.getAttribute("content") || "";
+    return content.replace(/^Officiell resultatlista för\s*/i, "").trim() || "Okänd tävling";
   }
   
   // Om inget namn hittades
