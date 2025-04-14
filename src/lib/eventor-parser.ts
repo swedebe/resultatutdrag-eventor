@@ -154,7 +154,36 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           let diff = "";
           let length = 0;
           
-          // Olika tabeller kan ha olika kolumnordning, så vi försöker vara flexibla
+          // Förbättrad namnhämtning
+          // Leta efter klubbnamnet och använd cellen till vänster för namn
+          for (let j = 0; j < cells.length; j++) {
+            const cellText = cells[j].textContent?.trim() || "";
+            
+            if (cellText === clubName && j > 0) {
+              name = cells[j-1].textContent?.trim() || "";
+              break;
+            }
+          }
+          
+          // Om vi fortfarande inte har ett namn, försök med vanlig metod
+          if (!name) {
+            for (let j = 0; j < cells.length; j++) {
+              const cell = cells[j];
+              const cellText = cell.textContent?.trim() || "";
+              
+              // Leta efter namn i celler som inte innehåller siffror/specialtecken
+              if (j > 0 && j < cells.length - 2 && 
+                  !cellText.match(/^\d/) && 
+                  !cellText.includes(":") && 
+                  cellText !== clubName &&
+                  !/^[+0-9]+$/.test(cellText)) {
+                name = cellText;
+                break;
+              }
+            }
+          }
+          
+          // Samla in övriga data
           for (let j = 0; j < cells.length; j++) {
             const cellText = cells[j].textContent?.trim() || "";
             
@@ -163,11 +192,6 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
               const posInfo = extractPositionInfo(cellText);
               position = posInfo.position;
               totalParticipants = posInfo.total;
-            } else if (cellText === clubName) {
-              // Klubbkolumnen - namnet är ofta i föregående kolumn
-              if (j > 0) {
-                name = cells[j - 1].textContent?.trim() || "";
-              }
             } else if (cellText.match(/^\d+:\d+/)) {
               // Ser ut som en tid (HH:MM:SS eller MM:SS)
               time = cellText;

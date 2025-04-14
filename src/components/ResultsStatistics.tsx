@@ -159,6 +159,7 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
 
           <div className="h-[300px] mt-2">
             <ChartContainer className="h-full" config={chartConfig}>
+              {/* Fix för TypeScript-felet genom att säkerställa att bara ett element skickas som children */}
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
