@@ -12,56 +12,57 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   
   for (const header of classHeaders) {
     if (header.textContent) {
-      // Extract ONLY the class name using regex patterns directly
+      // Get the text content and log it for debugging
       const fullText = header.textContent.trim();
       console.log("Full H3 content:", fullText);
       
-      // Extract only the class name using specific patterns for orienteering classes
+      // STRICT pattern matching for class names only
       const classPatterns = [
-        /^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr))/i,  // e.g. "Mycket lätt 2 Dam"
-        /^([HD]\d+)/,  // e.g. "H21", "D45"
-        /^(Öppen\s+\d+)/i,  // e.g. "Öppen 7"
+        // Matches "Mycket lätt 2 Dam" but stops at any non-class content
+        /^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr))/i,
+        // Matches "H21", "D45", etc.
+        /^([HD]\d+)/,  
+        // Matches "Öppen 7", etc.
+        /^(Öppen\s+\d+)/i,  
       ];
       
-      let classText = null;
+      // Try each pattern until we find a match
+      let className = null;
       for (const pattern of classPatterns) {
         const match = fullText.match(pattern);
         if (match && match[1]) {
-          classText = match[1];
+          className = match[1].trim();
           break;
         }
       }
       
-      // If no pattern matched, use the first part of the text up to any special characters
-      if (!classText) {
-        classText = fullText.split(/[,\(\d]/)[0].trim();
+      // If no patterns matched, use a more aggressive approach:
+      // Take text up to the first comma, parenthesis, or "m"
+      if (!className) {
+        className = fullText.split(/[,\(\dm]/)[0].trim();
       }
       
-      console.log("Extracted class name:", classText);
+      console.log("Extracted class name:", className);
       
-      // Find if this class header is related to the current results row
+      // Check if this header is related to our results row
       const headerContainer = header.closest('div.eventClassHeader');
-      if (headerContainer) {
-        // Check if this header container is before the table containing our row
-        const rowTable = row.closest('table');
-        if (rowTable) {
-          // Check if this header is linked to our results table
-          let currentNode: Element | null = headerContainer;
-          while (currentNode && currentNode !== rowTable) {
-            currentNode = currentNode.nextElementSibling;
-            if (!currentNode) break;
-          }
-          
-          // If we reached the row's table, this is the correct class
+      const rowTable = row.closest('table');
+      
+      if (headerContainer && rowTable) {
+        // Check if this header is before the table containing our row
+        let currentNode = headerContainer.nextElementSibling;
+        while (currentNode) {
           if (currentNode === rowTable) {
-            return classText || "";
+            return className || "";
           }
+          currentNode = currentNode.nextElementSibling;
         }
       }
     }
   }
   
-  // Second priority: Look for any H3 headings that seem like class names
+  // Fallbacks: same as before but with stricter pattern matching
+  // Look for any H3 headings that seem like class names
   const allH3s = Array.from(doc.querySelectorAll("h3"));
   
   for (const header of allH3s) {
@@ -76,14 +77,14 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
         // Try to determine if this header is related to our row
         const rowTable = row.closest('table');
         if (rowTable) {
-          let testNode: Element | null = header;
+          let testNode = header;
           while (testNode && testNode !== rowTable) {
             testNode = testNode.nextElementSibling;
             if (!testNode) break;
           }
           
           if (testNode === rowTable) {
-            // Extract just the class part
+            // Extract just the class part with strict patterns
             const classPatterns = [
               /^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr))/i,
               /^([HD]\d+)/,
@@ -93,10 +94,12 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
             for (const pattern of classPatterns) {
               const match = headerText.match(pattern);
               if (match && match[1]) {
-                return match[1];
+                return match[1].trim();
               }
             }
-            return headerText.split(/[,\(\d]/)[0].trim();
+            
+            // More aggressive splitting if no pattern matched
+            return headerText.split(/[,\(\dm]/)[0].trim();
           }
         }
       }
