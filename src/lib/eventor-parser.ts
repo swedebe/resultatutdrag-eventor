@@ -132,7 +132,7 @@ const extractDate = (html: string): string => {
  * Extraherar tävlingsnamn från HTML och tar bort eventuell "Officiell resultatlista för"-prefix
  */
 const extractEventName = (html: string): string => {
-  // Försöka hitta tävlingsnamnet i URL-parameter
+  // Försöka hitta tävlingsnamnet i URL-parameter "Tävlingens namn:"
   const eventNameMatch = html.match(/Tävlingens namn:\s*([^<\n]+)/i);
   if (eventNameMatch && eventNameMatch[1]) {
     return eventNameMatch[1].trim();
