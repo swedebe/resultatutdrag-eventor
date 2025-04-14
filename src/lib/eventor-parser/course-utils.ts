@@ -59,9 +59,9 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
   }
   
   // Method 2: Look for length in specific table structures
-  const table = row.closest('table');
-  if (table) {
-    const headerRow = table.querySelector('tr');
+  const courseTable = row.closest('table');
+  if (courseTable) {
+    const headerRow = courseTable.querySelector('tr');
     if (headerRow) {
       const headers = Array.from(headerRow.querySelectorAll('th'));
       // Look for columns with appropriate headers
@@ -85,8 +85,8 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
   }
   
   // Method 3: Look for length in text associated with class info
-  const table = row.closest('table');
-  const tableHeader = table?.previousElementSibling;
+  const parentTable = row.closest('table');
+  const tableHeader = parentTable?.previousElementSibling;
   if (tableHeader && tableHeader.textContent) {
     // Check table header text for length info
     const headerText = tableHeader.textContent;
