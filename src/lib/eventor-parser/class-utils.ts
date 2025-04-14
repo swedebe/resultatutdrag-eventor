@@ -1,4 +1,3 @@
-
 /**
  * Utilities for extracting class information
  */
@@ -13,22 +12,21 @@ export const extractClassInfo = (doc: Document, row: Element): string => {
   
   for (const header of classHeaders) {
     if (header.textContent) {
-      // Get ONLY the direct text content of the H3, not including child elements
-      // This is crucial to avoid picking up additional text outside of the actual class name
+      // Extract ONLY the direct text from the H3 element itself
       let headerText = "";
       
-      // Manually get only the text nodes that are direct children of this H3 element
-      for (let i = 0; i < header.childNodes.length; i++) {
-        const node = header.childNodes[i];
+      // Get only the direct text content, not including any child elements
+      for (const node of header.childNodes) {
         if (node.nodeType === Node.TEXT_NODE) {
-          headerText += node.textContent;
+          headerText += node.textContent || "";
         }
       }
       
       headerText = headerText.trim();
       console.log("Raw H3 text content:", headerText);
       
-      // Extract just the class name part using common patterns
+      // Take only the class name part without any additional information
+      // Common patterns for orienteering classes
       const classNameMatch = headerText.match(/^((?:Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(?:Dam|Herr)|[HD]\d+|Öppen\s+\d+)/i);
       const classText = classNameMatch ? classNameMatch[1] : headerText;
       console.log("Extracted class name:", classText);
