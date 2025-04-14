@@ -133,6 +133,45 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
       break;
   }
 
+  // Funktion för att skapa rätt BarCharts baserat på statistiktyp
+  const renderChart = () => {
+    switch (statType) {
+      case "placements":
+        return (
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="top3" fill="#3498db" name="Topp 3" />
+            <Bar dataKey="top10" fill="#2ecc71" name="Topp 10" />
+          </BarChart>
+        );
+      case "average":
+        return (
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="averagePosition" fill="#e74c3c" name="Genomsnitt" />
+          </BarChart>
+        );
+      case "participations":
+        return (
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="count" fill="#9b59b6" name="Antal starter" />
+          </BarChart>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -159,25 +198,7 @@ const ResultsStatistics = ({ results }: ResultsStatisticsProps) => {
 
           <div className="h-[300px] mt-2">
             <ChartContainer className="h-full" config={chartConfig}>
-              {/* Fix för TypeScript-felet genom att säkerställa att bara ett element skickas som children */}
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis />
-                <Tooltip />
-                {statType === "placements" && (
-                  <>
-                    <Bar dataKey="top3" fill="#3498db" name="Topp 3" />
-                    <Bar dataKey="top10" fill="#2ecc71" name="Topp 10" />
-                  </>
-                )}
-                {statType === "average" && (
-                  <Bar dataKey="averagePosition" fill="#e74c3c" name="Genomsnitt" />
-                )}
-                {statType === "participations" && (
-                  <Bar dataKey="count" fill="#9b59b6" name="Antal starter" />
-                )}
-              </BarChart>
+              {renderChart()}
               <ChartLegend verticalAlign="bottom">
                 <ChartLegendContent />
               </ChartLegend>
