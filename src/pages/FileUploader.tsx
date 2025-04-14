@@ -14,7 +14,7 @@ import { findCourseLength } from "@/lib/eventor-parser/course-utils";
 interface ResultRow {
   name: string;
   class: string;
-  eventId: string;
+  eventId: string | number;
   eventName: string;
   date: string;
   time: string;
@@ -64,21 +64,67 @@ const FileUploader = () => {
       const fileData = await file.arrayBuffer();
       const workbook = XLSX.read(fileData);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<ResultRow>(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      
+      console.log("Parsed Excel data:", jsonData);
       
       setProgress(10);
       setCurrentStatus("Fil inläst, bearbetar data...");
       
       // Behandla varje rad
       const enrichedResults = [];
+      let processedRows = 0;
+      
       for (let i = 0; i < jsonData.length; i++) {
         const row = jsonData[i];
-        const eventId = row.eventId?.toString() || "";
+        
+        // Hitta eventId - kan vara antingen "Tävlings-id" eller annan kolumn
+        const eventId = row["Tävlings-id"] || row.eventId || null;
         
         if (!eventId) {
           console.warn("Rad saknar Tävlings-id, hoppar över:", row);
           continue;
         }
+        
+        // Förbered data för resultatraden
+        let resultRow: ResultRow = {
+          eventId: eventId,
+          eventName: row["Tävling"] || row.eventName || "",
+          organizer: row["Arrangör"] || row.organizer || "",
+          date: row["Datum"] || row.date || "",
+          class: row["Klass"] || row.class || "",
+          name: `${row["Förnamn"] || ""} ${row["Efternamn"] || ""}`.trim() || row.name || "",
+          position: parseInt(row["Placering"] || "0", 10) || 0,
+          time: row["Tid"] || row.time || "",
+          diffInSeconds: 0,
+          timeInSeconds: 0,
+          length: 0,
+          totalParticipants: 0
+        };
+        
+        // Beräkna tidsskillnad om den finns
+        const diffString = row["Tid efter segraren"] || "";
+        if (diffString && diffString.startsWith("+")) {
+          // Konvertera tidsformat (+MM:SS) till sekunder
+          const parts = diffString.substring(1).split(":");
+          let seconds = 0;
+          if (parts.length === 2) {
+            seconds = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+          } else if (parts.length === 3) {
+            seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+          }
+          resultRow.diffInSeconds = seconds;
+        }
+        
+        // Konvertera tid till sekunder
+        const timeParts = resultRow.time.split(":");
+        let timeInSeconds = 0;
+        if (timeParts.length === 2) {
+          timeInSeconds = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
+        } else if (timeParts.length === 3) {
+          timeInSeconds = parseInt(timeParts[0], 10) * 3600 + parseInt(timeParts[1], 10) * 60 + parseInt(timeParts[2], 10);
+        }
+        resultRow.timeInSeconds = timeInSeconds;
         
         setProgress(10 + Math.floor(80 * (i / jsonData.length)));
         setCurrentStatus(`Hämtar information för tävling ${eventId} (${i+1}/${jsonData.length})...`);
@@ -94,7 +140,7 @@ const FileUploader = () => {
           const doc = parser.parseFromString(html, "text/html");
           
           // Hitta klassen
-          const className = row.class?.toString() || "";
+          const className = resultRow.class;
           let courseLength = 0;
           let totalParticipants = 0;
           
@@ -161,17 +207,16 @@ const FileUploader = () => {
           }
           
           // Uppdatera raden med den nya informationen
-          const enrichedRow = {
-            ...row,
-            length: courseLength,
-            totalParticipants: totalParticipants
-          };
+          resultRow.length = courseLength;
+          resultRow.totalParticipants = totalParticipants;
           
-          enrichedResults.push(enrichedRow);
+          enrichedResults.push(resultRow);
+          processedRows++;
         } catch (error) {
           console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
           // Lägg ändå till raden utan banlängd och antal startande
-          enrichedResults.push(row);
+          enrichedResults.push(resultRow);
+          processedRows++;
         }
       }
       
@@ -182,7 +227,7 @@ const FileUploader = () => {
       
       toast({
         title: "Filbearbetning slutförd",
-        description: `${enrichedResults.length} resultat bearbetade`,
+        description: `${processedRows} resultat bearbetade`,
       });
     } catch (error) {
       console.error("Fel vid bearbetning av fil:", error);
