@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
+import { Link } from "react-router-dom";
 import ResultsTable from "@/components/ResultsTable";
 import ResultsStatistics from "@/components/ResultsStatistics";
 import { parseEventorResults } from "@/lib/eventor-parser";
@@ -70,6 +71,17 @@ const Index = () => {
   return (
     <div className="container py-8">
       <h1 className="text-4xl font-bold mb-6">Göingarna Resultatanalys</h1>
+      
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <p className="text-muted-foreground">Importera resultat från Eventor eller använd Excel-uppladdning</p>
+        </div>
+        <Link to="/file-upload">
+          <Button variant="outline">
+            Excel-uppladdning
+          </Button>
+        </Link>
+      </div>
       
       <Card className="mb-6">
         <CardHeader>
