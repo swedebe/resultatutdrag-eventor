@@ -60,22 +60,28 @@ const extractPositionInfo = (positionText: string): { position: number; total: n
 const extractCourseLength = (lengthText: string): number => {
   if (!lengthText) return 0;
   
+  // Rensa bort oönskade tecken och trimma
+  const cleanedText = lengthText.replace(/[^\d\s.,km]/gi, '').trim();
+  
   // Försök hitta km-format (t.ex. "4.5 km")
-  let kmMatch = lengthText.match(/([\d.]+)\s*km/i);
+  let kmMatch = cleanedText.match(/([\d.,]+)\s*km/i);
   if (kmMatch) {
-    return Math.round(parseFloat(kmMatch[1]) * 1000);
+    // Hantera både punkt och komma som decimalavgränsare
+    const kmValue = kmMatch[1].replace(',', '.');
+    return Math.round(parseFloat(kmValue) * 1000);
   }
   
   // Försök hitta m-format (t.ex. "4 500 m" eller "4500m")
-  let mMatch = lengthText.match(/([\d\s]+)\s*m/i);
+  let mMatch = cleanedText.match(/([\d\s]+)\s*m/i);
   if (mMatch) {
     return parseInt(mMatch[1].replace(/\s/g, ''), 10);
   }
   
   // Sista försöket - hitta bara numret
-  let numMatch = lengthText.match(/[\d\s.]+/);
+  let numMatch = cleanedText.match(/[\d\s.,]+/);
   if (numMatch) {
-    const num = parseFloat(numMatch[0].replace(/\s/g, ''));
+    const numStr = numMatch[0].replace(/\s/g, '').replace(',', '.');
+    const num = parseFloat(numStr);
     // Om numret är litet, anta att det är i km
     if (num < 100) {
       return Math.round(num * 1000);
@@ -188,9 +194,69 @@ const extractEventName = (html: string): string => {
 };
 
 /**
+ * Försök hitta klassnamn på flera olika sätt
+ */
+const extractClassInfo = (doc: Document, row: Element): string => {
+  // Metod 1: Leta i tabellens huvud efter motsvarande kolumn
+  const table = row.closest('table');
+  if (table) {
+    const headerRow = table.querySelector('tr');
+    if (headerRow) {
+      const headers = Array.from(headerRow.querySelectorAll('th'));
+      const classIndex = headers.findIndex(header => 
+        header.textContent?.toLowerCase().includes('klass'));
+      
+      if (classIndex >= 0) {
+        const cells = row.querySelectorAll('td');
+        if (cells && cells.length > classIndex) {
+          const classText = cells[classIndex].textContent?.trim();
+          if (classText && classText !== "") return classText;
+        }
+      }
+    }
+  }
+  
+  // Metod 2: Leta efter ett föregående sibling-element som kan innehålla klassinfo
+  let prevElement = table?.previousElementSibling;
+  while (prevElement) {
+    if (prevElement.tagName === 'H2' || prevElement.tagName === 'H3' || prevElement.tagName === 'H4') {
+      const headingText = prevElement.textContent?.trim();
+      if (headingText) {
+        // Rensa från prefix som "Klass", "Resultat", etc.
+        return headingText.replace(/^(Klass|Resultat|Class)\s+/i, "");
+      }
+    }
+    prevElement = prevElement.previousElementSibling;
+  }
+  
+  // Metod 3: Leta efter text i raden som verkar vara ett klassnamn
+  const cells = Array.from(row.querySelectorAll('td'));
+  const classPatterns = [
+    /^[HD]\d+/,       // H21, D45, etc.
+    /^Öppen \d+/i,    // Öppen 1, Öppen 5, etc.
+    /^Open \d+/i,     // Open 1, Open 5, etc.
+    /^(Inskolning|Motion|MotionPlus)/i  // Vanliga träningsklasser 
+  ];
+  
+  for (const cell of cells) {
+    const text = cell.textContent?.trim() || "";
+    for (const pattern of classPatterns) {
+      if (pattern.test(text)) {
+        return text;
+      }
+    }
+  }
+  
+  return "";
+};
+
+/**
  * Försök hitta arrangör på många olika sätt
  */
-const extractOrganizer = (doc: Document): string => {
+const extractOrganizer = (html: string): string => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  
   // Metod 1: Leta efter specifikt element med arrangör klass
   const organizerElement = doc.querySelector(".organiser") || 
                          doc.querySelector(".organizer") || 
@@ -201,7 +267,14 @@ const extractOrganizer = (doc: Document): string => {
     return organizerElement.textContent.trim();
   }
   
-  // Metod 2: Sök efter text som innehåller "arrangör:" eller "organizer:"
+  // Metod 2: Leta efter ett element som innehåller "Arrangör:" eller liknande
+  const allText = doc.body.innerText;
+  const organizerMatch = allText.match(/\b(?:arrangör|arrangorer|organisers?|organisator)\s*:?\s*([^.,\n]+)/i);
+  if (organizerMatch && organizerMatch[1]) {
+    return organizerMatch[1].trim();
+  }
+  
+  // Metod 3: Sök efter text som innehåller "arrangör:" eller "organizer:"
   const arrangerLabels = Array.from(doc.querySelectorAll("label, th, dt, strong, b"));
   for (const label of arrangerLabels) {
     if (label.textContent && 
@@ -220,14 +293,85 @@ const extractOrganizer = (doc: Document): string => {
     }
   }
   
-  // Metod 3: Leta i metataggarna
+  // Metod 4: Leta i metataggarna
   const metaOrg = doc.querySelector('meta[name="organization"]') || 
                 doc.querySelector('meta[property="og:site_name"]');
   if (metaOrg && metaOrg.getAttribute("content")) {
     return metaOrg.getAttribute("content") || "";
   }
   
+  // Metod 5: Sök efter en vanlig tabell med information
+  const tables = doc.querySelectorAll('table');
+  for (const table of tables) {
+    const rows = table.querySelectorAll('tr');
+    for (const row of rows) {
+      const firstCell = row.querySelector('td, th');
+      if (firstCell && firstCell.textContent) {
+        const cellText = firstCell.textContent.toLowerCase();
+        if (cellText.includes('arrangör') || cellText.includes('organizer')) {
+          const secondCell = row.querySelector('td:nth-child(2)');
+          if (secondCell && secondCell.textContent) {
+            return secondCell.textContent.trim();
+          }
+        }
+      }
+    }
+  }
+  
   return "";
+};
+
+/**
+ * Extraherar banlängd på flera olika sätt
+ */
+const findCourseLength = (row: Element, doc: Document): number => {
+  // Metod 1: Leta i tabellens huvud efter motsvarande kolumn
+  const table = row.closest('table');
+  if (table) {
+    const headerRow = table.querySelector('tr');
+    if (headerRow) {
+      const headers = Array.from(headerRow.querySelectorAll('th'));
+      // Leta efter kolumner med lämpliga rubriker
+      const lengthLabels = ['längd', 'length', 'distans', 'distance', 'bana', 'course'];
+      
+      for (const label of lengthLabels) {
+        const lengthIndex = headers.findIndex(header => 
+          header.textContent?.toLowerCase().includes(label));
+        
+        if (lengthIndex >= 0) {
+          const cells = row.querySelectorAll('td');
+          if (cells && cells.length > lengthIndex) {
+            const lengthText = cells[lengthIndex].textContent?.trim();
+            if (lengthText) {
+              return extractCourseLength(lengthText);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Metod 2: Leta igenom alla celler i raden efter något som ser ut som en längd
+  const cells = Array.from(row.querySelectorAll('td'));
+  for (const cell of cells) {
+    const text = cell.textContent?.trim() || "";
+    if ((text.includes('km') || text.includes(' m') || text.match(/\d+\s*m$/i)) && 
+        !text.includes('min')) {
+      return extractCourseLength(text);
+    }
+  }
+  
+  // Metod 3: Leta i klassnamnet, ibland innehåller det längden
+  const classInfo = extractClassInfo(doc, row);
+  if (classInfo) {
+    const lengthInClassMatch = classInfo.match(/(\d+(?:[.,]\d+)?)\s*km/i);
+    if (lengthInClassMatch) {
+      const kmValue = lengthInClassMatch[1].replace(',', '.');
+      return Math.round(parseFloat(kmValue) * 1000);
+    }
+  }
+  
+  return 0;
 };
 
 /**
@@ -241,14 +385,15 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     
-    // Hitta tävlingens namn med vår nya metod
+    // Hitta tävlingens namn
     const eventName = extractEventName(html);
     
     // Använd förbättrad datumextrahering
     const eventDate = extractDate(html);
     
     // Leta efter arrangör med förbättrad metod
-    const organizer = extractOrganizer(doc);
+    const organizer = extractOrganizer(html);
+    console.log("Extracted organizer:", organizer);
     
     // Hitta resultat för den angivna klubben
     const tables = doc.querySelectorAll("table");
@@ -260,67 +405,34 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
       // Hoppa över tabeller med för få rader
       if (rows.length < 2) return;
       
-      // Försök hitta klassinformation
-      let currentClass = "";
-      
-      // Metod 1: Kolla föregående element för klassinformation
-      const prevElement = table.previousElementSibling;
-      if (prevElement && (prevElement.tagName === "H2" || prevElement.tagName === "H3" || prevElement.tagName === "H4")) {
-        currentClass = prevElement.textContent?.trim() || "";
-        // Ta bort prefix som "Klass " eller "Resultat "
-        currentClass = currentClass.replace(/^(Klass|Resultat|Class)\s+/i, "");
-      }
-      
-      // Metod 2: Kolla om det finns klass-information i tabellen själv
-      if (!currentClass) {
-        const firstRow = rows[0];
-        if (firstRow) {
-          const cells = firstRow.querySelectorAll("th");
-          for (let i = 0; i < cells.length; i++) {
-            const cell = cells[i];
-            const cellText = cell?.textContent?.trim() || "";
-            if (cellText.toLowerCase() === "klass" || cellText.toLowerCase() === "class") {
-              const nextCell = cells[i+1];
-              if (nextCell) {
-                currentClass = nextCell.textContent?.trim() || "";
-              }
-            }
-          }
-        }
-      }
-      
-      // Metod 3: Leta efter klass i tabellcaption
-      if (!currentClass) {
-        const caption = table.querySelector("caption");
-        if (caption && caption.textContent) {
-          const captionText = caption.textContent.trim();
-          const classMatch = captionText.match(/\b(H\d+|D\d+|U\d+|Öppen \d+|Open \d+)\b/);
-          if (classMatch) {
-            currentClass = classMatch[1];
-          }
-        }
-      }
-      
       // Gå igenom raderna och leta efter klubbnamnet
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        const cells = row.querySelectorAll("td");
-        
-        // Hoppa över rader med för få celler
-        if (cells.length < 3) continue;
-        
         const rowText = row.textContent || "";
         
         // Kontrollera om denna rad är för den angivna klubben
         if (rowText.includes(clubName)) {
+          console.log("Found row with club name:", rowText);
+          const cells = row.querySelectorAll("td");
+          
+          // Hoppa över rader med för få celler
+          if (cells.length < 3) continue;
+          
           // Hitta informationen vi vill extrahera
           let position = 0;
           let totalParticipants = 0;
           let name = "";
           let time = "";
           let diff = "";
-          let length = 0;
-          let classValue = currentClass; // Använd den hittade klassen
+          let classValue = "";
+          
+          // Använd vår förbättrade metod för att hitta klassnamn
+          classValue = extractClassInfo(doc, row);
+          console.log("Extracted class:", classValue);
+          
+          // Leta efter banlängd med förbättrad metod
+          const length = findCourseLength(row, doc);
+          console.log("Extracted length:", length);
           
           // Förbättrad namnhämtning
           // Leta efter klubbnamnet och använd cellen till vänster för namn
@@ -361,6 +473,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
               const posInfo = extractPositionInfo(cellText);
               position = posInfo.position;
               totalParticipants = posInfo.total;
+              console.log("Extracted position:", position, "total:", totalParticipants);
             } 
             // Leta efter tid (format: MM:SS eller HH:MM:SS)
             else if (cellText.match(/^\d+:\d+/)) {
@@ -369,14 +482,6 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             // Leta efter tidsdifferens (börjar med +)
             else if (cellText.startsWith("+")) {
               diff = cellText;
-            } 
-            // Leta efter banlängd
-            else if (cellText.includes("km") || (cellText.includes("m") && !cellText.includes("min"))) {
-              length = extractCourseLength(cellText);
-            }
-            // Leta efter klass (om inte redan hittad)
-            else if (!classValue && (cellText.match(/^[HD]\d+/) || cellText.match(/^Öppen \d+/) || cellText.match(/^Open \d+/))) {
-              classValue = cellText;
             }
           }
           
@@ -404,6 +509,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
       }
     });
     
+    console.log("Parsed results:", results);
     return results;
   } catch (error) {
     console.error("Error parsing Eventor HTML:", error);
