@@ -86,6 +86,14 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
     return sortDirection === "asc" ? <ArrowUp className="h-4 w-4 inline ml-1" /> : <ArrowDown className="h-4 w-4 inline ml-1" />;
   };
 
+  // Helper function to display dash for empty values
+  const displayValue = (value: any, suffix: string = ''): string => {
+    if (value === null || value === undefined || value === '' || value === 0) {
+      return "-";
+    }
+    return `${value}${suffix}`;
+  };
+
   return (
     <div className="mt-6 space-y-4">
       <div className="flex gap-2">
@@ -152,16 +160,16 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
             ) : (
               sortedResults.map((result, index) => (
                 <TableRow key={`${result.eventName}-${result.name}-${index}`}>
-                  <TableCell>{result.date || "-"}</TableCell>
-                  <TableCell>{result.eventName || "-"}</TableCell>
-                  <TableCell>{result.name || "-"}</TableCell>
-                  <TableCell>{result.class || "-"}</TableCell>
+                  <TableCell>{displayValue(result.date)}</TableCell>
+                  <TableCell>{displayValue(result.eventName)}</TableCell>
+                  <TableCell>{displayValue(result.name)}</TableCell>
+                  <TableCell>{displayValue(result.class)}</TableCell>
                   <TableCell>{result.length ? `${result.length} m` : "-"}</TableCell>
-                  <TableCell>{result.time || "-"}</TableCell>
-                  <TableCell>{result.diff || "-"}</TableCell>
-                  <TableCell>{result.position || "-"}</TableCell>
-                  <TableCell>{result.totalParticipants || "-"}</TableCell>
-                  <TableCell>{result.organizer || "-"}</TableCell>
+                  <TableCell>{displayValue(result.time)}</TableCell>
+                  <TableCell>{displayValue(result.diff)}</TableCell>
+                  <TableCell>{displayValue(result.position)}</TableCell>
+                  <TableCell>{displayValue(result.totalParticipants)}</TableCell>
+                  <TableCell>{displayValue(result.organizer)}</TableCell>
                 </TableRow>
               ))
             )}

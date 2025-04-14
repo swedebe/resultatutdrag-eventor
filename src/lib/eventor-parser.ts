@@ -162,6 +162,12 @@ const extractEventName = (html: string): string => {
     return cleanEventName(eventNameMatch[1]);
   }
 
+  // Check for "Tävlingens namn:" label in the page
+  const nameMatch = html.match(/Tävlingens namn:[\s\n]*([^<\r\n]+)/i);
+  if (nameMatch && nameMatch[1]) {
+    return cleanEventName(nameMatch[1].trim());
+  }
+
   // Försök hitta tävlingsnamnet i en rubrik
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
@@ -194,70 +200,98 @@ const extractEventName = (html: string): string => {
 };
 
 /**
- * Försök hitta klassnamn på flera olika sätt
+ * Improved extraction of class names from the page
  */
 const extractClassInfo = (doc: Document, row: Element): string => {
-  // Metod 1: Leta i tabellens huvud efter motsvarande kolumn
+  // Method 1: Find class headers that appear before result tables
+  // Look for DOM structure like the one in the image
+  const classHeadings = doc.querySelectorAll('h2, h3, strong');
+  for (const heading of classHeadings) {
+    const headingText = heading.textContent?.trim() || "";
+    // Check if the heading matches common orienteering class patterns
+    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(headingText) ||
+        /^[HD]\d+/.test(headingText) ||
+        /^Öppen \d+/i.test(headingText)) {
+      
+      // Check if this heading is related to the current row
+      // Either by being just before the table or having some other connection
+      const headingParent = heading.parentElement;
+      const rowTable = row.closest('table');
+      
+      if (headingParent && rowTable && 
+          (headingParent.nextElementSibling === rowTable || 
+           headingParent.contains(rowTable) ||
+           headingParent.previousElementSibling === rowTable)) {
+        return headingText;
+      }
+    }
+  }
+  
+  // Method 2: Look for class info in table header cells
   const table = row.closest('table');
   if (table) {
-    const headerRow = table.querySelector('tr');
-    if (headerRow) {
-      const headers = Array.from(headerRow.querySelectorAll('th'));
-      const classIndex = headers.findIndex(header => 
-        header.textContent?.toLowerCase().includes('klass'));
-      
-      if (classIndex >= 0) {
-        const cells = row.querySelectorAll('td');
-        if (cells && cells.length > classIndex) {
-          const classText = cells[classIndex].textContent?.trim();
-          if (classText && classText !== "") return classText;
+    const headers = Array.from(table.querySelectorAll('th'));
+    const classIndex = headers.findIndex(header => 
+      header.textContent?.toLowerCase().includes('klass'));
+    
+    if (classIndex >= 0) {
+      const cells = row.querySelectorAll('td');
+      if (cells && cells.length > classIndex) {
+        const cellText = cells[classIndex].textContent?.trim();
+        if (cellText && cellText !== "") {
+          return cellText;
         }
       }
     }
   }
   
-  // Metod 2: Leta efter ett föregående sibling-element som kan innehålla klassinfo
-  let prevElement = table?.previousElementSibling;
-  while (prevElement) {
-    if (prevElement.tagName === 'H2' || prevElement.tagName === 'H3' || prevElement.tagName === 'H4') {
-      const headingText = prevElement.textContent?.trim();
-      if (headingText) {
-        // Rensa från prefix som "Klass", "Resultat", etc.
-        return headingText.replace(/^(Klass|Resultat|Class)\s+/i, "");
-      }
+  // Method 3: Look for a class identifier in the page content
+  // This matches patterns like "Mycket lätt 2 Dam", "H21", etc.
+  const tableCaption = table?.querySelector('caption');
+  if (tableCaption && tableCaption.textContent) {
+    const captionText = tableCaption.textContent.trim();
+    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(captionText) ||
+        /^[HD]\d+/.test(captionText) ||
+        /^Öppen \d+/i.test(captionText)) {
+      return captionText;
     }
-    prevElement = prevElement.previousElementSibling;
   }
   
-  // Metod 3: Leta efter text i raden som verkar vara ett klassnamn
-  const cells = Array.from(row.querySelectorAll('td'));
-  const classPatterns = [
-    /^[HD]\d+/,       // H21, D45, etc.
-    /^Öppen \d+/i,    // Öppen 1, Öppen 5, etc.
-    /^Open \d+/i,     // Open 1, Open 5, etc.
-    /^(Inskolning|Motion|MotionPlus)/i  // Vanliga träningsklasser 
-  ];
-  
-  for (const cell of cells) {
-    const text = cell.textContent?.trim() || "";
-    for (const pattern of classPatterns) {
-      if (pattern.test(text)) {
-        return text;
-      }
+  // Method 4: Check if there's text right above the table with class info
+  const prevElement = table?.previousElementSibling;
+  if (prevElement && prevElement.textContent) {
+    const text = prevElement.textContent.trim();
+    if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(text) ||
+        /^[HD]\d+/.test(text) ||
+        /^Öppen \d+/i.test(text)) {
+      return text;
     }
+  }
+
+  // Method 5: Try to find class name in URL or document location
+  const pageUrl = doc.URL || '';
+  const classMatch = pageUrl.match(/[?&]class=([^&]+)/i);
+  if (classMatch && classMatch[1]) {
+    return decodeURIComponent(classMatch[1]);
   }
   
   return "";
 };
 
 /**
- * Försök hitta arrangör på många olika sätt
+ * Improved extraction of the organizer from the page
  */
 const extractOrganizer = (html: string): string => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   
-  // Metod 1: Leta efter specifikt element med arrangör klass
+  // Method 1: Look for organizer in labeled fields (as shown in the image)
+  const organizerLabelMatch = html.match(/Arrangörsorganisation:[\s\n]*([^<\r\n]+)/i);
+  if (organizerLabelMatch && organizerLabelMatch[1]) {
+    return organizerLabelMatch[1].trim();
+  }
+  
+  // Method 2: Look for specific element with organizer class
   const organizerElement = doc.querySelector(".organiser") || 
                          doc.querySelector(".organizer") || 
                          doc.querySelector("[id*='organiser']") || 
@@ -267,54 +301,34 @@ const extractOrganizer = (html: string): string => {
     return organizerElement.textContent.trim();
   }
   
-  // Metod 2: Leta efter ett element som innehåller "Arrangör:" eller liknande
-  const allText = doc.body.innerText;
-  const organizerMatch = allText.match(/\b(?:arrangör|arrangorer|organisers?|organisator)\s*:?\s*([^.,\n]+)/i);
-  if (organizerMatch && organizerMatch[1]) {
-    return organizerMatch[1].trim();
-  }
-  
-  // Metod 3: Sök efter text som innehåller "arrangör:" eller "organizer:"
-  const arrangerLabels = Array.from(doc.querySelectorAll("label, th, dt, strong, b"));
-  for (const label of arrangerLabels) {
-    if (label.textContent && 
-        (label.textContent.toLowerCase().includes("arrangör") || 
-         label.textContent.toLowerCase().includes("organizer"))) {
-      const nextSibling = label.nextElementSibling;
-      if (nextSibling && nextSibling.textContent) {
-        return nextSibling.textContent.trim();
-      }
-      
-      // Kolla om det finns text efter kolon
-      const colonText = label.textContent.split(":");
-      if (colonText.length > 1) {
-        return colonText[1].trim();
+  // Method 3: Look for table rows with organizer info
+  const allTables = doc.querySelectorAll('table');
+  for (const table of allTables) {
+    const rows = table.querySelectorAll('tr');
+    for (const row of rows) {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 2) {
+        const firstCellText = cells[0].textContent?.toLowerCase() || '';
+        if (firstCellText.includes('arrangör') || 
+            firstCellText.includes('organiser') || 
+            firstCellText.includes('organiz')) {
+          return cells[1].textContent?.trim() || '';
+        }
       }
     }
   }
   
-  // Metod 4: Leta i metataggarna
-  const metaOrg = doc.querySelector('meta[name="organization"]') || 
-                doc.querySelector('meta[property="og:site_name"]');
-  if (metaOrg && metaOrg.getAttribute("content")) {
-    return metaOrg.getAttribute("content") || "";
-  }
+  // Method 4: Look for elements containing "Arrangör:" or similar
+  const allText = doc.body.innerText;
+  const organizerMatches = [
+    allText.match(/\barrangör\s*:?\s*([^.,\n]+)/i),
+    allText.match(/\barrangörsorganisation\s*:?\s*([^.,\n]+)/i),
+    allText.match(/\borganiser\s*:?\s*([^.,\n]+)/i)
+  ];
   
-  // Metod 5: Sök efter en vanlig tabell med information
-  const tables = doc.querySelectorAll('table');
-  for (const table of tables) {
-    const rows = table.querySelectorAll('tr');
-    for (const row of rows) {
-      const firstCell = row.querySelector('td, th');
-      if (firstCell && firstCell.textContent) {
-        const cellText = firstCell.textContent.toLowerCase();
-        if (cellText.includes('arrangör') || cellText.includes('organizer')) {
-          const secondCell = row.querySelector('td:nth-child(2)');
-          if (secondCell && secondCell.textContent) {
-            return secondCell.textContent.trim();
-          }
-        }
-      }
+  for (const match of organizerMatches) {
+    if (match && match[1]) {
+      return match[1].trim();
     }
   }
   
@@ -322,16 +336,29 @@ const extractOrganizer = (html: string): string => {
 };
 
 /**
- * Extraherar banlängd på flera olika sätt
+ * Improved extraction of course length
  */
-const findCourseLength = (row: Element, doc: Document): number => {
-  // Metod 1: Leta i tabellens huvud efter motsvarande kolumn
+const findCourseLength = (row: Element, doc: Document, html: string): number => {
+  // Method 1: Look for the length in headers or sub-headers (as shown in the image)
+  const classHeadings = doc.querySelectorAll('h2, h3, h4, strong');
+  for (const heading of classHeadings) {
+    if (!heading.textContent) continue;
+    
+    const headingText = heading.textContent.trim();
+    // Look for patterns like "2 190 m, 11 startande" as shown in image
+    const lengthMatch = headingText.match(/(\d[\d\s]+)\s*m,\s*\d+\s+startande/i);
+    if (lengthMatch && lengthMatch[1]) {
+      return parseInt(lengthMatch[1].replace(/\s/g, ''));
+    }
+  }
+  
+  // Method 2: Look for length in specific table structures
   const table = row.closest('table');
   if (table) {
     const headerRow = table.querySelector('tr');
     if (headerRow) {
       const headers = Array.from(headerRow.querySelectorAll('th'));
-      // Leta efter kolumner med lämpliga rubriker
+      // Look for columns with appropriate headers
       const lengthLabels = ['längd', 'length', 'distans', 'distance', 'bana', 'course'];
       
       for (const label of lengthLabels) {
@@ -351,27 +378,76 @@ const findCourseLength = (row: Element, doc: Document): number => {
     }
   }
   
-  // Metod 2: Leta igenom alla celler i raden efter något som ser ut som en längd
-  const cells = Array.from(row.querySelectorAll('td'));
-  for (const cell of cells) {
-    const text = cell.textContent?.trim() || "";
-    if ((text.includes('km') || text.includes(' m') || text.match(/\d+\s*m$/i)) && 
-        !text.includes('min')) {
-      return extractCourseLength(text);
+  // Method 3: Look for length in text associated with class info
+  const classText = extractClassInfo(doc, row);
+  const tableHeader = table?.previousElementSibling;
+  if (tableHeader && tableHeader.textContent) {
+    // Check table header text for length info
+    const headerText = tableHeader.textContent;
+    // Match patterns like "2 190 m" as seen in the image
+    const lengthMatch = headerText.match(/(\d[\d\s]+)\s*m/i);
+    if (lengthMatch && lengthMatch[1]) {
+      return parseInt(lengthMatch[1].replace(/\s/g, ''));
     }
   }
   
-  // Metod 3: Leta i klassnamnet, ibland innehåller det längden
-  const classInfo = extractClassInfo(doc, row);
-  if (classInfo) {
-    const lengthInClassMatch = classInfo.match(/(\d+(?:[.,]\d+)?)\s*km/i);
-    if (lengthInClassMatch) {
-      const kmValue = lengthInClassMatch[1].replace(',', '.');
-      return Math.round(parseFloat(kmValue) * 1000);
+  // Method 4: Search for text in HTML that matches pattern like "2 190 m, 11 startande"
+  const lengthPatternMatch = html.match(/(\d[\d\s]+)\s*m,\s*\d+\s+startande/gi);
+  if (lengthPatternMatch && lengthPatternMatch.length > 0) {
+    for (const match of lengthPatternMatch) {
+      const lengthPart = match.match(/(\d[\d\s]+)\s*m/i);
+      if (lengthPart && lengthPart[1]) {
+        return parseInt(lengthPart[1].replace(/\s/g, ''));
+      }
     }
   }
   
   return 0;
+};
+
+/**
+ * Improved extraction of position and total participants
+ */
+const extractPositionInfo = (positionText: string, doc: Document, row: Element): { position: number; total: number } => {
+  // If position text is provided and valid, use it
+  if (positionText && /^\d+/.test(positionText)) {
+    // Remove all non-numeric characters and split into numbers
+    const match = positionText.match(/(\d+)(?:\s*(?:av|\/|\(av\)|\(of\)|\()\s*(\d+))?/i);
+    
+    if (match && match.length >= 2) {
+      return {
+        position: parseInt(match[1], 10) || 0,
+        total: match[2] ? parseInt(match[2], 10) : 0
+      };
+    }
+    
+    // If it's just a number, assume it's the position
+    const justNumber = positionText.match(/^(\d+)$/);
+    if (justNumber) {
+      // Try to find total participants from nearby elements
+      const table = row.closest('table');
+      const rowCount = table ? table.querySelectorAll('tr').length - 1 : 0; // -1 for header
+      
+      return {
+        position: parseInt(justNumber[1], 10),
+        total: rowCount > 0 ? rowCount : 0
+      };
+    }
+  }
+  
+  // Try to extract position from the first column of the table
+  const cells = row.querySelectorAll('td');
+  if (cells && cells.length > 0) {
+    const firstCellText = cells[0].textContent?.trim() || '';
+    if (/^\d+$/.test(firstCellText)) {
+      return {
+        position: parseInt(firstCellText, 10),
+        total: 0  // We'll try to determine this later
+      };
+    }
+  }
+  
+  return { position: 0, total: 0 };
 };
 
 /**
@@ -405,6 +481,35 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
       // Hoppa över tabeller med för få rader
       if (rows.length < 2) return;
       
+      // Store class and length info at the table level
+      let tableClass = "";
+      let tableLength = 0;
+      
+      // Try to find class and length from table caption or previous element
+      const tableCaption = table.querySelector('caption');
+      const prevElement = table.previousElementSibling;
+      
+      // Check previous element for class/length info
+      if (prevElement && prevElement.textContent) {
+        const prevText = prevElement.textContent.trim();
+        
+        // Look for class pattern (like "Mycket lätt 2 Dam" in image)
+        if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(prevText) ||
+            /^[HD]\d+/.test(prevText) ||
+            /^Öppen \d+/i.test(prevText)) {
+          tableClass = prevText;
+        }
+        
+        // Look for length pattern (like "2 190 m, 11 startande" in image)
+        const lengthMatch = prevText.match(/(\d[\d\s]+)\s*m/i);
+        if (lengthMatch && lengthMatch[1]) {
+          tableLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+        }
+      }
+      
+      // Get total participants for position calculations
+      const totalParticipantsInTable = rows.length - 1; // Minus header row
+      
       // Gå igenom raderna och leta efter klubbnamnet
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
@@ -424,18 +529,30 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           let name = "";
           let time = "";
           let diff = "";
-          let classValue = "";
+          let classValue = tableClass; // Use table-level class if available
           
-          // Använd vår förbättrade metod för att hitta klassnamn
-          classValue = extractClassInfo(doc, row);
-          console.log("Extracted class:", classValue);
+          // If we don't have a class value from the table, try to extract it specifically
+          if (!classValue) {
+            classValue = extractClassInfo(doc, row);
+            console.log("Extracted class:", classValue);
+          }
           
-          // Leta efter banlängd med förbättrad metod
-          const length = findCourseLength(row, doc);
-          console.log("Extracted length:", length);
+          // For course length, first try table-level length, then per-row extraction
+          let length = tableLength;
+          if (!length) {
+            length = findCourseLength(row, doc, html);
+            console.log("Extracted length:", length);
+          }
           
-          // Förbättrad namnhämtning
-          // Leta efter klubbnamnet och använd cellen till vänster för namn
+          // Improved position extraction
+          const firstCellText = cells[0]?.textContent?.trim() || '';
+          const posInfo = extractPositionInfo(firstCellText, doc, row);
+          position = posInfo.position;
+          
+          // If no total participants from position info, use table row count
+          totalParticipants = posInfo.total > 0 ? posInfo.total : totalParticipantsInTable;
+          
+          // Improved name extraction
           for (let j = 0; j < cells.length; j++) {
             const cellText = cells[j].textContent?.trim() || "";
             
@@ -445,13 +562,13 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             }
           }
           
-          // Om vi fortfarande inte har ett namn, försök med vanlig metod
+          // If we still don't have a name, try an alternative method
           if (!name) {
             for (let j = 0; j < cells.length; j++) {
               const cell = cells[j];
               const cellText = cell.textContent?.trim() || "";
               
-              // Leta efter namn i celler som inte innehåller siffror/specialtecken
+              // Look for name in cells that don't contain numbers/special chars
               if (j > 0 && j < cells.length - 2 && 
                   !cellText.match(/^\d/) && 
                   !cellText.includes(":") && 
@@ -463,34 +580,21 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             }
           }
           
-          // Samla in övriga data
+          // Collect other data
           for (let j = 0; j < cells.length; j++) {
             const cellText = cells[j].textContent?.trim() || "";
             
-            // Leta specifikt efter placering i första kolumnen
-            if (j === 0 && cellText.match(/^\d+/)) {
-              // Första kolumnen antas vara placering
-              const posInfo = extractPositionInfo(cellText);
-              position = posInfo.position;
-              totalParticipants = posInfo.total;
-              console.log("Extracted position:", position, "total:", totalParticipants);
-            } 
-            // Leta efter tid (format: MM:SS eller HH:MM:SS)
-            else if (cellText.match(/^\d+:\d+/)) {
+            // Look for time (format: MM:SS or HH:MM:SS)
+            if (cellText.match(/^\d+:\d+/)) {
               time = cellText;
             } 
-            // Leta efter tidsdifferens (börjar med +)
+            // Look for time difference (starts with +)
             else if (cellText.startsWith("+")) {
               diff = cellText;
             }
           }
           
-          // Om vi inte har en total, använd antalet rader som en uppskattning
-          if (totalParticipants === 0) {
-            totalParticipants = rows.length - 1; // Minus rubrikraden
-          }
-          
-          // Lägg till resultat
+          // Add the result
           results.push({
             name,
             class: classValue,
