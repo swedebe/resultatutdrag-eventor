@@ -4,20 +4,80 @@
  */
 
 /**
- * Extracts class info from the document based on visual guidance (blue text)
+ * Extracts class info from the document
+ * Class is always an H3 heading within a div with class="eventClassHeader"
  */
 export const extractClassInfo = (doc: Document, row: Element): string => {
-  // Leta först efter element med blå text (CSS class med storlek/färg som i bilden)
+  // First priority: Look for H3 headings in eventClassHeader divs
+  const classHeaders = Array.from(doc.querySelectorAll("div.eventClassHeader h3"));
+  
+  for (const header of classHeaders) {
+    if (header.textContent) {
+      const headerText = header.textContent.trim();
+      
+      // Find if this class header is related to the current results row
+      const headerContainer = header.closest('div.eventClassHeader');
+      if (headerContainer) {
+        // Check if this header container is before the table containing our row
+        const rowTable = row.closest('table');
+        if (rowTable) {
+          // Check if this header is linked to our results table
+          let currentNode: Element | null = headerContainer;
+          while (currentNode && currentNode !== rowTable) {
+            currentNode = currentNode.nextElementSibling;
+            if (!currentNode) break;
+          }
+          
+          // If we reached the row's table, this is the correct class
+          if (currentNode === rowTable) {
+            return headerText;
+          }
+        }
+      }
+    }
+  }
+  
+  // Second priority: Look for any H3 headings that seem like class names
+  const allH3s = Array.from(doc.querySelectorAll("h3"));
+  
+  for (const header of allH3s) {
+    if (header.textContent) {
+      const headerText = header.textContent.trim();
+      
+      // Check for common class patterns
+      if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(headerText) ||
+          /^[HD]\d+/.test(headerText) ||
+          /^Öppen \d+/i.test(headerText)) {
+        
+        // Try to determine if this header is related to our row
+        const rowTable = row.closest('table');
+        if (rowTable) {
+          let testNode: Element | null = header;
+          while (testNode && testNode !== rowTable) {
+            testNode = testNode.nextElementSibling;
+            if (!testNode) break;
+          }
+          
+          if (testNode === rowTable) {
+            return headerText;
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback to previous methods if no class header found
+  // Look for blue titles (CSS class with size/color as in the image)
   const blueTitles = Array.from(doc.querySelectorAll(".eventheader, .classheader, h1, h2, h3"));
   
   for (const title of blueTitles) {
     const titleText = title.textContent?.trim() || "";
-    // Vanliga klassmönster för orientering
+    // Common class patterns for orienteering
     if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr|D|H|Open)/.test(titleText) ||
         /^[HD]\d+/.test(titleText) ||
         /^Öppen \d+/i.test(titleText)) {
       
-      // Kontrollera om denna rubrik är relaterad till tabellen/raden vi tittar på
+      // Check if this title is related to the table/row we're looking at
       const titleContainer = title.closest('div, section, article');
       const rowTable = row.closest('table');
       

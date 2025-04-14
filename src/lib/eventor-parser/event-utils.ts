@@ -5,57 +5,47 @@
 
 /**
  * Extracts event name and organizer information from HTML
- * Organizer name always has "Tävlingens namn:" as prefix according to visual guidance
+ * Organizer name is found in <span class="ol_InlineIcon">
+ * Event name is found in the title tag, after "för"
  */
 export const extractEventAndOrganizerInfo = (html: string): { eventName: string; organizer: string } => {
-  // Standardvärden om inget hittas
+  // Default values if nothing is found
   let eventName = "Okänd tävling";
   let organizer = "";
   
-  // Leta efter "Tävlingens namn:" i sidan (enligt den gröna ramen i bilden)
-  const eventMatch = html.match(/Tävlingens namn:[^\n<]*([^<\n]+)/i);
-  if (eventMatch && eventMatch[1]) {
-    eventName = eventMatch[1].trim();
-  }
+  // Parse the HTML
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
   
-  // Leta efter organisatören i närheten av tävlingsnamnet
-  // Enligt bilden finns arrangören oftast under eller nära tävlingsnamnet
-  const organizerMatch = html.match(/Arrangör(?:sorganisation)?:[^\n<]*([^<\n]+)/i);
-  if (organizerMatch && organizerMatch[1]) {
-    organizer = organizerMatch[1].trim();
-  }
-  
-  // Om vi fortfarande inte har en organisatör, leta efter andra mönster
-  if (!organizer) {
-    const altOrganizerMatch = html.match(/Arrangerad av[^\n<]*([^<\n]+)/i);
-    if (altOrganizerMatch && altOrganizerMatch[1]) {
-      organizer = altOrganizerMatch[1].trim();
+  // Extract event name from title (text after "för")
+  const titleElement = doc.querySelector("title");
+  if (titleElement && titleElement.textContent) {
+    const titleText = titleElement.textContent;
+    const matchForText = titleText.match(/för\s+(.*?)$/i);
+    if (matchForText && matchForText[1]) {
+      eventName = matchForText[1].trim();
     }
   }
   
-  // Om inget av ovanstående fungerar, leta i dokumentets struktur
-  if (!eventName || !organizer) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
+  // Extract organizer from span with class="ol_InlineIcon"
+  const organizerSpan = doc.querySelector("span.ol_InlineIcon");
+  if (organizerSpan && organizerSpan.textContent) {
+    organizer = organizerSpan.textContent.trim();
+  }
+  
+  // Fallback: Look for organizer using previous patterns if not found
+  if (!organizer) {
+    // Look for "Arrangör:" in the page
+    const organizerMatch = html.match(/Arrangör(?:sorganisation)?:[^\n<]*([^<\n]+)/i);
+    if (organizerMatch && organizerMatch[1]) {
+      organizer = organizerMatch[1].trim();
+    }
     
-    // Sök efter element som innehåller "Tävlingens namn:" eller "Arrangör:"
-    const allElements = Array.from(doc.querySelectorAll("div, p, span, h1, h2, h3, h4, h5"));
-    
-    for (const element of allElements) {
-      const text = element.textContent || "";
-      
-      if (!eventName && text.includes("Tävlingens namn:")) {
-        const match = text.match(/Tävlingens namn:(.*?)(?:Arrangör|$)/i);
-        if (match && match[1]) {
-          eventName = match[1].trim();
-        }
-      }
-      
-      if (!organizer && text.includes("Arrangör")) {
-        const match = text.match(/Arrangör(?:sorganisation)?:(.*)/i);
-        if (match && match[1]) {
-          organizer = match[1].trim();
-        }
+    // Try alternative pattern
+    if (!organizer) {
+      const altOrganizerMatch = html.match(/Arrangerad av[^\n<]*([^<\n]+)/i);
+      if (altOrganizerMatch && altOrganizerMatch[1]) {
+        organizer = altOrganizerMatch[1].trim();
       }
     }
   }
