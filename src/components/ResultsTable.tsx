@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Table,
@@ -10,8 +11,9 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
-import { ResultRow } from "@/services/FileProcessingService";
+import { ArrowDown, ArrowUp, Download, Search } from "lucide-react";
+import { ResultRow, exportResultsToExcel } from "@/services/FileProcessingService";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SortableColumnProps {
   column: string;
@@ -48,6 +50,7 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
   const [sortColumn, setSortColumn] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
   
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -56,6 +59,14 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
       setSortColumn(column);
       setSortDirection("asc");
     }
+  };
+  
+  const handleExportExcel = () => {
+    exportResultsToExcel(results);
+    toast({
+      title: "Export slutförd",
+      description: "Resultat exporterade till berikade_resultat.xlsx",
+    });
   };
   
   const filteredResults = results.filter(result => {
@@ -123,18 +134,29 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
 
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex gap-2">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Sök på namn, klass eller tävling..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
-          />
+      <div className="flex gap-2 justify-between">
+        <div className="flex gap-2">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Sök på namn, klass eller tävling..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button variant="outline" onClick={() => setSearchTerm("")}>
+            Rensa
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => setSearchTerm("")}>
-          Rensa
+        
+        <Button 
+          variant="outline" 
+          onClick={handleExportExcel}
+          className="flex gap-2 items-center"
+        >
+          <Download className="h-4 w-4" />
+          Ladda ner som Excel
         </Button>
       </div>
 
