@@ -79,7 +79,7 @@ const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
               <span className="text-muted-foreground">[{log.timestamp}]</span>{' '}
               <span className="text-blue-500">[ID {log.eventId}]</span>{' '}
               {log.url && <span className="text-green-500">{log.url.substring(0, 60)}...</span>}{' '}
-              <span>{log.status}</span>
+              <span className={log.status.includes('Sparat resultat') ? 'text-yellow-500 font-bold' : ''}>{log.status}</span>
             </div>
           ))}
           <div ref={logsEndRef} />

@@ -44,7 +44,16 @@ export const processExcelFile = async (
       
       // Save processed result to database if runId is provided
       if (runId) {
-        await saveResultToDatabase(enhancedResultRow, runId);
+        const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
+        const saveMessage = savedSuccessfully 
+          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen`
+          : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
+          
+        addLog(resultRow.eventId, currentEventorUrl, saveMessage);
+        
+        if (runId) {
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, saveMessage);
+        }
       }
       
       enrichedResults.push(enhancedResultRow);
