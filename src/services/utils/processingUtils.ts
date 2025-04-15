@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for file processing
  */
@@ -37,29 +36,30 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
-  // Log all possible forms of the 'started' value for debugging
-  console.log('Processing started value:', {
-    original: resultRow.started,
-    type: typeof resultRow.started,
-    booleanConversion: Boolean(resultRow.started),
-    stringComparison: String(resultRow.started) === 'true' || String(resultRow.started) === '1',
-    numberConversion: Number(resultRow.started)
-  });
-  
-  // Handle all possible formats of the 'started' value
-  let startedValue = 0;
-  
-  if (resultRow.started === true || 
-      resultRow.started === 1 || 
-      resultRow.started === '1' || 
-      resultRow.started === 'true' || 
-      resultRow.started === 'True' ||
-      resultRow.started === 'TRUE' ||
-      resultRow.started === 'yes' ||
-      resultRow.started === 'Yes' ||
-      resultRow.started === 'YES') {
-    startedValue = 1;
-  }
+  // Robust conversion of 'started' with multiple match patterns
+  const startedValue = (() => {
+    const started = resultRow.started;
+    
+    // Hantera olika möjliga textformat och typer
+    const truePatterns = [
+      true, 
+      1, 
+      '1', 
+      'true', 
+      'True', 
+      'TRUE', 
+      'yes', 
+      'Yes', 
+      'YES', 
+      'J', 
+      'j'
+    ];
+    
+    return truePatterns.some(pattern => 
+      started === pattern || 
+      String(started).toLowerCase() === String(pattern).toLowerCase()
+    ) ? 1 : 0;
+  })();
   
   return {
     run_id: runId,
