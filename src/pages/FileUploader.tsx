@@ -41,10 +41,19 @@ const FileUploader = () => {
       const enrichedResults = await processExcelFile(file, setProgress, setCurrentStatus, delay);
       setResults(enrichedResults);
       
-      toast({
-        title: "Filbearbetning slutförd",
-        description: `${enrichedResults.length} resultat bearbetade`,
-      });
+      // Automatically export the results when processing is complete
+      if (enrichedResults.length > 0) {
+        exportResultsToExcel(enrichedResults);
+        toast({
+          title: "Export slutförd",
+          description: `${enrichedResults.length} resultat bearbetade och exporterade till berikade_resultat.xlsx`,
+        });
+      } else {
+        toast({
+          title: "Filbearbetning slutförd",
+          description: "Inga resultat att exportera",
+        });
+      }
     } catch (error) {
       console.error("Fel vid bearbetning av fil:", error);
       toast({
