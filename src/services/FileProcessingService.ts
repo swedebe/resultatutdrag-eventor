@@ -48,6 +48,15 @@ export const processExcelFile = async (
       // Save processed result to database if runId is provided
       if (runId) {
         const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
+        
+        if (!savedSuccessfully) {
+          console.error(`Failed to save result for event ${resultRow.eventId}`, {
+            'Original started': resultRow.started,
+            'Enhanced started': enhancedResultRow.started,
+            'Type': typeof enhancedResultRow.started
+          });
+        }
+        
         const saveMessage = savedSuccessfully 
           ? `Sparat resultat för tävling ${resultRow.eventId} i databasen` + 
             ` (started=${enhancedResultRow.started ? '1' : '0'}, type=${typeof enhancedResultRow.started})`

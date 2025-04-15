@@ -37,22 +37,34 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
-  // Get the value for started as it appears in the Excel file
-  // The value could be boolean, string or number, so handle all cases
-  const startedValue = resultRow.started;
+  // Log all possible forms of the 'started' value for debugging
+  console.log('Processing started value:', {
+    original: resultRow.started,
+    type: typeof resultRow.started,
+    booleanConversion: Boolean(resultRow.started),
+    stringComparison: String(resultRow.started) === 'true' || String(resultRow.started) === '1',
+    numberConversion: Number(resultRow.started)
+  });
   
-  // Determine the correct value: 1 if it's true/"true"/"1"/1 etc., 0 otherwise
-  const startedNumber = (
-    startedValue === true || 
-    startedValue === 'true' || 
-    startedValue === '1' || 
-    startedValue === 1
-  ) ? 1 : 0;
+  // Handle all possible formats of the 'started' value
+  let startedValue = 0;
+  
+  if (resultRow.started === true || 
+      resultRow.started === 1 || 
+      resultRow.started === '1' || 
+      resultRow.started === 'true' || 
+      resultRow.started === 'True' ||
+      resultRow.started === 'TRUE' ||
+      resultRow.started === 'yes' ||
+      resultRow.started === 'Yes' ||
+      resultRow.started === 'YES') {
+    startedValue = 1;
+  }
   
   return {
     run_id: runId,
     event_date: resultRow.date,
-    event_id: resultRow.eventId.toString(),
+    event_id: String(resultRow.eventId),
     event_name: resultRow.eventName,
     event_type: resultRow.eventType,
     runner_name: resultRow.name,
@@ -67,6 +79,6 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
     time_after_seconds: resultRow.timeInSeconds,
     course_length: resultRow.length,
     organizer: resultRow.organizer,
-    started: startedNumber
+    started: startedValue
   };
 };
