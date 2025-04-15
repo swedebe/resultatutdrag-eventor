@@ -42,6 +42,78 @@ export const extractCourseLength = (lengthText: string): number => {
 };
 
 /**
+ * Extracts course length and participants from event class header
+ * Format: "<h3>Class name</h3>2 190 m, 8 startande"
+ */
+export const extractCourseInfo = (html: string, className: string): {length: number, participants: number} => {
+  const result = { length: 0, participants: 0 };
+  
+  // Look specifically for eventClassHeader divs
+  const eventClassHeaderRegex = /<div class="eventClassHeader"><div><h3>([^<]+)<\/h3>([^<]+)<\/div>/g;
+  let match;
+  
+  while ((match = eventClassHeaderRegex.exec(html)) !== null) {
+    const headerClassName = match[1].trim();
+    const infoText = match[2].trim();
+    
+    // If this header matches our class name OR contains our class name (partial match)
+    if (headerClassName === className || 
+        (className && headerClassName.includes(className)) || 
+        (className && className.includes(headerClassName))) {
+      
+      console.log(`Found matching class header: "${headerClassName}" for class "${className}"`);
+      console.log(`Info text: "${infoText}"`);
+      
+      // Pattern: "2 190 m, 8 startande"
+      const lengthParticipantsRegex = /(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i;
+      const infoMatch = infoText.match(lengthParticipantsRegex);
+      
+      if (infoMatch) {
+        result.length = parseInt(infoMatch[1].replace(/\s/g, ''), 10);
+        result.participants = parseInt(infoMatch[2], 10);
+        console.log(`Extracted length: ${result.length}m, participants: ${result.participants}`);
+        return result;
+      }
+    }
+  }
+  
+  // Fallback: try a more general regex approach if the specific one fails
+  const fallbackRegex = new RegExp(`<h3>${className}<\/h3>\\s*(\\d[\\d\\s]+)\\s*m,\\s*(\\d+)\\s+startande`, 'i');
+  match = html.match(fallbackRegex);
+  
+  if (match) {
+    result.length = parseInt(match[1].replace(/\s/g, ''), 10);
+    result.participants = parseInt(match[2], 10);
+    console.log(`Fallback extracted length: ${result.length}m, participants: ${result.participants}`);
+    return result;
+  }
+  
+  // Second fallback: try a more flexible approach with className anywhere near the pattern
+  const flexRegex = new RegExp(`${className}[^<]*<\/h3>\\s*(\\d[\\d\\s]+)\\s*m,\\s*(\\d+)\\s+startande`, 'i');
+  match = html.match(flexRegex);
+  
+  if (match) {
+    result.length = parseInt(match[1].replace(/\s/g, ''), 10);
+    result.participants = parseInt(match[2], 10);
+    console.log(`Flex extracted length: ${result.length}m, participants: ${result.participants}`);
+    return result;
+  }
+  
+  // One more attempt - just find any pattern that looks like course info
+  const anyInfoRegex = /<h3>[^<]*<\/h3>\s*([\d\s]+)\s*m,\s*(\d+)\s+startande/gi;
+  const allMatches = [...html.matchAll(anyInfoRegex)];
+  
+  if (allMatches.length > 0) {
+    // Just take the first one we find if nothing else works
+    result.length = parseInt(allMatches[0][1].replace(/\s/g, ''), 10);
+    result.participants = parseInt(allMatches[0][2], 10);
+    console.log(`Generic extraction - length: ${result.length}m, participants: ${result.participants}`);
+  }
+  
+  return result;
+};
+
+/**
  * Finds the course length from various sources
  */
 export const findCourseLength = (row: Element, doc: Document, html: string): number => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import * as XLSX from 'xlsx';
 import ResultsTable from "@/components/ResultsTable";
 import { extractClassInfo } from "@/lib/eventor-parser/class-utils";
-import { findCourseLength } from "@/lib/eventor-parser/course-utils";
+import { findCourseLength, extractCourseInfo } from "@/lib/eventor-parser/course-utils";
 
 interface ResultRow {
   name: string;
@@ -170,122 +169,161 @@ const FileUploader = () => {
           const className = resultRow.class;
           addLog(eventId, eventorUrl, `Söker klass: "${className}"`);
           
-          let courseLength = 0;
-          let totalParticipants = 0;
+          // Directly look for eventClassHeader div with the specific format
+          addLog(eventId, eventorUrl, `Söker efter eventClassHeader för klass "${className}"`);
           
-          // Hitta tabell som innehåller klassen
-          const tables = doc.querySelectorAll("table");
-          addLog(eventId, eventorUrl, `Hittade ${tables.length} tabeller`);
+          // Use our new utility function to extract course info from eventClassHeader
+          const courseInfo = extractCourseInfo(html, className);
           
-          let relevantTable = null;
-          let foundClass = false;
-          
-          // Leta igenom tabeller och rubriker för att hitta rätt klass
-          const classHeaders = Array.from(doc.querySelectorAll("h3"));
-          addLog(eventId, eventorUrl, `Söker i ${classHeaders.length} rubriker`);
-          
-          for (const header of classHeaders) {
-            if (header.textContent?.includes(className)) {
-              foundClass = true;
-              addLog(eventId, eventorUrl, `Hittade klass i rubrik: "${header.textContent}"`);
-              
-              // Hitta närmaste tabell efter denna rubrik
-              let element = header.nextElementSibling;
-              while (element && element.tagName !== "TABLE") {
-                element = element.nextElementSibling;
-              }
-              
-              if (element && element.tagName === "TABLE") {
-                relevantTable = element;
+          if (courseInfo.length > 0 && courseInfo.participants > 0) {
+            addLog(eventId, eventorUrl, `Hittade via eventClassHeader: Längd=${courseInfo.length}m, Antal=${courseInfo.participants}`);
+            resultRow.length = courseInfo.length;
+            resultRow.totalParticipants = courseInfo.participants;
+          } else {
+            // Fallback to previous methods if eventClassHeader extraction fails
+            addLog(eventId, eventorUrl, `Kunde inte hitta via eventClassHeader, försöker med fallback-metoder`);
+            
+            let courseLength = 0;
+            let totalParticipants = 0;
+            
+            // Hitta tabell som innehåller klassen
+            const tables = doc.querySelectorAll("table");
+            addLog(eventId, eventorUrl, `Hittade ${tables.length} tabeller`);
+            
+            let relevantTable = null;
+            let foundClass = false;
+            
+            // Leta igenom tabeller och rubriker för att hitta rätt klass
+            const classHeaders = Array.from(doc.querySelectorAll("h3"));
+            addLog(eventId, eventorUrl, `Söker i ${classHeaders.length} rubriker`);
+            
+            for (const header of classHeaders) {
+              if (header.textContent?.includes(className)) {
+                foundClass = true;
+                addLog(eventId, eventorUrl, `Hittade klass i rubrik: "${header.textContent}"`);
                 
-                // Försök hitta banlängd från rubriken
-                const headerText = header.textContent || "";
-                const lengthMatch = headerText.match(/(\d[\d\s]+)\s*m/i);
-                if (lengthMatch && lengthMatch[1]) {
-                  courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
-                  addLog(eventId, eventorUrl, `Hittade banlängd i rubrik: ${courseLength}m`);
+                // Check if this is within an eventClassHeader
+                let parent = header.parentElement;
+                while (parent && !parent.classList.contains('eventClassHeader') && parent !== doc.body) {
+                  parent = parent.parentElement;
                 }
                 
-                // Räkna antal rader i tabellen för att få antal startande
-                if (relevantTable) {
-                  const rows = relevantTable.querySelectorAll("tr");
-                  totalParticipants = Math.max(0, rows.length - 1); // Ta bort rubrikraden
-                  addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
-                }
-                
-                break;
-              }
-            }
-          }
-          
-          // Om vi inte hittade via rubriker, leta genom tabeller direkt
-          if (!foundClass && className) {
-            addLog(eventId, eventorUrl, `Söker klass i tabellbeskrivningar`);
-            for (const table of tables) {
-              const caption = table.querySelector("caption");
-              if (caption && caption.textContent?.includes(className)) {
-                relevantTable = table;
-                addLog(eventId, eventorUrl, `Hittade klass i tabellbeskrivning: "${caption.textContent}"`);
-                
-                // Räkna antal rader för antal startande
-                const rows = table.querySelectorAll("tr");
-                totalParticipants = Math.max(0, rows.length - 1);
-                addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
-                
-                // Leta efter banlängd i närliggande element
-                if (caption.textContent) {
-                  const lengthMatch = caption.textContent.match(/(\d[\d\s]+)\s*m/i);
-                  if (lengthMatch && lengthMatch[1]) {
-                    courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
-                    addLog(eventId, eventorUrl, `Hittade banlängd i tabellbeskrivning: ${courseLength}m`);
+                // If we found an eventClassHeader, extract info from its text
+                if (parent && parent.classList.contains('eventClassHeader')) {
+                  const headerText = parent.textContent || "";
+                  addLog(eventId, eventorUrl, `Hittade eventClassHeader: "${headerText}"`);
+                  
+                  // Extract length and participants using regex
+                  const infoMatch = headerText.match(/(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i);
+                  if (infoMatch) {
+                    courseLength = parseInt(infoMatch[1].replace(/\s/g, ''));
+                    totalParticipants = parseInt(infoMatch[2], 10);
+                    addLog(eventId, eventorUrl, `Extraherade från eventClassHeader: Längd=${courseLength}m, Antal=${totalParticipants}`);
                   }
                 }
                 
-                break;
-              }
-            }
-          }
-          
-          // Om vi fortfarande inte hittat någon information, sök i alla textsträngar
-          if ((!courseLength || !totalParticipants) && className) {
-            addLog(eventId, eventorUrl, `Söker i hela HTML-dokumentet`);
-            
-            // Leta efter text som innehåller klassnamnet och eventuell banlängd
-            const bodyText = doc.body.textContent || "";
-            const classPattern = new RegExp(`${className}[\\s\\S]{0,100}(\\d[\\d\\s]+)\\s*m`, 'i');
-            const fullMatch = bodyText.match(classPattern);
-            
-            if (fullMatch && fullMatch[1]) {
-              courseLength = parseInt(fullMatch[1].replace(/\s/g, ''));
-              addLog(eventId, eventorUrl, `Hittade banlängd i text: ${courseLength}m`);
-            }
-            
-            // Räkna deltagare genom att hitta rader som innehåller klassnamnet
-            if (!totalParticipants) {
-              const rows = doc.querySelectorAll('tr');
-              let count = 0;
-              
-              rows.forEach(row => {
-                if (row.textContent?.includes(className)) {
-                  count++;
+                // Hitta närmaste tabell efter denna rubrik
+                if (!courseLength || !totalParticipants) {
+                  let element = header.nextElementSibling;
+                  while (element && element.tagName !== "TABLE") {
+                    element = element.nextElementSibling;
+                  }
+                  
+                  if (element && element.tagName === "TABLE") {
+                    relevantTable = element;
+                    
+                    // Försök hitta banlängd från rubriken om vi inte hittade den i eventClassHeader
+                    if (!courseLength) {
+                      const headerText = header.textContent || "";
+                      const lengthMatch = headerText.match(/(\d[\d\s]+)\s*m/i);
+                      if (lengthMatch && lengthMatch[1]) {
+                        courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+                        addLog(eventId, eventorUrl, `Hittade banlängd i rubrik: ${courseLength}m`);
+                      }
+                    }
+                    
+                    // Räkna antal rader i tabellen för att få antal startande om vi inte hittade det i eventClassHeader
+                    if (!totalParticipants && relevantTable) {
+                      const rows = relevantTable.querySelectorAll("tr");
+                      totalParticipants = Math.max(0, rows.length - 1); // Ta bort rubrikraden
+                      addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
+                    }
+                    
+                    break;
+                  }
                 }
-              });
-              
-              if (count > 0) {
-                totalParticipants = count;
-                addLog(eventId, eventorUrl, `Räknade träffar för klassnamn: ${totalParticipants}`);
               }
             }
+            
+            // Om vi inte hittade via rubriker, leta genom tabeller direkt
+            if (!foundClass && className) {
+              addLog(eventId, eventorUrl, `Söker klass i tabellbeskrivningar`);
+              for (const table of tables) {
+                const caption = table.querySelector("caption");
+                if (caption && caption.textContent?.includes(className)) {
+                  relevantTable = table;
+                  addLog(eventId, eventorUrl, `Hittade klass i tabellbeskrivning: "${caption.textContent}"`);
+                  
+                  // Räkna antal rader för antal startande
+                  const rows = table.querySelectorAll("tr");
+                  totalParticipants = Math.max(0, rows.length - 1);
+                  addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
+                  
+                  // Leta efter banlängd i närliggande element
+                  if (caption.textContent) {
+                    const lengthMatch = caption.textContent.match(/(\d[\d\s]+)\s*m/i);
+                    if (lengthMatch && lengthMatch[1]) {
+                      courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+                      addLog(eventId, eventorUrl, `Hittade banlängd i tabellbeskrivning: ${courseLength}m`);
+                    }
+                  }
+                  
+                  break;
+                }
+              }
+            }
+            
+            // Om vi fortfarande inte hittat någon information, sök i alla textsträngar
+            if ((!courseLength || !totalParticipants) && className) {
+              addLog(eventId, eventorUrl, `Söker i hela HTML-dokumentet`);
+              
+              // Leta efter text som innehåller klassnamnet och eventuell banlängd
+              const bodyText = doc.body.textContent || "";
+              const classPattern = new RegExp(`${className}[\\s\\S]{0,100}(\\d[\\d\\s]+)\\s*m`, 'i');
+              const fullMatch = bodyText.match(classPattern);
+              
+              if (fullMatch && fullMatch[1]) {
+                courseLength = parseInt(fullMatch[1].replace(/\s/g, ''));
+                addLog(eventId, eventorUrl, `Hittade banlängd i text: ${courseLength}m`);
+              }
+              
+              // Räkna deltagare genom att hitta rader som innehåller klassnamnet
+              if (!totalParticipants) {
+                const rows = doc.querySelectorAll('tr');
+                let count = 0;
+                
+                rows.forEach(row => {
+                  if (row.textContent?.includes(className)) {
+                    count++;
+                  }
+                });
+                
+                if (count > 0) {
+                  totalParticipants = count;
+                  addLog(eventId, eventorUrl, `Räknade träffar för klassnamn: ${totalParticipants}`);
+                }
+              }
+            }
+            
+            // Uppdatera raden med den nya informationen
+            resultRow.length = courseLength;
+            resultRow.totalParticipants = totalParticipants;
           }
           
-          // Uppdatera raden med den nya informationen
-          resultRow.length = courseLength;
-          resultRow.totalParticipants = totalParticipants;
-          
-          if (!courseLength && !totalParticipants) {
+          if (!resultRow.length && !resultRow.totalParticipants) {
             addLog(eventId, eventorUrl, `VARNING: Kunde inte hitta data för klassen "${className}"`);
           } else {
-            addLog(eventId, eventorUrl, `Slutresultat - Längd: ${courseLength}m, Antal startande: ${totalParticipants}`);
+            addLog(eventId, eventorUrl, `Slutresultat - Längd: ${resultRow.length}m, Antal startande: ${resultRow.totalParticipants}`);
           }
           
           enrichedResults.push(resultRow);

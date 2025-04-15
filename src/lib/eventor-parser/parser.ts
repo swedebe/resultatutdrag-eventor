@@ -5,7 +5,7 @@
 
 import { timeToSeconds } from "./time-utils";
 import { extractEnhancedPositionInfo } from "./position-utils";
-import { findCourseLength } from "./course-utils";
+import { findCourseLength, extractCourseInfo } from "./course-utils";
 import { extractDate } from "./date-utils";
 import { extractEventAndOrganizerInfo } from "./event-utils";
 import { extractClassInfo } from "./class-utils";
