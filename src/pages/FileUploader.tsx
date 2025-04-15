@@ -133,6 +133,8 @@ const FileUploader = () => {
     
     try {
       const resultsArray = Array.isArray(results) ? results : [];
+      console.log("Saving run with results count:", resultsArray.length);
+      console.log("Saving run with logs count:", logs.length);
       
       await supabase
         .from('runs')
@@ -143,8 +145,6 @@ const FileUploader = () => {
         })
         .eq('id', runId);
         
-      console.log("Saving run with logs count:", logs.length);
-      
       toast({
         title: "Sparad",
         description: `Körningen "${saveName}" har sparats med ${resultsArray.length} resultat`,

@@ -35,6 +35,7 @@ const RunDetail = () => {
         if (error) throw error;
 
         if (data) {
+          console.log("Retrieved run data:", data);
           // Convert logs from Json to LogEntry[]
           const runWithLogs: RunWithLogs = {
             ...data,
@@ -58,7 +59,7 @@ const RunDetail = () => {
   }, [id, toast]);
 
   const handleExport = () => {
-    if (!run || !run.results) {
+    if (!hasResults()) {
       toast({
         title: "Inga resultat att exportera",
         description: "Det finns inga resultat att exportera för denna körning",
@@ -68,7 +69,7 @@ const RunDetail = () => {
     }
 
     // Cast run.results to ResultRow[] to ensure type safety
-    const resultsArray = run.results as unknown as ResultRow[];
+    const resultsArray = run!.results as unknown as ResultRow[];
     exportResultsToExcel(resultsArray);
     
     toast({
@@ -111,8 +112,39 @@ const RunDetail = () => {
 
   // Helper function to check if results is an array and has length
   const hasResults = () => {
-    return Array.isArray(run.results) && run.results.length > 0;
+    return run?.results && 
+           Array.isArray(run.results) && 
+           run.results.length > 0;
   };
+
+  // Helper function to check if logs exist
+  const hasLogs = () => {
+    return run?.logs && 
+           Array.isArray(run.logs) && 
+           run.logs.length > 0;
+  };
+
+  // Convert the results to the proper type
+  const getResultsArray = (): ResultRow[] => {
+    if (!run || !run.results) return [];
+    
+    // Handle both cases: when results is already an array or when it needs conversion
+    if (Array.isArray(run.results)) {
+      return run.results as unknown as ResultRow[];
+    } else {
+      // Try to parse it if it's a string (shouldn't happen but just in case)
+      try {
+        if (typeof run.results === 'string') {
+          return JSON.parse(run.results) as ResultRow[];
+        }
+      } catch (e) {
+        console.error("Failed to parse results string:", e);
+      }
+      return [];
+    }
+  };
+
+  const resultsArray = getResultsArray();
 
   return (
     <div className="container py-8">
@@ -123,11 +155,11 @@ const RunDetail = () => {
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
         </Button>
-        <Button onClick={handleExport} variant="outline">
+        <Button onClick={handleExport} variant="outline" disabled={!hasResults()}>
           <FileDown className="mr-2 h-4 w-4" />
           Ladda ner Excel
         </Button>
-        {run.logs && run.logs.length > 0 && (
+        {hasLogs() && (
           <Button onClick={toggleShowLogs} variant="outline">
             {showLogs ? "Dölj loggar" : "Visa loggar"}
           </Button>
@@ -160,15 +192,19 @@ const RunDetail = () => {
               </div>
             )}
           </div>
+          <div className="mt-4">
+            <p className="text-sm font-medium">Antal resultat:</p>
+            <p className="text-lg">{resultsArray.length}</p>
+          </div>
         </CardContent>
       </Card>
       
-      {showLogs && run.logs && run.logs.length > 0 && (
+      {showLogs && hasLogs() && (
         <LogComponent logs={run.logs} onClearLogs={clearLogs} />
       )}
 
-      {hasResults() ? (
-        <ResultsTable results={run.results as unknown as ResultRow[]} />
+      {resultsArray.length > 0 ? (
+        <ResultsTable results={resultsArray} />
       ) : (
         <Card>
           <CardContent className="py-8">
