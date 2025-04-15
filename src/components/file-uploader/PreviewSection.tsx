@@ -3,7 +3,7 @@ import React from "react";
 import ResultsPreview from "@/components/ResultsPreview";
 import RunSettingsSection from "./RunSettingsSection";
 import ActionButtonsSection from "./ActionButtonsSection";
-import { ResultRow } from "@/services/FileProcessingService";
+import { ResultRow } from "@/types/results";
 
 interface PreviewSectionProps {
   results: ResultRow[];
