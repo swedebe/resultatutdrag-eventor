@@ -27,6 +27,7 @@ const ResultsPreview: React.FC<ResultsPreviewProps> = ({ results }) => {
             <TableRow>
               <TableHead>Namn</TableHead>
               <TableHead>Klass</TableHead>
+              <TableHead>Klasstyp</TableHead>
               <TableHead>Tävlings-id</TableHead>
               <TableHead>Tävlingsnamn</TableHead>
               <TableHead>Arrangör</TableHead>
@@ -47,6 +48,7 @@ const ResultsPreview: React.FC<ResultsPreviewProps> = ({ results }) => {
               <TableRow key={index}>
                 <TableCell>{result.name}</TableCell>
                 <TableCell>{result.class}</TableCell>
+                <TableCell>{result.classType}</TableCell>
                 <TableCell>{result.eventId}</TableCell>
                 <TableCell>{result.eventName}</TableCell>
                 <TableCell>{result.organizer}</TableCell>

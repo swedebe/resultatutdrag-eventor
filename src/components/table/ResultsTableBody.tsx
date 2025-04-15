@@ -19,7 +19,7 @@ const ResultsTableBody: React.FC<ResultsTableBodyProps> = ({ results }) => {
     <TableBody>
       {results.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={10} className="text-center py-4">
+          <TableCell colSpan={11} className="text-center py-4">
             Inga resultat hittades
           </TableCell>
         </TableRow>
@@ -31,6 +31,7 @@ const ResultsTableBody: React.FC<ResultsTableBodyProps> = ({ results }) => {
             <TableCell>{displayValue(result.eventType)}</TableCell>
             <TableCell>{displayValue(result.name)}</TableCell>
             <TableCell>{displayValue(result.class)}</TableCell>
+            <TableCell>{displayValue(result.classType)}</TableCell>
             <TableCell>{result.length ? `${result.length} m` : "-"}</TableCell>
             <TableCell>{displayValue(result.time)}</TableCell>
             <TableCell>{displayValue(result.position)}</TableCell>

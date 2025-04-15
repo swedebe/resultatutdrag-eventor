@@ -1,4 +1,3 @@
-
 import * as XLSX from 'xlsx';
 import { addLog } from '../components/LogComponent';
 import { extractCourseInfo } from '@/lib/eventor-parser/course-utils';
@@ -6,6 +5,7 @@ import { extractCourseInfo } from '@/lib/eventor-parser/course-utils';
 export type ResultRow = {
   name: string;
   class: string;
+  classType: string;
   eventId: string | number;
   eventName: string;
   date: string;
@@ -69,6 +69,7 @@ export const processExcelFile = async (
       organizer: row["Arrangör"] || row.organizer || "",
       date: row["Datum"] || row.date || "",
       class: row["Klass"] || row.class || "",
+      classType: row["Klasstyp"] || row.classType || "",
       name: `${row["Förnamn"] || ""} ${row["Efternamn"] || ""}`.trim() || row.name || "",
       position: parseInt(row["Placering"] || "0", 10) || 0,
       time: row["Tid"] || row.time || "",

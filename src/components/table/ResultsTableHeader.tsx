@@ -32,6 +32,9 @@ const ResultsTableHeader: React.FC<ResultsTableHeaderProps> = ({
         <SortableColumn column="class" currentSort={sortColumn} direction={sortDirection} onSort={onSort}>
           Klass
         </SortableColumn>
+        <SortableColumn column="classType" currentSort={sortColumn} direction={sortDirection} onSort={onSort}>
+          Klasstyp
+        </SortableColumn>
         <SortableColumn column="length" currentSort={sortColumn} direction={sortDirection} onSort={onSort}>
           Längd
         </SortableColumn>
