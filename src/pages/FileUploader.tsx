@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
-import { RunWithLogsUpdate, logsToJson } from "@/types/database";
+import { logsToJson } from "@/types/database";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -46,6 +46,8 @@ const FileUploader = () => {
             logs: logsToJson(newLogs) 
           })
           .eq('id', runId);
+        
+        console.log("Logs saved to database, count:", newLogs.length);  
       } catch (error) {
         console.error("Error saving logs to database:", error);
       }
@@ -141,6 +143,8 @@ const FileUploader = () => {
         })
         .eq('id', runId);
         
+      console.log("Saving run with logs count:", logs.length);
+      
       toast({
         title: "Sparad",
         description: `Körningen "${saveName}" har sparats med ${resultsArray.length} resultat`,
@@ -211,7 +215,7 @@ const FileUploader = () => {
         .update(updateData)
         .eq('id', runId);
         
-      console.log("Current state saved to database");
+      console.log("Current state saved to database with logs count:", logs.length);
     } catch (error) {
       console.error("Error saving current state:", error);
     }

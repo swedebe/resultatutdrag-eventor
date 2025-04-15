@@ -1,5 +1,5 @@
 
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -14,7 +14,7 @@ export interface LogEntry {
 let logsUpdateFunction: ((logs: LogEntry[]) => void) | null = null;
 let currentLogs: LogEntry[] = [];
 
-export const setLogsUpdateFunction = (updateFn: (logs: LogEntry[]) => void) => {
+export const setLogsUpdateFunction = (updateFn: ((logs: LogEntry[]) => void) | null) => {
   logsUpdateFunction = updateFn;
 };
 
@@ -47,13 +47,15 @@ const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
   const logsEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of logs when they change
-  React.useEffect(() => {
+  useEffect(() => {
     if (logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs]);
+  
+  console.log("LogComponent rendering with logs:", logs);
 
-  if (logs.length === 0) {
+  if (!logs || logs.length === 0) {
     return null;
   }
 

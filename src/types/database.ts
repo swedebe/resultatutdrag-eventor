@@ -12,7 +12,7 @@ export interface RunWithLogs {
   name: string;
   results: Json;
   user_id: string;
-  logs?: LogEntry[]; // Added logs field
+  logs: LogEntry[]; // Changed to always be LogEntry[] and marked as required
 }
 
 // Type for inserting or updating a run with logs
@@ -30,11 +30,13 @@ export interface RunWithLogsUpdate {
 
 // Function to convert LogEntry[] to Json for database operations
 export const logsToJson = (logs: LogEntry[]): Json => {
+  if (!logs || !Array.isArray(logs)) return [] as Json;
   return logs as unknown as Json;
 };
 
 // Function to convert Json to LogEntry[] when retrieving from database
 export const jsonToLogs = (json: Json | null): LogEntry[] => {
   if (!json) return [];
+  if (!Array.isArray(json)) return [];
   return json as unknown as LogEntry[];
 };

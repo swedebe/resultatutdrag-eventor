@@ -35,12 +35,15 @@ const RunDetail = () => {
       
       if (error) throw error;
       
+      console.log("Retrieved run data:", data);
+      
       // Ensure we properly convert the data
       const runWithLogs: RunWithLogs = {
         ...data,
         logs: jsonToLogs(data.logs)
       };
       
+      console.log("Converted logs:", runWithLogs.logs);
       setNewName(runWithLogs.name);
       
       return runWithLogs;
@@ -137,7 +140,7 @@ const RunDetail = () => {
   const toggleLogs = () => {
     setShowLogs(!showLogs);
   };
-
+  
   const handleClearLogs = () => {
     toast({
       title: "Kan inte rensa loggar",
@@ -178,9 +181,11 @@ const RunDetail = () => {
   const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
-  // Properly get logs
+  // Properly handle logs from the run object
   const logs: LogEntry[] = run?.logs || [];
   const hasLogs = logs.length > 0;
+  
+  console.log("Has logs?", hasLogs, "Log count:", logs.length);
 
   const wasCanceled = logs.some(log => 
     log.status === "Användaren avbröt körningen" || 
