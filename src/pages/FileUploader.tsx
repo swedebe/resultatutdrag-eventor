@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
-import { RunWithLogsUpdate } from "@/types/database";
+import { RunWithLogsUpdate, logsToJson } from "@/types/database";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -40,8 +40,8 @@ const FileUploader = () => {
     
     if (runId) {
       try {
-        const updateData: RunWithLogsUpdate = { 
-          logs: newLogs 
+        const updateData = { 
+          logs: logsToJson(newLogs) 
         };
         
         await supabase
@@ -58,9 +58,9 @@ const FileUploader = () => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       if (isProcessing && runId) {
         try {
-          const updateData: RunWithLogsUpdate = {
+          const updateData = {
             results: results,
-            logs: logs,
+            logs: logsToJson(logs),
             event_count: results.length
           };
           
@@ -132,10 +132,10 @@ const FileUploader = () => {
     setIsSaving(true);
     
     try {
-      const updateData: RunWithLogsUpdate = { 
+      const updateData = { 
         results: results,
         event_count: results.length,
-        logs: logs
+        logs: logsToJson(logs)
       };
       
       await supabase
@@ -186,7 +186,7 @@ const FileUploader = () => {
       try {
         supabase
           .from('runs')
-          .update({ logs: updatedLogs })
+          .update({ logs: logsToJson(updatedLogs) })
           .eq('id', runId);
       } catch (error) {
         console.error("Error saving cancellation log:", error);
@@ -198,9 +198,9 @@ const FileUploader = () => {
     if (!runId) return;
     
     try {
-      const updateData: RunWithLogsUpdate = { 
+      const updateData = { 
         results: results,
-        logs: logs,
+        logs: logsToJson(logs),
         event_count: results.length
       };
       
@@ -257,7 +257,7 @@ const FileUploader = () => {
                 .from('runs')
                 .update({ 
                   results: partialResults,
-                  logs: logs,
+                  logs: logsToJson(logs),
                   event_count: partialResults.length
                 })
                 .eq('id', newRunId);
@@ -306,7 +306,7 @@ const FileUploader = () => {
           await supabase
             .from('runs')
             .update({ 
-              logs: logs,
+              logs: logsToJson(logs),
               results: results,
               event_count: results.length
             })

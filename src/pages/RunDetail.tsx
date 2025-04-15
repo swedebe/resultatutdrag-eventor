@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import ResultsTable from "@/components/ResultsTable";
 import { Input } from "@/components/ui/input";
 import LogComponent, { LogEntry } from "@/components/LogComponent";
-import { RunWithLogs } from "@/types/database";
+import { RunWithLogs, jsonToLogs } from "@/types/database";
 
 const RunDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,7 +35,10 @@ const RunDetail = () => {
       
       if (error) throw error;
       
-      const runWithLogs = data as unknown as RunWithLogs;
+      const runWithLogs: RunWithLogs = {
+        ...data,
+        logs: jsonToLogs(data.logs)
+      };
       
       setNewName(runWithLogs.name);
       
@@ -172,7 +176,7 @@ const RunDetail = () => {
   const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
-  const logs: LogEntry[] = run?.logs && Array.isArray(run.logs) ? run.logs : [];
+  const logs: LogEntry[] = run?.logs || [];
   const hasLogs = logs.length > 0;
 
   const wasCanceled = logs.some(log => 
