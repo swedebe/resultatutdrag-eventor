@@ -40,13 +40,11 @@ const FileUploader = () => {
     
     if (runId) {
       try {
-        const updateData = { 
-          logs: logsToJson(newLogs) 
-        };
-        
         await supabase
           .from('runs')
-          .update(updateData)
+          .update({ 
+            logs: logsToJson(newLogs) 
+          })
           .eq('id', runId);
       } catch (error) {
         console.error("Error saving logs to database:", error);
@@ -92,7 +90,7 @@ const FileUploader = () => {
         .insert({
           name: initialName,
           results: [],
-          logs: [],
+          logs: logsToJson([]),
           event_count: 0,
           user_id: (await supabase.auth.getUser()).data.user?.id
         })
@@ -132,21 +130,25 @@ const FileUploader = () => {
     setIsSaving(true);
     
     try {
-      const updateData = { 
-        results: results,
-        event_count: results.length,
-        logs: logsToJson(logs)
-      };
+      const resultsArray = Array.isArray(results) ? results : [];
       
       await supabase
         .from('runs')
-        .update(updateData)
+        .update({ 
+          results: resultsArray,
+          event_count: resultsArray.length,
+          logs: logsToJson(logs)
+        })
         .eq('id', runId);
         
       toast({
         title: "Sparad",
-        description: `Körningen "${saveName}" har sparats med ${results.length} resultat`,
+        description: `Körningen "${saveName}" har sparats med ${resultsArray.length} resultat`,
       });
+      
+      setTimeout(() => {
+        navigate(`/run/${runId}`);
+      }, 500);
     } catch (error: any) {
       console.error("Error saving results to database:", error);
       toast({

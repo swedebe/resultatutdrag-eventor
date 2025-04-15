@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +34,7 @@ const RunDetail = () => {
       
       if (error) throw error;
       
+      // Ensure we properly convert the data
       const runWithLogs: RunWithLogs = {
         ...data,
         logs: jsonToLogs(data.logs)
@@ -173,9 +173,11 @@ const RunDetail = () => {
     );
   }
 
+  // Ensure results is properly handled as an array
   const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
+  // Properly use the jsonToLogs function
   const logs: LogEntry[] = run?.logs || [];
   const hasLogs = logs.length > 0;
 

@@ -25,7 +25,7 @@ export interface RunWithLogsUpdate {
   name?: string;
   results?: Json;
   user_id?: string;
-  logs?: LogEntry[]; // Added logs field
+  logs?: Json; // Changed to Json type for database compatibility
 }
 
 // Function to convert LogEntry[] to Json for database operations
