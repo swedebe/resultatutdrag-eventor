@@ -9,6 +9,118 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      processed_results: {
+        Row: {
+          birth_year: string | null
+          class_name: string | null
+          class_type: string | null
+          course_length: number | null
+          event_date: string | null
+          event_id: string | null
+          event_name: string | null
+          event_type: string | null
+          id: string
+          person_id: number | null
+          position: number | null
+          run_id: string
+          runner_name: string | null
+          saved_at: string
+          started: number | null
+          time: string | null
+          time_after: string | null
+          time_after_seconds: number | null
+          total_participants: number | null
+        }
+        Insert: {
+          birth_year?: string | null
+          class_name?: string | null
+          class_type?: string | null
+          course_length?: number | null
+          event_date?: string | null
+          event_id?: string | null
+          event_name?: string | null
+          event_type?: string | null
+          id?: string
+          person_id?: number | null
+          position?: number | null
+          run_id: string
+          runner_name?: string | null
+          saved_at?: string
+          started?: number | null
+          time?: string | null
+          time_after?: string | null
+          time_after_seconds?: number | null
+          total_participants?: number | null
+        }
+        Update: {
+          birth_year?: string | null
+          class_name?: string | null
+          class_type?: string | null
+          course_length?: number | null
+          event_date?: string | null
+          event_id?: string | null
+          event_name?: string | null
+          event_type?: string | null
+          id?: string
+          person_id?: number | null
+          position?: number | null
+          run_id?: string
+          runner_name?: string | null
+          saved_at?: string
+          started?: number | null
+          time?: string | null
+          time_after?: string | null
+          time_after_seconds?: number | null
+          total_participants?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processed_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      processing_logs: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          id: string
+          run_id: string
+          status: string | null
+          timestamp: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          run_id: string
+          status?: string | null
+          timestamp?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          run_id?: string
+          status?: string | null
+          timestamp?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       runs: {
         Row: {
           club_name: string | null

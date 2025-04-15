@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
-import { logsToJson } from "@/types/database";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -38,43 +37,15 @@ const FileUploader = () => {
   const updateLogs = async (newLogs: LogEntry[]) => {
     setLogs(newLogs);
     
-    if (runId) {
-      try {
-        const { error } = await supabase
-          .from('runs')
-          .update({ 
-            logs: logsToJson(newLogs) 
-          })
-          .eq('id', runId);
-        
-        if (error) {
-          console.error("Error saving logs to database:", error);
-        } else {
-          console.log("Logs saved to database, count:", newLogs.length);
-        }
-      } catch (error) {
-        console.error("Error saving logs to database:", error);
-      }
-    }
+    // We don't need to store logs in the runs table anymore
+    // They're directly inserted into the processing_logs table during processing
   };
 
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       if (isProcessing && runId) {
-        try {
-          const updateData = {
-            results: results,
-            logs: logsToJson(logs),
-            event_count: results.length
-          };
-          
-          await supabase
-            .from('runs')
-            .update(updateData)
-            .eq('id', runId);
-        } catch (error) {
-          console.error("Error saving state before unload:", error);
-        }
+        // The data is already being saved to the database tables during processing
+        // We don't need to save anything here anymore
         
         e.preventDefault();
         e.returnValue = "Du har en pågående körning. Är du säker på att du vill lämna sidan?";
@@ -87,7 +58,7 @@ const FileUploader = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [isProcessing, runId, results, logs]);
+  }, [isProcessing, runId]);
   
   const createNewRun = async (initialName: string): Promise<string | null> => {
     try {
@@ -95,8 +66,8 @@ const FileUploader = () => {
         .from('runs')
         .insert({
           name: initialName,
-          results: [],
-          logs: logsToJson([]),
+          results: [],  // Keep this for backward compatibility
+          logs: [],     // Keep this for backward compatibility 
           event_count: 0,
           user_id: (await supabase.auth.getUser()).data.user?.id
         })
@@ -137,16 +108,11 @@ const FileUploader = () => {
     setIsSaving(true);
     
     try {
-      const resultsArray = Array.isArray(results) ? results : [];
-      console.log("Saving run with results count:", resultsArray.length);
-      console.log("Saving run with logs count:", logs.length);
-      
+      // Update run table with event count (results are already saved in processed_results)
       const { error } = await supabase
         .from('runs')
         .update({ 
-          results: resultsArray,
-          event_count: resultsArray.length,
-          logs: logsToJson(logs)
+          event_count: results.length
         })
         .eq('id', runId);
         
@@ -154,11 +120,11 @@ const FileUploader = () => {
         throw error;
       }
         
-      console.log("Results and logs saved successfully");
+      console.log("Run updated successfully");
       
       toast({
         title: "Sparad",
-        description: `Körningen "${saveName}" har sparats med ${resultsArray.length} resultat`,
+        description: `Körningen "${saveName}" har sparats med ${results.length} resultat`,
       });
       
       setTimeout(() => {
@@ -181,10 +147,6 @@ const FileUploader = () => {
       setCancelProcessing(true);
       addCancellationLog();
       setCurrentStatus("Avbryter körning...");
-      
-      if (runId) {
-        saveCurrentState();
-      }
     }
   };
 
@@ -199,36 +161,21 @@ const FileUploader = () => {
     const updatedLogs = [...logs, newLog];
     setLogs(updatedLogs);
     
+    // Save the cancellation log to database
     if (runId) {
       try {
         supabase
-          .from('runs')
-          .update({ logs: logsToJson(updatedLogs) })
-          .eq('id', runId);
+          .from('processing_logs')
+          .insert({
+            run_id: runId,
+            timestamp: new Date().toISOString().substring(11, 23),
+            event_id: "system",
+            url: "",
+            status: "Användaren avbröt körningen"
+          });
       } catch (error) {
         console.error("Error saving cancellation log:", error);
       }
-    }
-  };
-  
-  const saveCurrentState = async () => {
-    if (!runId) return;
-    
-    try {
-      const updateData = { 
-        results: results,
-        logs: logsToJson(logs),
-        event_count: results.length
-      };
-      
-      await supabase
-        .from('runs')
-        .update(updateData)
-        .eq('id', runId);
-        
-      console.log("Current state saved to database with logs count:", logs.length);
-    } catch (error) {
-      console.error("Error saving current state:", error);
     }
   };
   
@@ -268,23 +215,9 @@ const FileUploader = () => {
             throw new Error("Användaren avbröt körningen");
           }
           
-          if (newRunId) {
-            try {
-              await supabase
-                .from('runs')
-                .update({ 
-                  results: partialResults,
-                  logs: logsToJson(logs),
-                  event_count: partialResults.length
-                })
-                .eq('id', newRunId);
-            } catch (error) {
-              console.error("Error saving partial results:", error);
-            }
-          }
-          
           return !cancelProcessing;
-        }
+        },
+        newRunId  // Pass runId to save results directly to database during processing
       );
       
       if (!cancelProcessing) {
@@ -316,21 +249,6 @@ const FileUploader = () => {
           description: error.message || "Ett fel uppstod vid bearbetning av filen",
           variant: "destructive",
         });
-      }
-      
-      if (newRunId) {
-        try {
-          await supabase
-            .from('runs')
-            .update({ 
-              logs: logsToJson(logs),
-              results: results,
-              event_count: results.length
-            })
-            .eq('id', newRunId);
-        } catch (saveError) {
-          console.error("Error saving logs after error:", saveError);
-        }
       }
     } finally {
       setIsProcessing(false);

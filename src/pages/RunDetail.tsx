@@ -8,9 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ResultsTable from "@/components/ResultsTable";
 import LogComponent from "@/components/LogComponent";
 import { RunWithLogs } from "@/types/database";
-import { jsonToLogs } from "@/types/database";
 import { Home, FileDown } from "lucide-react";
-import { exportResultsToExcel, ResultRow } from "@/services/FileProcessingService";
+import { exportResultsToExcel, ResultRow, fetchProcessedResults, fetchProcessingLogs } from "@/services/FileProcessingService";
 import { useToast } from "@/components/ui/use-toast";
 
 const RunDetail = () => {
@@ -18,6 +17,8 @@ const RunDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [run, setRun] = useState<RunWithLogs | null>(null);
+  const [results, setResults] = useState<ResultRow[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogs, setShowLogs] = useState(false);
 
@@ -25,36 +26,43 @@ const RunDetail = () => {
     const fetchRunDetails = async () => {
       if (!id) return;
 
+      setLoading(true);
+
       try {
-        const { data, error } = await supabase
+        // 1. First, fetch basic run info
+        const { data: runData, error: runError } = await supabase
           .from('runs')
           .select('*')
           .eq('id', id)
           .single();
 
-        if (error) throw error;
-
-        if (data) {
-          console.log("Retrieved run data:", data);
-          console.log("Raw results type:", typeof data.results);
-          console.log("Raw results data:", JSON.stringify(data.results).substring(0, 300) + "...");
-          console.log("Raw logs type:", typeof data.logs);
-          console.log("Raw logs data:", JSON.stringify(data.logs).substring(0, 300) + "...");
-          
-          // Convert logs from Json to LogEntry[]
-          const runWithLogs: RunWithLogs = {
-            ...data,
-            logs: jsonToLogs(data.logs)
-          };
-          
-          console.log("Processed logs count:", runWithLogs.logs.length);
-          console.log("Results array?", Array.isArray(runWithLogs.results));
-          if (Array.isArray(runWithLogs.results)) {
-            console.log("Results count:", runWithLogs.results.length);
-          }
-          
-          setRun(runWithLogs);
+        if (runError) throw runError;
+        
+        if (!runData) {
+          console.error("No run found with id:", id);
+          setLoading(false);
+          return;
         }
+
+        console.log("Retrieved basic run data:", runData);
+        
+        // 2. Fetch processed results from the new table
+        const processedResults = await fetchProcessedResults(id);
+        console.log(`Fetched ${processedResults.length} processed results from database`);
+        
+        // 3. Fetch logs from the new table
+        const processingLogs = await fetchProcessingLogs(id);
+        console.log(`Fetched ${processingLogs.length} logs from database`);
+        
+        // 4. Create a combined run object with all data
+        const runWithLogs: RunWithLogs = {
+          ...runData,
+          logs: processingLogs || []
+        };
+        
+        setRun(runWithLogs);
+        setResults(processedResults);
+        setLogs(processingLogs);
       } catch (error) {
         console.error('Error fetching run details:', error);
         toast({
@@ -71,7 +79,7 @@ const RunDetail = () => {
   }, [id, toast]);
 
   const handleExport = () => {
-    if (!hasResults()) {
+    if (results.length === 0) {
       toast({
         title: "Inga resultat att exportera",
         description: "Det finns inga resultat att exportera för denna körning",
@@ -80,9 +88,7 @@ const RunDetail = () => {
       return;
     }
 
-    // Get properly processed results array
-    const resultsArray = getResultsArray();
-    exportResultsToExcel(resultsArray);
+    exportResultsToExcel(results);
     
     toast({
       title: "Export slutförd",
@@ -122,44 +128,12 @@ const RunDetail = () => {
     setShowLogs(false);
   };
 
-  // Helper function to check if results is an array and has length
-  const hasResults = () => {
-    return run?.results && 
-           Array.isArray(run.results) && 
-           run.results.length > 0;
-  };
-
   // Helper function to check if logs exist
   const hasLogs = () => {
-    return run?.logs && 
-           Array.isArray(run.logs) && 
-           run.logs.length > 0;
+    return logs && 
+           Array.isArray(logs) && 
+           logs.length > 0;
   };
-
-  // Convert the results to the proper type
-  const getResultsArray = (): ResultRow[] => {
-    if (!run || !run.results) return [];
-    
-    // Handle both cases: when results is already an array or when it needs conversion
-    if (Array.isArray(run.results)) {
-      return run.results as unknown as ResultRow[];
-    } else if (typeof run.results === 'object' && run.results !== null) {
-      // Sometimes Supabase might return it as a non-array object
-      return [run.results] as unknown as ResultRow[];
-    } else if (typeof run.results === 'string') {
-      // Try to parse it if it's a string
-      try {
-        const parsed = JSON.parse(run.results);
-        return Array.isArray(parsed) ? parsed : [parsed];
-      } catch (e) {
-        console.error("Failed to parse results string:", e);
-        return [];
-      }
-    }
-    return [];
-  };
-
-  const resultsArray = getResultsArray();
 
   return (
     <div className="container py-8">
@@ -170,7 +144,7 @@ const RunDetail = () => {
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
         </Button>
-        <Button onClick={handleExport} variant="outline" disabled={!hasResults()}>
+        <Button onClick={handleExport} variant="outline" disabled={results.length === 0}>
           <FileDown className="mr-2 h-4 w-4" />
           Ladda ner Excel
         </Button>
@@ -209,17 +183,17 @@ const RunDetail = () => {
           </div>
           <div className="mt-4">
             <p className="text-sm font-medium">Antal resultat:</p>
-            <p className="text-lg">{resultsArray.length}</p>
+            <p className="text-lg">{results.length}</p>
           </div>
         </CardContent>
       </Card>
       
       {showLogs && hasLogs() && (
-        <LogComponent logs={run.logs} onClearLogs={clearLogs} />
+        <LogComponent logs={logs} onClearLogs={clearLogs} />
       )}
 
-      {resultsArray.length > 0 ? (
-        <ResultsTable results={resultsArray} />
+      {results.length > 0 ? (
+        <ResultsTable results={results} />
       ) : (
         <Card>
           <CardContent className="py-8">
