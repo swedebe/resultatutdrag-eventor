@@ -11,26 +11,45 @@ import { useNavigate } from "react-router-dom";
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Check if user is already logged in
+  // Check if user is already logged in and handle recovery token
   useEffect(() => {
-    const checkSession = async () => {
+    const checkSessionAndRecoveryToken = async () => {
+      // First check if there's an access token in the URL fragment (recovery flow)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        // Extract the tokens from the URL fragment
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        
+        if (accessToken) {
+          // We're in a password recovery flow
+          setShowUpdatePassword(true);
+          // Don't redirect to homepage yet
+          return;
+        }
+      }
+
+      // If no recovery token, check for existing session
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         navigate("/");
       }
     };
     
-    checkSession();
+    checkSessionAndRecoveryToken();
     
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (session) {
+        if (event !== 'PASSWORD_RECOVERY' && session) {
           navigate("/");
         }
       }
@@ -83,8 +102,11 @@ const Auth = () => {
     }
     
     try {
+      // Get the current URL without hash or query params
+      const currentUrl = window.location.origin + window.location.pathname;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: currentUrl,
       });
       
       if (error) throw error;
@@ -106,20 +128,98 @@ const Auth = () => {
     }
   };
   
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Lösenorden matchar inte",
+        description: "Vänligen kontrollera att lösenorden matchar",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Lösenord uppdaterat",
+        description: "Ditt lösenord har uppdaterats. Du kan nu logga in med ditt nya lösenord.",
+      });
+      
+      // Clear hash from URL
+      window.history.replaceState(null, '', window.location.pathname);
+      setShowUpdatePassword(false);
+    } catch (error: any) {
+      toast({
+        title: "Ett fel uppstod",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="flex min-h-[80vh] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{showResetPassword ? "Återställ lösenord" : "Logga in"}</CardTitle>
+          <CardTitle>
+            {showUpdatePassword 
+              ? "Skapa nytt lösenord" 
+              : showResetPassword 
+                ? "Återställ lösenord" 
+                : "Logga in"}
+          </CardTitle>
           <CardDescription>
-            {showResetPassword 
-              ? "Ange din e-post för att få en länk att återställa ditt lösenord" 
-              : "Logga in för att hantera din klubbs resultat"}
+            {showUpdatePassword
+              ? "Ange och bekräfta ditt nya lösenord"
+              : showResetPassword 
+                ? "Ange din e-post för att få en länk att återställa ditt lösenord" 
+                : "Logga in för att hantera din klubbs resultat"}
           </CardDescription>
         </CardHeader>
         
         <CardContent>
-          {showResetPassword ? (
+          {showUpdatePassword ? (
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nytt lösenord</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Bekräfta lösenord</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Bearbetar..." : "Uppdatera lösenord"}
+              </Button>
+            </form>
+          ) : showResetPassword ? (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-email">E-post</Label>
@@ -171,15 +271,17 @@ const Auth = () => {
         </CardContent>
         
         <CardFooter className="flex flex-col">
-          <Button 
-            variant="link" 
-            onClick={() => setShowResetPassword(!showResetPassword)}
-            className="w-full"
-          >
-            {showResetPassword
-              ? "Tillbaka till inloggning"
-              : "Glömt lösenord?"}
-          </Button>
+          {!showUpdatePassword && (
+            <Button 
+              variant="link" 
+              onClick={() => setShowResetPassword(!showResetPassword)}
+              className="w-full"
+            >
+              {showResetPassword
+                ? "Tillbaka till inloggning"
+                : "Glömt lösenord?"}
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>
