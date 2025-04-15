@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
-import { ResultRow } from "@/services/FileProcessingService";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface FileUploadFormProps {
   isProcessing: boolean;
@@ -14,6 +15,8 @@ interface FileUploadFormProps {
   onExport: () => void;
   onClear: () => void;
   hasResults: boolean;
+  delay: number;
+  onDelayChange: (delay: number) => void;
 }
 
 const FileUploadForm: React.FC<FileUploadFormProps> = ({
@@ -24,7 +27,9 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({
   onProcessFile,
   onExport,
   onClear,
-  hasResults
+  hasResults,
+  delay,
+  onDelayChange
 }) => {
   const { toast } = useToast();
   
@@ -37,6 +42,13 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({
       });
     } else {
       onFileChange(null);
+    }
+  };
+
+  const handleDelayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDelay = parseInt(e.target.value, 10) || 0;
+    if (newDelay >= 0) {
+      onDelayChange(newDelay);
     }
   };
 
@@ -54,6 +66,22 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({
             file:bg-primary file:text-white
             hover:file:bg-primary/90"
         />
+        
+        <div className="flex gap-3 items-center">
+          <Label htmlFor="delay-input" className="whitespace-nowrap">Delay mellan anrop (sekunder):</Label>
+          <Input 
+            id="delay-input"
+            type="number" 
+            min="0"
+            value={delay} 
+            onChange={handleDelayChange}
+            className="w-20"
+            disabled={isProcessing}
+          />
+          <div className="text-xs text-muted-foreground">
+            (Högre värde förhindrar rate-limiting från Eventor)
+          </div>
+        </div>
         
         <div className="flex gap-3">
           <Button 

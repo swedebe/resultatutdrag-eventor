@@ -23,7 +23,17 @@ export type ResultRow = {
   [key: string]: any;
 };
 
-export const processExcelFile = async (file: File, setProgress: (value: number) => void, setCurrentStatus: (status: string) => void): Promise<ResultRow[]> => {
+// Hjälpfunktion för att vänta ett antal sekunder
+const sleep = (seconds: number) => {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+};
+
+export const processExcelFile = async (
+  file: File, 
+  setProgress: (value: number) => void, 
+  setCurrentStatus: (status: string) => void,
+  delaySeconds: number = 30
+): Promise<ResultRow[]> => {
   setProgress(0);
   setCurrentStatus("Läser in fil...");
   
@@ -120,13 +130,28 @@ export const processExcelFile = async (file: File, setProgress: (value: number) 
       }
 
       enrichedResults.push(resultRow);
+      
+      // Använd delay mellan anrop för att undvika rate limit
+      if (i < jsonData.length - 1 && delaySeconds > 0) {
+        const waitMessage = `Väntar ${delaySeconds} sekunder innan nästa anrop (för att undvika rate limiting)...`;
+        setCurrentStatus(waitMessage);
+        addLog(eventId, currentEventorUrl, waitMessage);
+        await sleep(delaySeconds);
+      }
     } catch (error) {
       console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
-      // Fix the missing variable - use the same currentEventorUrl from above
       const currentEventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
       addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error}`);
       // Add the row without course length and participant count
       enrichedResults.push(resultRow);
+      
+      // Använd delay även efter fel för att undvika rate limit
+      if (i < jsonData.length - 1 && delaySeconds > 0) {
+        const waitMessage = `Väntar ${delaySeconds} sekunder innan nästa anrop (för att undvika rate limiting)...`;
+        setCurrentStatus(waitMessage);
+        addLog(eventId, currentEventorUrl, waitMessage);
+        await sleep(delaySeconds);
+      }
     }
   }
   

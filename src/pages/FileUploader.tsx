@@ -16,6 +16,7 @@ const FileUploader = () => {
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [delay, setDelay] = useState<number>(30);
   
   // Setup logging functionality
   useEffect(() => {
@@ -37,7 +38,7 @@ const FileUploader = () => {
     clearLogs();
     
     try {
-      const enrichedResults = await processExcelFile(file, setProgress, setCurrentStatus);
+      const enrichedResults = await processExcelFile(file, setProgress, setCurrentStatus, delay);
       setResults(enrichedResults);
       
       toast({
@@ -108,6 +109,8 @@ const FileUploader = () => {
             onExport={handleExport}
             onClear={handleClearResults}
             hasResults={results.length > 0}
+            delay={delay}
+            onDelayChange={setDelay}
           />
         </CardContent>
       </Card>
