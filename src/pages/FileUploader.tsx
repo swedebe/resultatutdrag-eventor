@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Home, Trash2, FileDown, Pencil, Save, XCircle, ArrowLeft } from "lucide-react";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -36,17 +36,11 @@ const FileUploader = () => {
 
   const updateLogs = async (newLogs: LogEntry[]) => {
     setLogs(newLogs);
-    
-    // We don't need to store logs in the runs table anymore
-    // They're directly inserted into the processing_logs table during processing
   };
 
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       if (isProcessing && runId) {
-        // The data is already being saved to the database tables during processing
-        // We don't need to save anything here anymore
-        
         e.preventDefault();
         e.returnValue = "Du har en pågående körning. Är du säker på att du vill lämna sidan?";
         return e.returnValue;
@@ -108,7 +102,6 @@ const FileUploader = () => {
     setIsSaving(true);
     
     try {
-      // Update run table with event count (results are already saved in processed_results)
       const { error } = await supabase
         .from('runs')
         .update({ 
@@ -161,7 +154,6 @@ const FileUploader = () => {
     const updatedLogs = [...logs, newLog];
     setLogs(updatedLogs);
     
-    // Save the cancellation log to database
     if (runId) {
       try {
         supabase
@@ -217,7 +209,7 @@ const FileUploader = () => {
           
           return !cancelProcessing;
         },
-        newRunId  // Pass runId to save results directly to database during processing
+        newRunId
       );
       
       if (!cancelProcessing) {
@@ -351,7 +343,14 @@ const FileUploader = () => {
   
   return (
     <div className="container py-8">
-      <h1 className="text-4xl font-bold mb-6">Göingarna Resultatanalys - Filuppladdning</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-4xl font-bold">Resultatanalys - Filuppladdning</h1>
+        <Link to="/">
+          <Button variant="outline" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
+          </Button>
+        </Link>
+      </div>
       
       <Card className="mb-6">
         <CardHeader>

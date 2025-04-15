@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,6 +23,28 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(name);
+  const [actualEventCount, setActualEventCount] = useState(eventCount);
+
+  useEffect(() => {
+    // Fetch the actual count from processed_results table
+    const fetchActualCount = async () => {
+      const { count, error } = await supabase
+        .from('processed_results')
+        .select('*', { count: 'exact', head: true })
+        .eq('run_id', id);
+      
+      if (error) {
+        console.error("Error fetching actual count:", error);
+        return;
+      }
+      
+      if (count !== null) {
+        setActualEventCount(count);
+      }
+    };
+
+    fetchActualCount();
+  }, [id]);
 
   const formattedDate = React.useMemo(() => {
     try {
@@ -139,7 +161,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         <div className="space-y-1">
           <h3 className="font-medium">{name}</h3>
           <p className="text-sm text-muted-foreground">
-            {eventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
+            {actualEventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
           </p>
         </div>
       )}
