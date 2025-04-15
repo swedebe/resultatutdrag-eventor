@@ -48,6 +48,12 @@ const RunDetail = () => {
         title: "Export slutförd",
         description: "Resultat exporterade till berikade_resultat.xlsx",
       });
+    } else {
+      toast({
+        title: "Inga resultat att exportera",
+        description: "Denna körning innehåller inga resultat som kan exporteras",
+        variant: "destructive",
+      });
     }
   };
   
@@ -153,6 +159,7 @@ const RunDetail = () => {
 
   // Ensure results is an array before passing it to ResultsTable
   const results = Array.isArray(run.results) ? run.results : [];
+  const hasResults = results.length > 0;
 
   return (
     <div className="container py-8">
@@ -190,7 +197,7 @@ const RunDetail = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleExport} variant="outline">
+          <Button onClick={handleExport} variant="outline" disabled={!hasResults}>
             <FileDown className="mr-2 h-4 w-4" /> Exportera till Excel
           </Button>
           <Button onClick={handleDelete} variant="destructive" disabled={isDeleting}>
@@ -199,7 +206,24 @@ const RunDetail = () => {
         </div>
       </div>
 
-      <ResultsTable results={results as ResultRow[]} />
+      {!hasResults ? (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Inga resultat</CardTitle>
+            <CardDescription>
+              Denna körning innehåller inga sparade resultat. Det kan bero på att körningen avbröts innan någon data hämtades eller att något gick fel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Du kan skapa en ny körning från filuppladdningssidan:</p>
+            <Button className="mt-4" onClick={() => navigate("/file-upload")}>
+              Skapa ny körning
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <ResultsTable results={results as ResultRow[]} />
+      )}
     </div>
   );
 };
