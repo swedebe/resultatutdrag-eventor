@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import FileUploader from "./pages/FileUploader";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
+import AuthWrapper from "./components/AuthWrapper";
 
 const queryClient = new QueryClient();
 
@@ -17,8 +19,23 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/file-upload" element={<FileUploader />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
+            element={
+              <AuthWrapper>
+                <Index />
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/file-upload"
+            element={
+              <AuthWrapper>
+                <FileUploader />
+              </AuthWrapper>
+            }
+          />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

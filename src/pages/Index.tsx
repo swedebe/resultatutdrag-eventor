@@ -1,130 +1,92 @@
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
-import ResultsTable from "@/components/ResultsTable";
-import ResultsStatistics from "@/components/ResultsStatistics";
-import { parseEventorResults } from "@/lib/eventor-parser";
+import { Button } from "@/components/ui/button";
+import AuthStatus from "@/components/AuthStatus";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
-  const { toast } = useToast();
-  const [results, setResults] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [url, setUrl] = useState("");
-  const [clubName, setClubName] = useState("Göingarna");
-
-  const handleFetchResults = async () => {
-    if (!url.includes("eventor.orientering.se")) {
-      toast({
-        title: "Fel",
-        description: "URL:en måste vara från eventor.orientering.se",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // I en riktig implementation skulle vi använda en proxy-server eller API
-      // för att undvika CORS-problem vid hämtning från Eventor
-      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-      const html = await response.text();
-      
-      const parsedResults = parseEventorResults(html, clubName);
-      
-      if (parsedResults.length === 0) {
-        toast({
-          title: "Inga resultat hittades",
-          description: `Kunde inte hitta några resultat för ${clubName} på den angivna sidan.`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Resultat importerade",
-          description: `${parsedResults.length} resultat hittades för ${clubName}`,
-        });
-        setResults((prev) => [...prev, ...parsedResults]);
+  // Fetch user info from Supabase
+  const { data: userData } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('club_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        return data;
       }
-    } catch (error) {
-      console.error("Error fetching results:", error);
-      toast({
-        title: "Fel vid hämtning",
-        description: "Kunde inte hämta resultat från den angivna URL:en",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      return null;
     }
-  };
-
-  const handleClearResults = () => {
-    setResults([]);
-    toast({
-      title: "Resultat rensade",
-      description: "Alla resultat har tagits bort från tabellen",
-    });
-  };
+  });
 
   return (
     <div className="container py-8">
-      <h1 className="text-4xl font-bold mb-6">Göingarna Resultatanalys</h1>
-      
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <p className="text-muted-foreground">Importera resultat från Eventor eller använd Excel-uppladdning</p>
-        </div>
-        <Link to="/file-upload">
-          <Button variant="outline">
-            Excel-uppladdning
-          </Button>
-        </Link>
+        <h1 className="text-4xl font-bold">Resultatanalys</h1>
+        <AuthStatus />
       </div>
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Importera resultat</CardTitle>
+          <CardTitle>Välkommen {userData?.club_name}</CardTitle>
           <CardDescription>
-            Klistra in länken till resultat från eventor.orientering.se för att importera
+            Importera och analysera orienteringsresultat för din klubb
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <div className="flex gap-3">
-              <Input
-                placeholder="https://eventor.orientering.se/Events/ResultList?eventId=..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleFetchResults} disabled={isLoading}>
-                {isLoading ? "Hämtar..." : "Hämta resultat"}
-              </Button>
-            </div>
-            
-            <div className="flex gap-3">
-              <Input
-                placeholder="Klubbnamn"
-                value={clubName}
-                onChange={(e) => setClubName(e.target.value)}
-                className="w-48"
-              />
-              <Button variant="outline" onClick={handleClearResults}>
-                Rensa alla resultat
-              </Button>
+            <p>
+              Med detta verktyg kan du enkelt ladda upp och analysera resultat från orienteringstävlingar.
+            </p>
+            <p>
+              Använd Excel-uppladdningen för att importera dina resultat och få detaljerade analyser.
+            </p>
+            <div className="flex justify-center mt-4">
+              <Link to="/file-upload">
+                <Button>
+                  Gå till Excel-uppladdning
+                </Button>
+              </Link>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {results.length > 0 && (
-        <>
-          <ResultsStatistics results={results} />
-          <ResultsTable results={results} />
-        </>
-      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Analysera</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Se detaljerade statistikanalyser av dina importerade resultat med visualiseringar och insikter.</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Jämför</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Jämför resultat över tid och mellan olika klasser för att upptäcka trender och förbättringar.</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Exportera</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Exportera dina analyserade resultat till Excel för att dela med klubbmedlemmar eller för vidare analys.</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
