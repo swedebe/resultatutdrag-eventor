@@ -37,7 +37,7 @@ export const processExcelFile = async (
       const resultRow = mapExcelRowToResultRow(row);
       
       // Log the original started value for debugging
-      console.log(`Row ${i+1}: Original 'started' value:`, resultRow.started);
+      console.log(`Row ${i+1}: Original 'started' value:`, resultRow.started, typeof resultRow.started);
       
       setProgress(10 + Math.floor(80 * (i / jsonData.length)));
       setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${jsonData.length})...`);
@@ -50,7 +50,7 @@ export const processExcelFile = async (
         const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
         const saveMessage = savedSuccessfully 
           ? `Sparat resultat för tävling ${resultRow.eventId} i databasen` + 
-            ` (started=${enhancedResultRow.started ? '1' : '0'})`
+            ` (started=${enhancedResultRow.started ? '1' : '0'}, type=${typeof enhancedResultRow.started})`
           : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
           
         addLog(resultRow.eventId, currentEventorUrl, saveMessage);
@@ -91,6 +91,11 @@ export const processExcelFile = async (
       }
     } catch (error: any) {
       console.error(`Error processing row:`, error);
+      addLog("error", "", `Fel vid bearbetning av rad: ${error.message || error}`);
+      
+      if (runId) {
+        await saveLogToDatabase(runId, "error", "", `Fel vid bearbetning av rad: ${error.message || error}`);
+      }
       
       // Continue with next row
       continue;

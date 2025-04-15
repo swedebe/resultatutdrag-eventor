@@ -31,17 +31,25 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
       processedResult.user_club = runData.club_name || null;
     }
     
+    console.log('Attempting to save to database:', {
+      eventId: processedResult.event_id,
+      runId: processedResult.run_id,
+      startedValue: resultRow.started, 
+      processedStartedValue: processedResult.started
+    });
+    
     const { error } = await supabase.from('processed_results').insert(processedResult);
     
     if (error) {
-      console.error('Error inserting processed result:', error);
+      console.error(`Error inserting processed result for event ${resultRow.eventId}:`, error);
+      console.error('Result data that caused the error:', JSON.stringify(processedResult));
       return false;
     }
     
     console.log('Result saved to database:', processedResult);
     return true;
   } catch (err) {
-    console.error('Error saving processed result:', err);
+    console.error(`Error saving processed result for event ${resultRow?.eventId}:`, err);
     return false;
   }
 };
