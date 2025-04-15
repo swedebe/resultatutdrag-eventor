@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for file processing
  */
@@ -40,7 +41,7 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
   const startedValue = (() => {
     const started = resultRow.started;
     
-    // Hantera olika möjliga textformat och typer
+    // Handle different possible text formats and types
     const truePatterns = [
       true, 
       1, 

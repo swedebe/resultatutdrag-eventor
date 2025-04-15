@@ -1,4 +1,5 @@
 
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -47,7 +48,20 @@ export const processExcelFile = async (
       
       // Save processed result to database if runId is provided
       if (runId) {
+        console.log(`About to save result for event ${resultRow.eventId}, started value:`, 
+          enhancedResultRow.started, typeof enhancedResultRow.started);
+            
         const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
+        
+        const saveMessage = savedSuccessfully 
+          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen (started=${enhancedResultRow.started ? '1' : '0'})`
+          : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
+          
+        addLog(resultRow.eventId, currentEventorUrl, saveMessage);
+        
+        if (runId) {
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, saveMessage);
+        }
         
         if (!savedSuccessfully) {
           console.error(`Failed to save result for event ${resultRow.eventId}`, {
@@ -55,17 +69,6 @@ export const processExcelFile = async (
             'Enhanced started': enhancedResultRow.started,
             'Type': typeof enhancedResultRow.started
           });
-        }
-        
-        const saveMessage = savedSuccessfully 
-          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen` + 
-            ` (started=${enhancedResultRow.started ? '1' : '0'}, type=${typeof enhancedResultRow.started})`
-          : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
-          
-        addLog(resultRow.eventId, currentEventorUrl, saveMessage);
-        
-        if (runId) {
-          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, saveMessage);
         }
       }
       

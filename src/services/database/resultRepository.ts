@@ -36,13 +36,11 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
       runId: processedResult.run_id,
       startedValue: resultRow.started, 
       processedStartedValue: processedResult.started,
-      fullDataKeys: Object.keys(processedResult),
+      startedType: typeof processedResult.started
     });
     
-    // Make sure 'started' is explicitly converted to a number
-    if (processedResult.started !== null && processedResult.started !== undefined) {
-      processedResult.started = Number(processedResult.started);
-    }
+    // Ensure started is always an integer
+    processedResult.started = Number(processedResult.started) === 1 ? 1 : 0;
     
     // Make a clean insert with explicit type conversions
     const { error } = await supabase.from('processed_results').insert({
@@ -53,17 +51,21 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
       total_participants: processedResult.total_participants ? Number(processedResult.total_participants) : null,
       time_after_seconds: processedResult.time_after_seconds ? Number(processedResult.time_after_seconds) : null,
       course_length: processedResult.course_length ? Number(processedResult.course_length) : null,
-      started: processedResult.started ? 1 : 0
+      started: processedResult.started
     });
     
     if (error) {
       console.error(`Error inserting processed result for event ${resultRow.eventId}:`, error);
       console.error('Error details:', error.message, error.code, error.details);
-      console.error('Result data that caused the error:', JSON.stringify(processedResult));
+      console.error('Result data that caused the error:', JSON.stringify({
+        ...processedResult,
+        started: processedResult.started,
+        started_type: typeof processedResult.started
+      }));
       return false;
     }
     
-    console.log('Result saved to database:', processedResult);
+    console.log('Result saved to database with started value:', processedResult.started);
     return true;
   } catch (err) {
     console.error(`Error saving processed result for event ${resultRow?.eventId}:`, err);
