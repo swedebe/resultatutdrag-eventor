@@ -1,20 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import ResultsTable from "@/components/ResultsTable";
-import LogComponent from "@/components/LogComponent";
 import { RunWithLogs } from "@/types/database";
-import { Home, FileDown } from "lucide-react";
-import { exportResultsToExcel, ResultRow, fetchProcessedResults, fetchProcessingLogs } from "@/services/FileProcessingService";
 import { useToast } from "@/components/ui/use-toast";
+import { exportResultsToExcel, ResultRow, fetchProcessedResults, fetchProcessingLogs } from "@/services/FileProcessingService";
+import RunInfoCard from '@/components/run-details/RunInfoCard';
+import RunActionButtons from '@/components/run-details/RunActionButtons';
+import RunLogSection from '@/components/run-details/RunLogSection';
+import RunResultsSection from '@/components/run-details/RunResultsSection';
+import RunDetailSkeleton from '@/components/run-details/RunDetailSkeleton';
+import RunNotFound from '@/components/run-details/RunNotFound';
 
 const RunDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [run, setRun] = useState<RunWithLogs | null>(null);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -96,29 +95,6 @@ const RunDetail = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="container py-8">
-        <Skeleton className="h-12 w-3/4 mb-4" />
-        <Skeleton className="h-64 w-full mb-6" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
-  }
-
-  if (!run) {
-    return (
-      <div className="container py-8">
-        <h1 className="text-4xl font-bold mb-6">Körning hittades inte</h1>
-        <p className="mb-6">Körningen du söker finns inte eller så har den tagits bort.</p>
-        <Button onClick={() => navigate('/')}>
-          <Home className="mr-2 h-4 w-4" />
-          Tillbaka till startsidan
-        </Button>
-      </div>
-    );
-  }
-
   const toggleShowLogs = () => {
     setShowLogs(prev => !prev);
   };
@@ -135,72 +111,35 @@ const RunDetail = () => {
            logs.length > 0;
   };
 
+  if (loading) {
+    return <RunDetailSkeleton />;
+  }
+
+  if (!run) {
+    return <RunNotFound />;
+  }
+
   return (
     <div className="container py-8">
       <h1 className="text-4xl font-bold mb-6">Körningsdetaljer: {run.name}</h1>
       
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Button onClick={() => navigate('/')}>
-          <Home className="mr-2 h-4 w-4" />
-          Tillbaka till startsidan
-        </Button>
-        <Button onClick={handleExport} variant="outline" disabled={results.length === 0}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Ladda ner Excel
-        </Button>
-        {hasLogs() && (
-          <Button onClick={toggleShowLogs} variant="outline">
-            {showLogs ? "Dölj loggar" : "Visa loggar"}
-          </Button>
-        )}
-      </div>
+      <RunActionButtons
+        onExport={handleExport}
+        resultsCount={results.length}
+        hasLogs={hasLogs()}
+        showLogs={showLogs}
+        onToggleLogs={toggleShowLogs}
+      />
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Körningsinformation</CardTitle>
-          <CardDescription>Information om denna analys</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium">Namn:</p>
-              <p className="text-lg">{run.name}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Datum:</p>
-              <p className="text-lg">{new Date(run.date).toLocaleString('sv-SE')}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Antal evenemang:</p>
-              <p className="text-lg">{run.event_count}</p>
-            </div>
-            {run.club_name && (
-              <div>
-                <p className="text-sm font-medium">Klubb:</p>
-                <p className="text-lg">{run.club_name}</p>
-              </div>
-            )}
-          </div>
-          <div className="mt-4">
-            <p className="text-sm font-medium">Antal resultat:</p>
-            <p className="text-lg">{results.length}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <RunInfoCard run={run} resultsCount={results.length} />
       
-      {showLogs && hasLogs() && (
-        <LogComponent logs={logs} onClearLogs={clearLogs} />
-      )}
+      <RunLogSection 
+        logs={logs}
+        showLogs={showLogs}
+        onClearLogs={clearLogs}
+      />
 
-      {results.length > 0 ? (
-        <ResultsTable results={results} />
-      ) : (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-muted-foreground">Inga resultat finns tillgängliga för denna körning.</p>
-          </CardContent>
-        </Card>
-      )}
+      <RunResultsSection results={results} />
     </div>
   );
 };
