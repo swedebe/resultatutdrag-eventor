@@ -39,19 +39,29 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
       startedType: typeof processedResult.started
     });
     
-    // Ensure started is always an integer
+    // Double-check that started is a proper integer
     processedResult.started = Number(processedResult.started) === 1 ? 1 : 0;
     
-    // Make a clean insert with explicit type conversions
+    // Make a clean insert with explicit type conversions for all numeric fields
     const { error } = await supabase.from('processed_results').insert({
-      ...processedResult,
+      run_id: processedResult.run_id,
       event_id: String(processedResult.event_id),
+      event_name: processedResult.event_name,
+      event_date: processedResult.event_date,
+      event_type: processedResult.event_type,
+      runner_name: processedResult.runner_name,
       person_id: processedResult.person_id ? Number(processedResult.person_id) : null,
+      birth_year: processedResult.birth_year,
+      class_name: processedResult.class_name,
+      class_type: processedResult.class_type,
       position: processedResult.position ? Number(processedResult.position) : null,
       total_participants: processedResult.total_participants ? Number(processedResult.total_participants) : null,
+      time: processedResult.time,
+      time_after: processedResult.time_after,
       time_after_seconds: processedResult.time_after_seconds ? Number(processedResult.time_after_seconds) : null,
       course_length: processedResult.course_length ? Number(processedResult.course_length) : null,
-      started: processedResult.started
+      organizer: processedResult.organizer,
+      started: Number(processedResult.started) // One more forced conversion to be absolutely sure
     });
     
     if (error) {

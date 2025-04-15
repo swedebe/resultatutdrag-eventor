@@ -37,9 +37,13 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
-  // Convert the 'started' value to a strict 0 or 1 integer
+  // Make sure we have a clean number for started
+  // Force conversion to number to ensure database compatibility
   const startedValue = (() => {
-    // Handle the case where started could be undefined, null, or various formats
+    // Log incoming value for debugging
+    console.log(`Raw started value: ${resultRow.started}, type: ${typeof resultRow.started}`);
+    
+    // Handle undefined/null case
     if (resultRow.started === undefined || resultRow.started === null) {
       return 0;
     }
@@ -59,14 +63,19 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
       'j'
     ];
     
-    // Convert to strict 0 or 1
-    return truePatterns.some(pattern => 
+    // Perform the comparison and force a numeric 0 or 1
+    const isTrue = truePatterns.some(pattern => 
       resultRow.started === pattern || 
       String(resultRow.started).toLowerCase() === String(pattern).toLowerCase()
-    ) ? 1 : 0;
+    );
+    
+    // Force to number type with + operator
+    return isTrue ? 1 : 0;
   })();
   
-  // Return the processed result with started as a strict integer
+  console.log(`Processed started value: ${startedValue}, type: ${typeof startedValue}`);
+  
+  // Return the processed result with started as a guaranteed number
   return {
     run_id: runId,
     event_date: resultRow.date,
@@ -85,6 +94,6 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
     time_after_seconds: resultRow.timeInSeconds,
     course_length: resultRow.length,
     organizer: resultRow.organizer,
-    started: startedValue  // Always an integer (0 or 1)
+    started: Number(startedValue) // Force to number type again to be extra safe
   };
 };
