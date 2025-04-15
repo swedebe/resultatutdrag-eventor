@@ -9,6 +9,7 @@ import { User } from '@supabase/supabase-js';
 const AuthStatus = () => {
   const [user, setUser] = useState<User | null>(null);
   const [clubName, setClubName] = useState<string>('');
+  const [name, setName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -20,18 +21,20 @@ const AuthStatus = () => {
         
         if (!session?.user) {
           setClubName('');
+          setName('');
         } else {
           // Defer fetching user profile with setTimeout to avoid deadlocks
           setTimeout(async () => {
             try {
               const { data, error } = await supabase
                 .from('users')
-                .select('club_name')
+                .select('club_name, name')
                 .eq('id', session.user.id)
                 .maybeSingle();
                 
               if (!error && data) {
                 setClubName(data.club_name);
+                setName(data.name || '');
               }
             } catch (error) {
               console.error('Error fetching user profile:', error);
@@ -50,12 +53,13 @@ const AuthStatus = () => {
         if (session?.user) {
           const { data, error } = await supabase
             .from('users')
-            .select('club_name')
+            .select('club_name, name')
             .eq('id', session.user.id)
             .maybeSingle();
 
           if (!error && data) {
             setClubName(data.club_name);
+            setName(data.name || '');
           }
         }
       } catch (error) {
@@ -104,7 +108,7 @@ const AuthStatus = () => {
     <div className="flex items-center gap-4">
       <div className="text-sm">
         <span className="text-muted-foreground mr-2">Inloggad som</span>
-        <span className="font-medium">{clubName || user.email}</span>
+        <span className="font-medium">{name || clubName || user.email}</span>
       </div>
       <Button variant="outline" size="sm" onClick={handleSignOut}>
         Logga ut

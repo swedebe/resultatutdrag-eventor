@@ -11,9 +11,8 @@ import { useNavigate } from "react-router-dom";
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [clubName, setClubName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -69,14 +68,14 @@ const Auth = () => {
     }
   };
   
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    if (!clubName) {
+    if (!email) {
       toast({
-        title: "Klubbnamn saknas",
-        description: "Du måste ange ett klubbnamn för att registrera dig",
+        title: "E-post saknas",
+        description: "Du måste ange din e-post för att återställa lösenordet",
         variant: "destructive",
       });
       setLoading(false);
@@ -84,26 +83,21 @@ const Auth = () => {
     }
     
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            club_name: clubName,
-          }
-        }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
       });
       
       if (error) throw error;
       
       toast({
-        title: "Registrering lyckades",
-        description: "Kontrollera din e-post för verifieringslänk",
+        title: "Återställningslänk skickad",
+        description: "Kontrollera din e-post för en länk att återställa ditt lösenord",
       });
       
+      setShowResetPassword(false);
     } catch (error: any) {
       toast({
-        title: "Ett fel uppstod vid registrering",
+        title: "Ett fel uppstod",
         description: error.message,
         variant: "destructive",
       });
@@ -116,75 +110,75 @@ const Auth = () => {
     <div className="flex min-h-[80vh] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isSignUp ? "Registrera konto" : "Logga in"}</CardTitle>
+          <CardTitle>{showResetPassword ? "Återställ lösenord" : "Logga in"}</CardTitle>
           <CardDescription>
-            {isSignUp 
-              ? "Skapa ett nytt konto för din orienteringsklubb" 
+            {showResetPassword 
+              ? "Ange din e-post för att få en länk att återställa ditt lösenord" 
               : "Logga in för att hantera din klubbs resultat"}
           </CardDescription>
         </CardHeader>
         
         <CardContent>
-          <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-post</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="din@email.se"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Lösenord</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            
-            {isSignUp && (
+          {showResetPassword ? (
+            <form onSubmit={handleResetPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="club">Klubbnamn</Label>
+                <Label htmlFor="reset-email">E-post</Label>
                 <Input
-                  id="club"
-                  type="text"
-                  placeholder="Din orienteringsklubb"
-                  value={clubName}
-                  onChange={(e) => setClubName(e.target.value)}
+                  id="reset-email"
+                  type="email"
+                  placeholder="din@email.se"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-            )}
-            
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading
-                ? "Bearbetar..."
-                : isSignUp
-                  ? "Registrera"
-                  : "Logga in"
-              }
-            </Button>
-          </form>
+              
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Bearbetar..." : "Skicka återställningslänk"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-post</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="din@email.se"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Lösenord</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Bearbetar..." : "Logga in"}
+              </Button>
+            </form>
+          )}
         </CardContent>
         
         <CardFooter className="flex flex-col">
           <Button 
             variant="link" 
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => setShowResetPassword(!showResetPassword)}
             className="w-full"
           >
-            {isSignUp
-              ? "Redan registrerad? Logga in"
-              : "Behöver du ett konto? Registrera dig"
-            }
+            {showResetPassword
+              ? "Tillbaka till inloggning"
+              : "Glömt lösenord?"}
           </Button>
         </CardFooter>
       </Card>
