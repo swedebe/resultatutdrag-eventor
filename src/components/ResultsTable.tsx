@@ -12,9 +12,37 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
+import { ResultRow } from "@/services/FileProcessingService";
+
+interface SortableColumnProps {
+  column: string;
+  currentSort: string;
+  direction: string;
+  onSort: (column: string) => void;
+  children: React.ReactNode;
+}
+
+const SortableColumn: React.FC<SortableColumnProps> = ({ 
+  column, 
+  currentSort, 
+  direction, 
+  onSort, 
+  children 
+}) => {
+  return (
+    <TableHead role="button" onClick={() => onSort(column)} className="whitespace-nowrap">
+      {children}
+      {currentSort === column && (
+        direction === "asc" 
+          ? <ArrowUp className="h-4 w-4 inline ml-1" /> 
+          : <ArrowDown className="h-4 w-4 inline ml-1" />
+      )}
+    </TableHead>
+  );
+};
 
 interface ResultsTableProps {
-  results: any[];
+  results: ResultRow[];
 }
 
 const ResultsTable = ({ results }: ResultsTableProps) => {
@@ -61,10 +89,6 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
         valueA = a.timeInSeconds || Number.MAX_VALUE;
         valueB = b.timeInSeconds || Number.MAX_VALUE;
         break;
-      case "timeAfterWinner":
-        valueA = a.timeAfterWinner || "";
-        valueB = b.timeAfterWinner || "";
-        break;
       case "position":
       case "totalParticipants":
       case "length":
@@ -84,11 +108,6 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
     if (valueA > valueB) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
-
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortColumn !== column) return null;
-    return sortDirection === "asc" ? <ArrowUp className="h-4 w-4 inline ml-1" /> : <ArrowDown className="h-4 w-4 inline ml-1" />;
-  };
 
   // Helper function to display dash for empty or zero values
   const displayValue = (value: any, suffix: string = ''): string => {
@@ -122,54 +141,42 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
           </TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead role="button" onClick={() => handleSort("date")} className="whitespace-nowrap">
-                Datum <SortIcon column="date" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("eventName")} className="whitespace-nowrap">
-                Tävling <SortIcon column="eventName" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("eventType")} className="whitespace-nowrap">
-                Typ <SortIcon column="eventType" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("name")} className="whitespace-nowrap">
-                Namn <SortIcon column="name" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("personId")} className="whitespace-nowrap">
-                Person-id <SortIcon column="personId" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("birthYear")} className="whitespace-nowrap">
-                Födelseår <SortIcon column="birthYear" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("class")} className="whitespace-nowrap">
-                Klass <SortIcon column="class" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("length")} className="whitespace-nowrap">
-                Längd <SortIcon column="length" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("time")} className="whitespace-nowrap">
-                Tid <SortIcon column="time" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("timeAfterWinner")} className="whitespace-nowrap">
-                Tid efter segraren <SortIcon column="timeAfterWinner" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("position")} className="whitespace-nowrap">
-                Plac <SortIcon column="position" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("totalParticipants")} className="whitespace-nowrap">
-                Antal <SortIcon column="totalParticipants" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("started")} className="whitespace-nowrap">
-                Startat <SortIcon column="started" />
-              </TableHead>
-              <TableHead role="button" onClick={() => handleSort("organizer")} className="whitespace-nowrap">
-                Arrangör <SortIcon column="organizer" />
-              </TableHead>
+              <SortableColumn column="date" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Datum
+              </SortableColumn>
+              <SortableColumn column="eventName" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Tävling
+              </SortableColumn>
+              <SortableColumn column="eventType" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Typ
+              </SortableColumn>
+              <SortableColumn column="name" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Namn
+              </SortableColumn>
+              <SortableColumn column="class" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Klass
+              </SortableColumn>
+              <SortableColumn column="length" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Längd
+              </SortableColumn>
+              <SortableColumn column="time" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Tid
+              </SortableColumn>
+              <SortableColumn column="position" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Plac
+              </SortableColumn>
+              <SortableColumn column="totalParticipants" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Antal
+              </SortableColumn>
+              <SortableColumn column="organizer" currentSort={sortColumn} direction={sortDirection} onSort={handleSort}>
+                Arrangör
+              </SortableColumn>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedResults.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-4">
+                <TableCell colSpan={10} className="text-center py-4">
                   Inga resultat hittades
                 </TableCell>
               </TableRow>
@@ -180,15 +187,11 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
                   <TableCell>{displayValue(result.eventName)}</TableCell>
                   <TableCell>{displayValue(result.eventType)}</TableCell>
                   <TableCell>{displayValue(result.name)}</TableCell>
-                  <TableCell>{displayValue(result.personId)}</TableCell>
-                  <TableCell>{displayValue(result.birthYear)}</TableCell>
                   <TableCell>{displayValue(result.class)}</TableCell>
                   <TableCell>{result.length ? `${result.length} m` : "-"}</TableCell>
                   <TableCell>{displayValue(result.time)}</TableCell>
-                  <TableCell>{displayValue(result.timeAfterWinner)}</TableCell>
                   <TableCell>{displayValue(result.position)}</TableCell>
                   <TableCell>{displayValue(result.totalParticipants)}</TableCell>
-                  <TableCell>{displayValue(result.started)}</TableCell>
                   <TableCell>{displayValue(result.organizer)}</TableCell>
                 </TableRow>
               ))
