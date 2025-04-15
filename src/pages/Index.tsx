@@ -53,16 +53,13 @@ const Index = () => {
         <CardHeader>
           <CardTitle>Välkommen {userData?.club_name}</CardTitle>
           <CardDescription>
-            Importera och analysera orienteringsresultat för din klubb
+            Med detta verktyg kan du använda en eportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <p>
-              Med detta verktyg kan du enkelt ladda upp och analysera resultat från orienteringstävlingar.
-            </p>
-            <p>
-              Använd Excel-uppladdningen för att importera dina resultat och få detaljerade analyser.
+              Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil.
             </p>
             <div className="flex justify-center mt-4">
               <Link to="/file-upload">

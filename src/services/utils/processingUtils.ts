@@ -37,9 +37,12 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
-  // Robust conversion of 'started' with multiple match patterns
+  // Convert the 'started' value to a strict 0 or 1 integer
   const startedValue = (() => {
-    const started = resultRow.started;
+    // Handle the case where started could be undefined, null, or various formats
+    if (resultRow.started === undefined || resultRow.started === null) {
+      return 0;
+    }
     
     // Handle different possible text formats and types
     const truePatterns = [
@@ -56,12 +59,14 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
       'j'
     ];
     
+    // Convert to strict 0 or 1
     return truePatterns.some(pattern => 
-      started === pattern || 
-      String(started).toLowerCase() === String(pattern).toLowerCase()
+      resultRow.started === pattern || 
+      String(resultRow.started).toLowerCase() === String(pattern).toLowerCase()
     ) ? 1 : 0;
   })();
   
+  // Return the processed result with started as a strict integer
   return {
     run_id: runId,
     event_date: resultRow.date,
@@ -80,6 +85,6 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
     time_after_seconds: resultRow.timeInSeconds,
     course_length: resultRow.length,
     organizer: resultRow.organizer,
-    started: startedValue
+    started: startedValue  // Always an integer (0 or 1)
   };
 };
