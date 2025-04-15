@@ -122,6 +122,8 @@ export const processExcelFile = async (file: File, setProgress: (value: number) 
       enrichedResults.push(resultRow);
     } catch (error) {
       console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
+      // Fix the missing variable - use the same currentEventorUrl from above
+      const currentEventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
       addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error}`);
       // Add the row without course length and participant count
       enrichedResults.push(resultRow);
