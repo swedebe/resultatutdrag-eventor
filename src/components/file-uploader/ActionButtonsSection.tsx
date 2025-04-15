@@ -36,15 +36,25 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         <Save className="mr-2 h-4 w-4" />
         {isSaving ? "Sparar..." : "Slutför"}
       </Button>
-      <Link to="/">
+      
+      {/* Use Button instead of Link when processing, otherwise use Link */}
+      {isProcessing ? (
         <Button 
           variant="outline"
-          disabled={isProcessing}
+          disabled={true}
         >
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
         </Button>
-      </Link>
+      ) : (
+        <Link to="/">
+          <Button variant="outline">
+            <Home className="mr-2 h-4 w-4" />
+            Tillbaka till startsidan
+          </Button>
+        </Link>
+      )}
+      
       <Button 
         onClick={onExportResults}
         variant="outline"
@@ -53,6 +63,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         <FileDown className="mr-2 h-4 w-4" />
         Ladda ner Excel
       </Button>
+      
       <Button 
         onClick={onDeleteRun}
         variant="destructive"
@@ -61,6 +72,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         <Trash2 className="mr-2 h-4 w-4" />
         Ta bort körning
       </Button>
+      
       {onCancelProcessing && (
         <Button 
           onClick={onCancelProcessing}

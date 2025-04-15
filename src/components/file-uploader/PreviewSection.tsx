@@ -47,6 +47,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         onRenameRun={onRenameRun}
         isRenaming={isRenaming}
         runId={runId}
+        isProcessing={isProcessing}
       />
       <ActionButtonsSection
         onSaveResults={onSaveResults}

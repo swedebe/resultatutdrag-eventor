@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
@@ -138,14 +139,13 @@ const FileUploader = () => {
       addCancellationLog();
       setCurrentStatus("Avbryter körning...");
       
-      setTimeout(() => {
-        setIsProcessing(false);
-        setCurrentStatus("Körning avbruten av användaren");
-        toast({
-          title: "Körning avbruten",
-          description: "Körningen avbröts av användaren",
-        });
-      }, 500);
+      // Immediately set processing to false to stop the current operation
+      setIsProcessing(false);
+      
+      toast({
+        title: "Körning avbruten",
+        description: "Körningen avbröts av användaren",
+      });
     }
   };
 
@@ -201,6 +201,9 @@ const FileUploader = () => {
     setRunId(newRunId);
     
     try {
+      // Use a local variable to track if processing was cancelled
+      let wasCancelled = false;
+      
       const enrichedResults = await processExcelFile(
         file, 
         setProgress, 
@@ -209,8 +212,10 @@ const FileUploader = () => {
         async (partialResults: ResultRow[]) => {
           setResults(partialResults);
           
-          if (cancelProcessing) {
+          // Check if cancellation was requested or if processing was stopped
+          if (cancelProcessing || !isProcessing) {
             console.log("Cancellation detected, stopping processing");
+            wasCancelled = true;
             return false;
           }
           
@@ -219,7 +224,8 @@ const FileUploader = () => {
         newRunId
       );
       
-      if (!cancelProcessing) {
+      // Only update results and show success toast if not cancelled
+      if (!wasCancelled) {
         setResults(enrichedResults);
         
         if (enrichedResults.length > 0) {
@@ -237,6 +243,7 @@ const FileUploader = () => {
     } catch (error: any) {
       console.error("Fel vid bearbetning av fil:", error);
       
+      // Check if cancellation was requested
       if (cancelProcessing) {
         toast({
           title: "Körning avbruten",
@@ -352,11 +359,17 @@ const FileUploader = () => {
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">Resultatanalys - Filuppladdning</h1>
-        <Link to="/">
-          <Button variant="outline" className="flex items-center gap-2" disabled={isProcessing}>
+        {isProcessing ? (
+          <Button variant="outline" className="flex items-center gap-2" disabled={true}>
             <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
           </Button>
-        </Link>
+        ) : (
+          <Link to="/">
+            <Button variant="outline" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
+            </Button>
+          </Link>
+        )}
       </div>
       
       <FileUploadSection
