@@ -1,17 +1,15 @@
+
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import FileUploadForm from "@/components/FileUploadForm";
+import { useNavigate, Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction } from "@/components/LogComponent";
-import ResultsPreview from "@/components/ResultsPreview";
 import ResultsTable from "@/components/ResultsTable";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, Link } from "react-router-dom";
-import { Home, Trash2, FileDown, Pencil, Save, XCircle, ArrowLeft } from "lucide-react";
+import FileUploadSection from "@/components/file-uploader/FileUploadSection";
+import PreviewSection from "@/components/file-uploader/PreviewSection";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -352,111 +350,37 @@ const FileUploader = () => {
         </Link>
       </div>
       
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Ladda upp resultatfil (Excel)</CardTitle>
-          <CardDescription>
-            Ladda upp en Excel-fil med resultat för att automatiskt berika dem med banlängd och antal startande
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FileUploadForm
-            isProcessing={isProcessing}
-            progress={progress}
-            currentStatus={currentStatus}
-            onFileChange={setFile}
-            onProcessFile={handleProcessFile}
-            onClear={handleClearResults}
-            hasResults={results.length > 0}
-            delay={delay}
-            onDelayChange={setDelay}
-          />
-          
-          {isProcessing && (
-            <Button 
-              variant="destructive" 
-              onClick={handleCancelProcessing}
-              className="mt-4"
-            >
-              <XCircle className="mr-2 h-4 w-4" /> Avbryt körning
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      <FileUploadSection
+        isProcessing={isProcessing}
+        progress={progress}
+        currentStatus={currentStatus}
+        file={file}
+        onFileChange={setFile}
+        onProcessFile={handleProcessFile}
+        onClear={handleClearResults}
+        hasResults={results.length > 0}
+        delay={delay}
+        onDelayChange={setDelay}
+        onCancelProcessing={handleCancelProcessing}
+      />
       
       <LogComponent logs={logs} onClearLogs={clearLogs} />
       
+      <PreviewSection
+        results={results}
+        saveName={saveName}
+        onSaveNameChange={setSaveName}
+        onRenameRun={handleRenameRun}
+        isRenaming={isRenaming}
+        runId={runId}
+        onSaveResults={saveResultsToDatabase}
+        onExportResults={handleExport}
+        onDeleteRun={handleDeleteRun}
+        isSaving={isSaving}
+      />
+      
       {results.length > 0 && (
-        <>
-          <ResultsPreview results={results} />
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Hantera körning</CardTitle>
-              <CardDescription>
-                Hantera denna körning eller exportera resultaten
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:gap-4 items-end">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="save-name">Namn på körningen</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        id="save-name"
-                        value={saveName} 
-                        onChange={(e) => setSaveName(e.target.value)}
-                        placeholder="Ange ett beskrivande namn för denna körning" 
-                      />
-                      <Button 
-                        onClick={handleRenameRun} 
-                        disabled={isRenaming || !saveName.trim() || !runId}
-                        variant="secondary"
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Byt namn
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    <Button 
-                      onClick={saveResultsToDatabase}
-                      variant="default"
-                      disabled={isSaving || results.length === 0 || !runId}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      {isSaving ? "Sparar..." : "Spara till databasen"}
-                    </Button>
-                    <Button 
-                      onClick={() => navigate("/")}
-                      variant="outline"
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      Tillbaka till startsidan
-                    </Button>
-                    <Button 
-                      onClick={handleExport}
-                      variant="outline"
-                    >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Ladda ner Excel
-                    </Button>
-                    <Button 
-                      onClick={handleDeleteRun}
-                      variant="destructive"
-                      disabled={!runId}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Ta bort körning
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <ResultsTable results={results} />
-        </>
+        <ResultsTable results={results} />
       )}
     </div>
   );
