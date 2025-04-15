@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import SavedRunItem from "@/components/SavedRunItem";
+import { PlusCircle } from "lucide-react";
 
 const Index = () => {
   // Fetch user info from Supabase
@@ -23,6 +25,20 @@ const Index = () => {
         return data;
       }
       return null;
+    }
+  });
+
+  // Fetch saved runs
+  const { data: savedRuns, isLoading: loadingRuns, refetch: refetchRuns } = useQuery({
+    queryKey: ['saved-runs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('runs')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
     }
   });
 
@@ -50,8 +66,9 @@ const Index = () => {
             </p>
             <div className="flex justify-center mt-4">
               <Link to="/file-upload">
-                <Button>
-                  Gå till Excel-uppladdning
+                <Button className="flex items-center gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  Skapa ny körning
                 </Button>
               </Link>
             </div>
@@ -59,34 +76,45 @@ const Index = () => {
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Analysera</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Se detaljerade statistikanalyser av dina importerade resultat med visualiseringar och insikter.</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Jämför</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Jämför resultat över tid och mellan olika klasser för att upptäcka trender och förbättringar.</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Exportera</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Exportera dina analyserade resultat till Excel för att dela med klubbmedlemmar eller för vidare analys.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Dina sparade körningar</CardTitle>
+            <CardDescription>
+              Tidigare sparade körningar och analyser
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingRuns ? (
+            <p className="text-center py-4 text-muted-foreground">Laddar sparade körningar...</p>
+          ) : savedRuns && savedRuns.length > 0 ? (
+            <div className="space-y-3">
+              {savedRuns.map(run => (
+                <SavedRunItem
+                  key={run.id}
+                  id={run.id}
+                  name={run.name}
+                  date={run.date}
+                  eventCount={run.event_count}
+                  onDelete={refetchRuns}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 px-4">
+              <p className="text-muted-foreground mb-4">
+                Du har inga sparade körningar än
+              </p>
+              <Link to="/file-upload">
+                <Button>
+                  Skapa din första körning
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -9,6 +9,7 @@ import FileUploader from "./pages/FileUploader";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthWrapper from "./components/AuthWrapper";
+import RunDetail from "./pages/RunDetail";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,14 @@ const App = () => (
             element={
               <AuthWrapper>
                 <FileUploader />
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/run/:id"
+            element={
+              <AuthWrapper>
+                <RunDetail />
               </AuthWrapper>
             }
           />
