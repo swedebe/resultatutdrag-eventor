@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import ResultsTable from "@/components/ResultsTable";
 import { Input } from "@/components/ui/input";
 import LogComponent, { LogEntry } from "@/components/LogComponent";
+import { RunWithLogs } from "@/types/database";
 
 const RunDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,10 +35,13 @@ const RunDetail = () => {
       
       if (error) throw error;
       
-      // Set the current name for editing
-      setNewName(data.name);
+      // Cast the data to include our logs type
+      const runWithLogs = data as unknown as RunWithLogs;
       
-      return data;
+      // Set the current name for editing
+      setNewName(runWithLogs.name);
+      
+      return runWithLogs;
     }
   });
 
@@ -173,11 +176,11 @@ const RunDetail = () => {
   }
 
   // Ensure results is an array before passing it to ResultsTable
-  const results = Array.isArray(run.results) ? run.results : [];
+  const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
   // Get logs from run.logs (if available) or default to empty array
-  const logs: LogEntry[] = Array.isArray(run.logs) ? run.logs : [];
+  const logs: LogEntry[] = run?.logs && Array.isArray(run.logs) ? run.logs : [];
   const hasLogs = logs.length > 0;
 
   // If the run was canceled or had an error, show a notice

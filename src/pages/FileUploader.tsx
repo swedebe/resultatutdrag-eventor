@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -13,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
+import { RunWithLogsUpdate } from "@/types/database";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -30,24 +30,23 @@ const FileUploader = () => {
   const [cancelProcessing, setCancelProcessing] = useState<boolean>(false);
   const navigate = useNavigate();
   
-  // Setup logging functionality
   useEffect(() => {
     setLogsUpdateFunction(updateLogs);
     return () => setLogsUpdateFunction(null);
   }, []);
 
-  // Function to update logs and save them to database
   const updateLogs = async (newLogs: LogEntry[]) => {
     setLogs(newLogs);
     
-    // If we have a run ID, save the logs to the database
     if (runId) {
       try {
+        const updateData: RunWithLogsUpdate = { 
+          logs: newLogs 
+        };
+        
         await supabase
           .from('runs')
-          .update({ 
-            logs: newLogs
-          })
+          .update(updateData)
           .eq('id', runId);
       } catch (error) {
         console.error("Error saving logs to database:", error);
@@ -55,25 +54,24 @@ const FileUploader = () => {
     }
   };
 
-  // Handle browser close/refresh events
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       if (isProcessing && runId) {
-        // Save the current state before the browser closes
         try {
+          const updateData: RunWithLogsUpdate = {
+            results: results,
+            logs: logs,
+            event_count: results.length
+          };
+          
           await supabase
             .from('runs')
-            .update({ 
-              results: results,
-              logs: logs,
-              event_count: results.length
-            })
+            .update(updateData)
             .eq('id', runId);
         } catch (error) {
           console.error("Error saving state before unload:", error);
         }
         
-        // Show a confirmation dialog
         e.preventDefault();
         e.returnValue = "Du har en pågående körning. Är du säker på att du vill lämna sidan?";
         return e.returnValue;
@@ -87,7 +85,6 @@ const FileUploader = () => {
     };
   }, [isProcessing, runId, results, logs]);
   
-  // Create a new run in the database
   const createNewRun = async (initialName: string): Promise<string | null> => {
     try {
       const { data, error } = await supabase
@@ -122,7 +119,6 @@ const FileUploader = () => {
     }
   };
 
-  // Save current results to database
   const saveResultsToDatabase = async () => {
     if (!runId) {
       toast({
@@ -136,13 +132,15 @@ const FileUploader = () => {
     setIsSaving(true);
     
     try {
+      const updateData: RunWithLogsUpdate = { 
+        results: results,
+        event_count: results.length,
+        logs: logs
+      };
+      
       await supabase
         .from('runs')
-        .update({ 
-          results: results,
-          event_count: results.length,
-          logs: logs
-        })
+        .update(updateData)
         .eq('id', runId);
         
       toast({
@@ -167,7 +165,6 @@ const FileUploader = () => {
       addCancellationLog();
       setCurrentStatus("Avbryter körning...");
       
-      // Save current state to database
       if (runId) {
         saveCurrentState();
       }
@@ -185,7 +182,6 @@ const FileUploader = () => {
     const updatedLogs = [...logs, newLog];
     setLogs(updatedLogs);
     
-    // Save logs to database
     if (runId) {
       try {
         supabase
@@ -198,18 +194,19 @@ const FileUploader = () => {
     }
   };
   
-  // Save current state to database
   const saveCurrentState = async () => {
     if (!runId) return;
     
     try {
+      const updateData: RunWithLogsUpdate = { 
+        results: results,
+        logs: logs,
+        event_count: results.length
+      };
+      
       await supabase
         .from('runs')
-        .update({ 
-          results: results,
-          logs: logs,
-          event_count: results.length
-        })
+        .update(updateData)
         .eq('id', runId);
         
       console.log("Current state saved to database");
@@ -232,14 +229,12 @@ const FileUploader = () => {
     setCancelProcessing(false);
     clearLogs();
     
-    // Create a default name for the run based on date and time
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     const timeStr = today.toTimeString().split(' ')[0];
     const initialRunName = `Körning ${dateStr} ${timeStr}`;
     setSaveName(initialRunName);
     
-    // Create a new run in the database
     const newRunId = await createNewRun(initialRunName);
     setRunId(newRunId);
     
@@ -249,16 +244,13 @@ const FileUploader = () => {
         setProgress, 
         setCurrentStatus, 
         delay,
-        // Callback for incremental updates with promise support for cancelation
         async (partialResults: ResultRow[]) => {
           setResults(partialResults);
           
-          // Check if processing should be canceled
           if (cancelProcessing) {
             throw new Error("Användaren avbröt körningen");
           }
           
-          // Save partial results and logs to database
           if (newRunId) {
             try {
               await supabase
@@ -274,7 +266,7 @@ const FileUploader = () => {
             }
           }
           
-          return !cancelProcessing; // Return false to cancel processing
+          return !cancelProcessing;
         }
       );
       
@@ -309,7 +301,6 @@ const FileUploader = () => {
         });
       }
       
-      // Ensure logs are saved even when an error occurs
       if (newRunId) {
         try {
           await supabase
@@ -364,7 +355,6 @@ const FileUploader = () => {
         description: "Körningen har tagits bort från databasen.",
       });
       
-      // Navigate back to home after deletion
       navigate("/");
     } catch (error: any) {
       console.error("Fel vid borttagning av körning:", error);
