@@ -36,11 +36,23 @@ const RunDetail = () => {
 
         if (data) {
           console.log("Retrieved run data:", data);
+          console.log("Raw results type:", typeof data.results);
+          console.log("Raw results data:", JSON.stringify(data.results).substring(0, 300) + "...");
+          console.log("Raw logs type:", typeof data.logs);
+          console.log("Raw logs data:", JSON.stringify(data.logs).substring(0, 300) + "...");
+          
           // Convert logs from Json to LogEntry[]
           const runWithLogs: RunWithLogs = {
             ...data,
             logs: jsonToLogs(data.logs)
           };
+          
+          console.log("Processed logs count:", runWithLogs.logs.length);
+          console.log("Results array?", Array.isArray(runWithLogs.results));
+          if (Array.isArray(runWithLogs.results)) {
+            console.log("Results count:", runWithLogs.results.length);
+          }
+          
           setRun(runWithLogs);
         }
       } catch (error) {
@@ -68,8 +80,8 @@ const RunDetail = () => {
       return;
     }
 
-    // Cast run.results to ResultRow[] to ensure type safety
-    const resultsArray = run!.results as unknown as ResultRow[];
+    // Get properly processed results array
+    const resultsArray = getResultsArray();
     exportResultsToExcel(resultsArray);
     
     toast({
@@ -131,17 +143,20 @@ const RunDetail = () => {
     // Handle both cases: when results is already an array or when it needs conversion
     if (Array.isArray(run.results)) {
       return run.results as unknown as ResultRow[];
-    } else {
-      // Try to parse it if it's a string (shouldn't happen but just in case)
+    } else if (typeof run.results === 'object' && run.results !== null) {
+      // Sometimes Supabase might return it as a non-array object
+      return [run.results] as unknown as ResultRow[];
+    } else if (typeof run.results === 'string') {
+      // Try to parse it if it's a string
       try {
-        if (typeof run.results === 'string') {
-          return JSON.parse(run.results) as ResultRow[];
-        }
+        const parsed = JSON.parse(run.results);
+        return Array.isArray(parsed) ? parsed : [parsed];
       } catch (e) {
         console.error("Failed to parse results string:", e);
+        return [];
       }
-      return [];
     }
+    return [];
   };
 
   const resultsArray = getResultsArray();

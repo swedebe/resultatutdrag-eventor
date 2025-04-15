@@ -40,14 +40,18 @@ const FileUploader = () => {
     
     if (runId) {
       try {
-        await supabase
+        const { error } = await supabase
           .from('runs')
           .update({ 
             logs: logsToJson(newLogs) 
           })
           .eq('id', runId);
         
-        console.log("Logs saved to database, count:", newLogs.length);  
+        if (error) {
+          console.error("Error saving logs to database:", error);
+        } else {
+          console.log("Logs saved to database, count:", newLogs.length);
+        }
       } catch (error) {
         console.error("Error saving logs to database:", error);
       }
@@ -105,6 +109,7 @@ const FileUploader = () => {
           title: "Körning skapad",
           description: "En ny körning har skapats i databasen.",
         });
+        console.log("Created new run with ID:", data[0].id);
         return data[0].id;
       }
       return null;
@@ -136,7 +141,7 @@ const FileUploader = () => {
       console.log("Saving run with results count:", resultsArray.length);
       console.log("Saving run with logs count:", logs.length);
       
-      await supabase
+      const { error } = await supabase
         .from('runs')
         .update({ 
           results: resultsArray,
@@ -145,6 +150,12 @@ const FileUploader = () => {
         })
         .eq('id', runId);
         
+      if (error) {
+        throw error;
+      }
+        
+      console.log("Results and logs saved successfully");
+      
       toast({
         title: "Sparad",
         description: `Körningen "${saveName}" har sparats med ${resultsArray.length} resultat`,
