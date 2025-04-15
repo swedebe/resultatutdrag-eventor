@@ -13,13 +13,41 @@ const AuthStatus = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_, session) => {
+        setUser(session?.user || null);
+        
+        if (!session?.user) {
+          setClubName('');
+        } else {
+          // Defer fetching user profile with setTimeout to avoid deadlocks
+          setTimeout(async () => {
+            try {
+              const { data, error } = await supabase
+                .from('users')
+                .select('club_name')
+                .eq('id', session.user.id)
+                .maybeSingle();
+                
+              if (!error && data) {
+                setClubName(data.club_name);
+              }
+            } catch (error) {
+              console.error('Error fetching user profile:', error);
+            }
+          }, 0);
+        }
+      }
+    );
+    
+    // THEN check for existing session
     const fetchUser = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user || null);
         
         if (session?.user) {
-          // Get club name from users table
           const { data, error } = await supabase
             .from('users')
             .select('club_name')
@@ -38,16 +66,7 @@ const AuthStatus = () => {
     };
 
     fetchUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
-        setUser(session?.user || null);
-        if (!session?.user) {
-          setClubName('');
-        }
-      }
-    );
-
+    
     return () => subscription.unsubscribe();
   }, []);
 

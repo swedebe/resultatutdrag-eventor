@@ -96,15 +96,6 @@ const Auth = () => {
       
       if (error) throw error;
       
-      // Insert user data to public.users table
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([
-          { email, club_name: clubName }
-        ]);
-        
-      if (profileError) throw profileError;
-      
       toast({
         title: "Registrering lyckades",
         description: "Kontrollera din e-post för verifieringslänk",
