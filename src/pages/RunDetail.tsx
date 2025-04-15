@@ -33,7 +33,8 @@ const RunDetail = () => {
   });
 
   const handleExport = () => {
-    if (run?.results && run.results.length > 0) {
+    // Check if run.results exists and is an array before accessing its length
+    if (run?.results && Array.isArray(run.results) && run.results.length > 0) {
       exportResultsToExcel(run.results as ResultRow[]);
       toast({
         title: "Export slutförd",
@@ -70,6 +71,9 @@ const RunDetail = () => {
     );
   }
 
+  // Ensure results is an array before passing it to ResultsTable
+  const results = Array.isArray(run.results) ? run.results : [];
+
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
@@ -85,7 +89,7 @@ const RunDetail = () => {
         <Button onClick={handleExport}>Exportera till Excel</Button>
       </div>
 
-      <ResultsTable results={run.results as ResultRow[]} />
+      <ResultsTable results={results as ResultRow[]} />
     </div>
   );
 };
