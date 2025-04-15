@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -177,7 +178,7 @@ const RunDetail = () => {
   const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
-  // Properly use the jsonToLogs function
+  // Properly get logs
   const logs: LogEntry[] = run?.logs || [];
   const hasLogs = logs.length > 0;
 
