@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Table,
@@ -63,10 +62,10 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
     if (!searchTerm) return true;
     const searchTermLower = searchTerm.toLowerCase();
     return (
-      result.name?.toLowerCase().includes(searchTermLower) ||
-      result.class?.toLowerCase().includes(searchTermLower) ||
-      result.eventName?.toLowerCase().includes(searchTermLower) ||
-      result.organizer?.toLowerCase().includes(searchTermLower)
+      (typeof result.name === 'string' && result.name.toLowerCase().includes(searchTermLower)) ||
+      (typeof result.class === 'string' && result.class.toLowerCase().includes(searchTermLower)) ||
+      (typeof result.eventName === 'string' && result.eventName.toLowerCase().includes(searchTermLower)) ||
+      (typeof result.organizer === 'string' && result.organizer.toLowerCase().includes(searchTermLower))
     );
   });
   
@@ -79,11 +78,17 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
       case "eventName":
       case "organizer":
       case "eventType":
+        valueA = typeof a[sortColumn] === 'string' ? (a[sortColumn] as string).toLowerCase() : '';
+        valueB = typeof b[sortColumn] === 'string' ? (b[sortColumn] as string).toLowerCase() : '';
+        break;
       case "personId":
       case "birthYear":
+        valueA = a[sortColumn] || '';
+        valueB = b[sortColumn] || '';
+        break;
       case "started":
-        valueA = a[sortColumn]?.toLowerCase() || "";
-        valueB = b[sortColumn]?.toLowerCase() || "";
+        valueA = a[sortColumn]?.toString() || '';
+        valueB = b[sortColumn]?.toString() || '';
         break;
       case "time":
         valueA = a.timeInSeconds || Number.MAX_VALUE;
@@ -109,7 +114,6 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
     return 0;
   });
 
-  // Helper function to display dash for empty or zero values
   const displayValue = (value: any, suffix: string = ''): string => {
     if (value === null || value === undefined || value === '' || value === 0) {
       return "-";

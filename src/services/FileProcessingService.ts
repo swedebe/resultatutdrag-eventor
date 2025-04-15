@@ -87,17 +87,17 @@ export const processExcelFile = async (file: File, setProgress: (value: number) 
     
     try {
       // Fetch course length and participants from Eventor
-      const eventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
-      addLog(eventId, eventorUrl, "Påbörjar hämtning");
+      const currentEventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
+      addLog(eventId, currentEventorUrl, "Påbörjar hämtning");
       
-      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(eventorUrl)}`);
+      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(currentEventorUrl)}`);
       if (!response.ok) {
-        addLog(eventId, eventorUrl, `Fel: ${response.status} ${response.statusText}`);
+        addLog(eventId, currentEventorUrl, `Fel: ${response.status} ${response.statusText}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const html = await response.text();
-      addLog(eventId, eventorUrl, `OK: ${html.length} tecken`);
+      addLog(eventId, currentEventorUrl, `OK: ${html.length} tecken`);
       
       // Create a temporary DOM for parsing
       const parser = new DOMParser();
@@ -105,24 +105,24 @@ export const processExcelFile = async (file: File, setProgress: (value: number) 
       
       // Find the class
       const className = resultRow.class;
-      addLog(eventId, eventorUrl, `Söker klass: "${className}"`);
+      addLog(eventId, currentEventorUrl, `Söker klass: "${className}"`);
       
       // Use the utility function to extract course info
       const courseInfo = extractCourseInfo(html, className);
       
       if (courseInfo.length > 0 && courseInfo.participants > 0) {
-        addLog(eventId, eventorUrl, `Hittade via eventClassHeader: Längd=${courseInfo.length}m, Antal=${courseInfo.participants}`);
+        addLog(eventId, currentEventorUrl, `Hittade via eventClassHeader: Längd=${courseInfo.length}m, Antal=${courseInfo.participants}`);
         resultRow.length = courseInfo.length;
         resultRow.totalParticipants = courseInfo.participants;
       } else {
         // Log that we couldn't find via the main method
-        addLog(eventId, eventorUrl, `Kunde inte hitta via eventClassHeader, data saknas för klassen "${className}"`);
+        addLog(eventId, currentEventorUrl, `Kunde inte hitta via eventClassHeader, data saknas för klassen "${className}"`);
       }
 
       enrichedResults.push(resultRow);
     } catch (error) {
       console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
-      addLog(eventId, eventorUrl, `Fel vid hämtning: ${error}`);
+      addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error}`);
       // Add the row without course length and participant count
       enrichedResults.push(resultRow);
     }
