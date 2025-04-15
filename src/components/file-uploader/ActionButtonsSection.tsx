@@ -2,13 +2,15 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Home, Trash2, FileDown, Save } from "lucide-react";
+import { Home, Trash2, FileDown, Save, XCircle } from "lucide-react";
 
 interface ActionButtonsSectionProps {
   onSaveResults: () => void;
   onExportResults: () => void;
   onDeleteRun: () => void;
+  onCancelProcessing?: () => void;
   isSaving: boolean;
+  isProcessing: boolean;
   resultsLength: number;
   runId: string | null;
 }
@@ -17,7 +19,9 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
   onSaveResults,
   onExportResults,
   onDeleteRun,
+  onCancelProcessing,
   isSaving,
+  isProcessing,
   resultsLength,
   runId,
 }) => {
@@ -26,15 +30,16 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
       <Button 
         onClick={onSaveResults}
         variant="default"
-        disabled={isSaving || resultsLength === 0 || !runId}
+        disabled={isSaving || resultsLength === 0 || !runId || isProcessing}
         className="bg-green-600 hover:bg-green-700"
       >
         <Save className="mr-2 h-4 w-4" />
-        {isSaving ? "Sparar..." : "Spara till databasen"}
+        {isSaving ? "Sparar..." : "Slutför"}
       </Button>
       <Link to="/">
         <Button 
           variant="outline"
+          disabled={isProcessing}
         >
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
@@ -43,6 +48,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
       <Button 
         onClick={onExportResults}
         variant="outline"
+        disabled={isProcessing}
       >
         <FileDown className="mr-2 h-4 w-4" />
         Ladda ner Excel
@@ -50,11 +56,21 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
       <Button 
         onClick={onDeleteRun}
         variant="destructive"
-        disabled={!runId}
+        disabled={!runId || isProcessing}
       >
         <Trash2 className="mr-2 h-4 w-4" />
         Ta bort körning
       </Button>
+      {onCancelProcessing && (
+        <Button 
+          onClick={onCancelProcessing}
+          variant="destructive"
+          disabled={!isProcessing}
+        >
+          <XCircle className="mr-2 h-4 w-4" />
+          Avbryt körning
+        </Button>
+      )}
     </div>
   );
 };

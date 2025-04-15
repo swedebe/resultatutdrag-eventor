@@ -15,7 +15,9 @@ interface PreviewSectionProps {
   onSaveResults: () => void;
   onExportResults: () => void;
   onDeleteRun: () => void;
+  onCancelProcessing?: () => void;
   isSaving: boolean;
+  isProcessing: boolean;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -28,7 +30,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onSaveResults,
   onExportResults,
   onDeleteRun,
+  onCancelProcessing,
   isSaving,
+  isProcessing,
 }) => {
   if (results.length === 0) {
     return null;
@@ -48,7 +52,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         onSaveResults={onSaveResults}
         onExportResults={onExportResults}
         onDeleteRun={onDeleteRun}
+        onCancelProcessing={onCancelProcessing}
         isSaving={isSaving}
+        isProcessing={isProcessing}
         resultsLength={results.length}
         runId={runId}
       />

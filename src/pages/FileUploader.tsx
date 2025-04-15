@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
@@ -138,6 +137,15 @@ const FileUploader = () => {
       setCancelProcessing(true);
       addCancellationLog();
       setCurrentStatus("Avbryter körning...");
+      
+      setTimeout(() => {
+        setIsProcessing(false);
+        setCurrentStatus("Körning avbruten av användaren");
+        toast({
+          title: "Körning avbruten",
+          description: "Körningen avbröts av användaren",
+        });
+      }, 500);
     }
   };
 
@@ -202,10 +210,11 @@ const FileUploader = () => {
           setResults(partialResults);
           
           if (cancelProcessing) {
-            throw new Error("Användaren avbröt körningen");
+            console.log("Cancellation detected, stopping processing");
+            return false;
           }
           
-          return !cancelProcessing;
+          return true;
         },
         newRunId
       );
@@ -216,7 +225,7 @@ const FileUploader = () => {
         if (enrichedResults.length > 0) {
           toast({
             title: "Filbearbetning slutförd",
-            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Spara" för att spara resultaten.`,
+            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Slutför" för att slutföra körningen.`,
           });
         } else {
           toast({
@@ -344,7 +353,7 @@ const FileUploader = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">Resultatanalys - Filuppladdning</h1>
         <Link to="/">
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2" disabled={isProcessing}>
             <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
           </Button>
         </Link>
@@ -376,7 +385,9 @@ const FileUploader = () => {
         onSaveResults={saveResultsToDatabase}
         onExportResults={handleExport}
         onDeleteRun={handleDeleteRun}
+        onCancelProcessing={handleCancelProcessing}
         isSaving={isSaving}
+        isProcessing={isProcessing}
       />
       
       {results.length > 0 && (
