@@ -22,25 +22,29 @@ const Auth = () => {
   // Check if user is already logged in and handle recovery token
   useEffect(() => {
     const checkSessionAndRecoveryToken = async () => {
-      // First check if there's an access token in the URL fragment (recovery flow)
-      const hash = window.location.hash;
-      if (hash && hash.includes('access_token=')) {
-        // Extract the tokens from the URL fragment
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token');
-        
-        if (accessToken) {
-          // We're in a password recovery flow
-          setShowUpdatePassword(true);
-          // Don't redirect to homepage yet
-          return;
+      try {
+        // First check if there's an access token in the URL fragment (recovery flow)
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token=')) {
+          // Extract the tokens from the URL fragment
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token');
+          
+          if (accessToken) {
+            // We're in a password recovery flow
+            setShowUpdatePassword(true);
+            // Don't redirect to homepage yet
+            return;
+          }
         }
-      }
 
-      // If no recovery token, check for existing session
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        navigate("/");
+        // If no recovery token, check for existing session
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
       }
     };
     
@@ -168,8 +172,14 @@ const Auth = () => {
     }
   };
   
+  // Debug rendering
+  console.log("Auth component rendering", {
+    showResetPassword,
+    showUpdatePassword
+  });
+  
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
+    <div className="flex min-h-[80vh] items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>
