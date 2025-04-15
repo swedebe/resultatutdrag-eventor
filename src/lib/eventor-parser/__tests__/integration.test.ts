@@ -1,4 +1,5 @@
 
+import { describe, test, expect } from '@jest/globals';
 import { extractCourseInfo } from "../course-utils";
 
 describe("Eventor Integration Tests", () => {
