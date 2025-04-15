@@ -10,7 +10,7 @@ import LogComponent from "@/components/LogComponent";
 import { RunWithLogs } from "@/types/database";
 import { jsonToLogs } from "@/types/database";
 import { Home, FileDown } from "lucide-react";
-import { exportResultsToExcel } from "@/services/FileProcessingService";
+import { exportResultsToExcel, ResultRow } from "@/services/FileProcessingService";
 import { useToast } from "@/components/ui/use-toast";
 
 const RunDetail = () => {
@@ -67,7 +67,9 @@ const RunDetail = () => {
       return;
     }
 
-    exportResultsToExcel(run.results);
+    // Cast run.results to ResultRow[] to ensure type safety
+    const resultsArray = run.results as unknown as ResultRow[];
+    exportResultsToExcel(resultsArray);
     
     toast({
       title: "Export slutförd",
@@ -105,6 +107,11 @@ const RunDetail = () => {
   const clearLogs = () => {
     // This is just a UI function, it doesn't actually clear logs in the database
     setShowLogs(false);
+  };
+
+  // Helper function to check if results is an array and has length
+  const hasResults = () => {
+    return Array.isArray(run.results) && run.results.length > 0;
   };
 
   return (
@@ -160,8 +167,8 @@ const RunDetail = () => {
         <LogComponent logs={run.logs} onClearLogs={clearLogs} />
       )}
 
-      {run.results && run.results.length > 0 ? (
-        <ResultsTable results={run.results} />
+      {hasResults() ? (
+        <ResultsTable results={run.results as unknown as ResultRow[]} />
       ) : (
         <Card>
           <CardContent className="py-8">
