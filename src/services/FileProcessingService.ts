@@ -33,8 +33,8 @@ export const processExcelFile = async (
   file: File, 
   setProgress: (value: number) => void, 
   setCurrentStatus: (status: string) => void,
-  delaySeconds: number = 15,  // Changed default to 15 seconds
-  onPartialResults?: (results: ResultRow[]) => Promise<void> // New callback parameter
+  delaySeconds: number = 15,
+  onPartialResults?: (results: ResultRow[]) => Promise<boolean> // Modified to return boolean
 ): Promise<ResultRow[]> => {
   setProgress(0);
   setCurrentStatus("Läser in fil...");
@@ -135,9 +135,13 @@ export const processExcelFile = async (
       enrichedResults.push(resultRow);
       
       // Call the partial results callback if provided
-      // Save at regular intervals (e.g., every 5 entries)
-      if (onPartialResults && (i % 5 === 0 || i === jsonData.length - 1)) {
-        await onPartialResults([...enrichedResults]);
+      if (onPartialResults) {
+        // Await the callback and check if processing should continue
+        const shouldContinue = await onPartialResults([...enrichedResults]);
+        if (shouldContinue === false) {
+          addLog("system", "", "Bearbetning avbruten av användaren");
+          break; // Exit the loop if the callback returns false
+        }
       }
       
       // Använd delay mellan anrop för att undvika rate limit
@@ -147,16 +151,22 @@ export const processExcelFile = async (
         addLog(eventId, currentEventorUrl, waitMessage);
         await sleep(delaySeconds);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
       const currentEventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
-      addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error}`);
+      addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error.message || error}`);
+      
       // Add the row without course length and participant count
       enrichedResults.push(resultRow);
       
       // Call the partial results callback if provided
-      if (onPartialResults && (i % 5 === 0 || i === jsonData.length - 1)) {
-        await onPartialResults([...enrichedResults]);
+      if (onPartialResults) {
+        // Await the callback and check if processing should continue
+        const shouldContinue = await onPartialResults([...enrichedResults]);
+        if (shouldContinue === false) {
+          addLog("system", "", "Bearbetning avbruten av användaren");
+          break; // Exit the loop if the callback returns false
+        }
       }
       
       // Använd delay även efter fel för att undvika rate limit

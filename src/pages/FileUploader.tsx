@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Home, Trash2, FileDown, Pencil, Save } from "lucide-react";
+import { Home, Trash2, FileDown, Pencil, Save, XCircle } from "lucide-react";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -22,11 +22,12 @@ const FileUploader = () => {
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [delay, setDelay] = useState<number>(15); // Changed default to 15
+  const [delay, setDelay] = useState<number>(15);
   const [saveName, setSaveName] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
+  const [cancelProcessing, setCancelProcessing] = useState<boolean>(false);
   const navigate = useNavigate();
   
   // Setup logging functionality
@@ -53,6 +54,38 @@ const FileUploader = () => {
       }
     }
   };
+
+  // Handle browser close/refresh events
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      if (isProcessing && runId) {
+        // Save the current state before the browser closes
+        try {
+          await supabase
+            .from('runs')
+            .update({ 
+              results: results,
+              logs: logs,
+              event_count: results.length
+            })
+            .eq('id', runId);
+        } catch (error) {
+          console.error("Error saving state before unload:", error);
+        }
+        
+        // Show a confirmation dialog
+        e.preventDefault();
+        e.returnValue = "Du har en pågående körning. Är du säker på att du vill lämna sidan?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isProcessing, runId, results, logs]);
   
   // Create a new run in the database
   const createNewRun = async (initialName: string): Promise<string | null> => {
@@ -108,6 +141,7 @@ const FileUploader = () => {
         .update({ 
           results: results,
           event_count: results.length,
+          logs: logs
         })
         .eq('id', runId);
         
@@ -126,6 +160,63 @@ const FileUploader = () => {
       setIsSaving(false);
     }
   };
+
+  const handleCancelProcessing = () => {
+    if (isProcessing) {
+      setCancelProcessing(true);
+      addCancellationLog();
+      setCurrentStatus("Avbryter körning...");
+      
+      // Save current state to database
+      if (runId) {
+        saveCurrentState();
+      }
+    }
+  };
+
+  const addCancellationLog = () => {
+    const newLog: LogEntry = {
+      timestamp: new Date().toISOString().substring(11, 23),
+      eventId: "system",
+      url: "",
+      status: "Användaren avbröt körningen"
+    };
+    
+    const updatedLogs = [...logs, newLog];
+    setLogs(updatedLogs);
+    
+    // Save logs to database
+    if (runId) {
+      try {
+        supabase
+          .from('runs')
+          .update({ logs: updatedLogs })
+          .eq('id', runId);
+      } catch (error) {
+        console.error("Error saving cancellation log:", error);
+      }
+    }
+  };
+  
+  // Save current state to database
+  const saveCurrentState = async () => {
+    if (!runId) return;
+    
+    try {
+      await supabase
+        .from('runs')
+        .update({ 
+          results: results,
+          logs: logs,
+          event_count: results.length
+        })
+        .eq('id', runId);
+        
+      console.log("Current state saved to database");
+    } catch (error) {
+      console.error("Error saving current state:", error);
+    }
+  };
   
   const handleProcessFile = async () => {
     if (!file) {
@@ -138,6 +229,7 @@ const FileUploader = () => {
     }
     
     setIsProcessing(true);
+    setCancelProcessing(false);
     clearLogs();
     
     // Create a default name for the run based on date and time
@@ -157,34 +249,84 @@ const FileUploader = () => {
         setProgress, 
         setCurrentStatus, 
         delay,
-        // We're not automatically saving results anymore, just updating the UI
-        (partialResults: ResultRow[]) => {
+        // Callback for incremental updates with promise support for cancelation
+        async (partialResults: ResultRow[]) => {
           setResults(partialResults);
+          
+          // Check if processing should be canceled
+          if (cancelProcessing) {
+            throw new Error("Användaren avbröt körningen");
+          }
+          
+          // Save partial results and logs to database
+          if (newRunId) {
+            try {
+              await supabase
+                .from('runs')
+                .update({ 
+                  results: partialResults,
+                  logs: logs,
+                  event_count: partialResults.length
+                })
+                .eq('id', newRunId);
+            } catch (error) {
+              console.error("Error saving partial results:", error);
+            }
+          }
+          
+          return !cancelProcessing; // Return false to cancel processing
         }
       );
       
-      setResults(enrichedResults);
+      if (!cancelProcessing) {
+        setResults(enrichedResults);
+        
+        if (enrichedResults.length > 0) {
+          toast({
+            title: "Filbearbetning slutförd",
+            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Spara" för att spara resultaten.`,
+          });
+        } else {
+          toast({
+            title: "Filbearbetning slutförd",
+            description: "Inga resultat hittades.",
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Fel vid bearbetning av fil:", error);
       
-      if (enrichedResults.length > 0) {
+      if (cancelProcessing) {
         toast({
-          title: "Filbearbetning slutförd",
-          description: `${enrichedResults.length} resultat bearbetade. Klicka på "Spara" för att spara resultaten.`,
+          title: "Körning avbruten",
+          description: "Körningen avbröts av användaren",
         });
       } else {
         toast({
-          title: "Filbearbetning slutförd",
-          description: "Inga resultat hittades.",
+          title: "Fel vid bearbetning",
+          description: error.message || "Ett fel uppstod vid bearbetning av filen",
+          variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error("Fel vid bearbetning av fil:", error);
-      toast({
-        title: "Fel vid bearbetning",
-        description: "Ett fel uppstod vid bearbetning av filen",
-        variant: "destructive",
-      });
+      
+      // Ensure logs are saved even when an error occurs
+      if (newRunId) {
+        try {
+          await supabase
+            .from('runs')
+            .update({ 
+              logs: logs,
+              results: results,
+              event_count: results.length
+            })
+            .eq('id', newRunId);
+        } catch (saveError) {
+          console.error("Error saving logs after error:", saveError);
+        }
+      }
     } finally {
       setIsProcessing(false);
+      setCancelProcessing(false);
     }
   };
   
@@ -305,6 +447,16 @@ const FileUploader = () => {
             delay={delay}
             onDelayChange={setDelay}
           />
+          
+          {isProcessing && (
+            <Button 
+              variant="destructive" 
+              onClick={handleCancelProcessing}
+              className="mt-4"
+            >
+              <XCircle className="mr-2 h-4 w-4" /> Avbryt körning
+            </Button>
+          )}
         </CardContent>
       </Card>
       

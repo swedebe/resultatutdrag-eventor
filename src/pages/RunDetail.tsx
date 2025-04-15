@@ -180,6 +180,12 @@ const RunDetail = () => {
   const logs: LogEntry[] = Array.isArray(run.logs) ? run.logs : [];
   const hasLogs = logs.length > 0;
 
+  // If the run was canceled or had an error, show a notice
+  const wasCanceled = logs.some(log => 
+    log.status === "Användaren avbröt körningen" || 
+    log.status.includes("avbruten av användaren")
+  );
+
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
@@ -213,6 +219,7 @@ const RunDetail = () => {
           
           <p className="text-muted-foreground">
             {new Date(run.date).toLocaleDateString("sv-SE")} • {run.event_count} resultat
+            {wasCanceled && " • Avbruten av användaren"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -240,6 +247,17 @@ const RunDetail = () => {
             <CardTitle>Inga loggar</CardTitle>
             <CardDescription>
               Det finns inga loggar sparade för denna körning.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {wasCanceled && (
+        <Card className="mb-6 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-amber-800 dark:text-amber-400">Avbruten körning</CardTitle>
+            <CardDescription>
+              Denna körning avbröts innan den slutfördes. Resultaten kan vara ofullständiga.
             </CardDescription>
           </CardHeader>
         </Card>
