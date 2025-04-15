@@ -32,8 +32,13 @@ const AuthStatus = () => {
                 .eq('id', session.user.id)
                 .maybeSingle();
                 
-              if (!error && data) {
-                setClubName(data.club_name);
+              if (error) {
+                console.error('Error fetching user profile:', error);
+                return;
+              }
+
+              if (data) {
+                setClubName(data.club_name || '');
                 setName(data.name || '');
               }
             } catch (error) {
@@ -57,8 +62,13 @@ const AuthStatus = () => {
             .eq('id', session.user.id)
             .maybeSingle();
 
-          if (!error && data) {
-            setClubName(data.club_name);
+          if (error) {
+            console.error('Error fetching user:', error);
+            return;
+          }
+
+          if (data) {
+            setClubName(data.club_name || '');
             setName(data.name || '');
           }
         }
