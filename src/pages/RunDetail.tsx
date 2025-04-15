@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ResultRow, exportResultsToExcel } from "@/services/FileProcessingService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, FileDown, Trash2, Pencil } from "lucide-react";
+import { ChevronLeft, FileDown, Trash2, Pencil, Check, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import ResultsTable from "@/components/ResultsTable";
 import { Input } from "@/components/ui/input";
