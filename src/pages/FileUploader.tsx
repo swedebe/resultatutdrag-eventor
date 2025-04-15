@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Home, Trash2, FileDown, Pencil } from "lucide-react";
+import { Home, Trash2, FileDown, Pencil, Save } from "lucide-react";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -31,12 +31,12 @@ const FileUploader = () => {
   
   // Setup logging functionality
   useEffect(() => {
-    setLogsUpdateFunction(updateLogsWithSaving);
+    setLogsUpdateFunction(updateLogs);
     return () => setLogsUpdateFunction(null);
   }, []);
 
   // Function to update logs and save them to database
-  const updateLogsWithSaving = async (newLogs: LogEntry[]) => {
+  const updateLogs = async (newLogs: LogEntry[]) => {
     setLogs(newLogs);
     
     // If we have a run ID, save the logs to the database
@@ -45,8 +45,7 @@ const FileUploader = () => {
         await supabase
           .from('runs')
           .update({ 
-            results: results,
-            event_count: results.length,
+            logs: newLogs
           })
           .eq('id', runId);
       } catch (error) {
@@ -63,6 +62,7 @@ const FileUploader = () => {
         .insert({
           name: initialName,
           results: [],
+          logs: [],
           event_count: 0,
           user_id: (await supabase.auth.getUser()).data.user?.id
         })
@@ -91,7 +91,16 @@ const FileUploader = () => {
 
   // Save current results to database
   const saveResultsToDatabase = async () => {
-    if (!runId) return;
+    if (!runId) {
+      toast({
+        title: "Ingen körning aktiv",
+        description: "Det finns ingen aktiv körning att spara resultat till",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSaving(true);
     
     try {
       await supabase
@@ -101,8 +110,20 @@ const FileUploader = () => {
           event_count: results.length,
         })
         .eq('id', runId);
-    } catch (error) {
+        
+      toast({
+        title: "Sparad",
+        description: `Körningen "${saveName}" har sparats med ${results.length} resultat`,
+      });
+    } catch (error: any) {
       console.error("Error saving results to database:", error);
+      toast({
+        title: "Fel vid sparande",
+        description: error.message || "Ett fel uppstod vid sparande av körningen",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -136,18 +157,9 @@ const FileUploader = () => {
         setProgress, 
         setCurrentStatus, 
         delay,
-        // Callback to save incremental results
-        async (partialResults: ResultRow[]) => {
+        // We're not automatically saving results anymore, just updating the UI
+        (partialResults: ResultRow[]) => {
           setResults(partialResults);
-          if (newRunId) {
-            await supabase
-              .from('runs')
-              .update({ 
-                results: partialResults,
-                event_count: partialResults.length,
-              })
-              .eq('id', newRunId);
-          }
         }
       );
       
@@ -156,23 +168,12 @@ const FileUploader = () => {
       if (enrichedResults.length > 0) {
         toast({
           title: "Filbearbetning slutförd",
-          description: `${enrichedResults.length} resultat bearbetade och sparade`,
+          description: `${enrichedResults.length} resultat bearbetade. Klicka på "Spara" för att spara resultaten.`,
         });
-        
-        // Final update with all results
-        if (newRunId) {
-          await supabase
-            .from('runs')
-            .update({ 
-              results: enrichedResults,
-              event_count: enrichedResults.length,
-            })
-            .eq('id', newRunId);
-        }
       } else {
         toast({
           title: "Filbearbetning slutförd",
-          description: "Inga resultat att exportera",
+          description: "Inga resultat hittades.",
         });
       }
     } catch (error) {
@@ -342,6 +343,15 @@ const FileUploader = () => {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-4">
+                    <Button 
+                      onClick={saveResultsToDatabase}
+                      variant="default"
+                      disabled={isSaving || results.length === 0 || !runId}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {isSaving ? "Sparar..." : "Spara till databasen"}
+                    </Button>
                     <Button 
                       onClick={() => navigate("/")}
                       variant="outline"

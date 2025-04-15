@@ -6,10 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { ResultRow, exportResultsToExcel } from "@/services/FileProcessingService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, FileDown, Trash2, Pencil, Check, X } from "lucide-react";
+import { ChevronLeft, FileDown, Trash2, Pencil, Check, X, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import ResultsTable from "@/components/ResultsTable";
 import { Input } from "@/components/ui/input";
+import LogComponent, { LogEntry } from "@/components/LogComponent";
 
 const RunDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ const RunDetail = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   // Fetch run details from Supabase
   const { data: run, isLoading, error, refetch } = useQuery({
@@ -128,6 +130,19 @@ const RunDetail = () => {
       });
     }
   };
+  
+  const toggleLogs = () => {
+    setShowLogs(!showLogs);
+  };
+
+  // Clear logs function (if needed)
+  const handleClearLogs = () => {
+    toast({
+      title: "Kan inte rensa loggar",
+      description: "Loggar från tidigare körningar kan inte rensas",
+      variant: "destructive",
+    });
+  };
 
   if (isLoading) {
     return (
@@ -160,6 +175,10 @@ const RunDetail = () => {
   // Ensure results is an array before passing it to ResultsTable
   const results = Array.isArray(run.results) ? run.results : [];
   const hasResults = results.length > 0;
+  
+  // Get logs from run.logs (if available) or default to empty array
+  const logs: LogEntry[] = Array.isArray(run.logs) ? run.logs : [];
+  const hasLogs = logs.length > 0;
 
   return (
     <div className="container py-8">
@@ -197,6 +216,11 @@ const RunDetail = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          {hasLogs && (
+            <Button onClick={toggleLogs} variant="outline">
+              <FileText className="mr-2 h-4 w-4" /> {showLogs ? "Dölj loggar" : "Visa loggar"}
+            </Button>
+          )}
           <Button onClick={handleExport} variant="outline" disabled={!hasResults}>
             <FileDown className="mr-2 h-4 w-4" /> Exportera till Excel
           </Button>
@@ -205,6 +229,21 @@ const RunDetail = () => {
           </Button>
         </div>
       </div>
+
+      {showLogs && hasLogs && (
+        <LogComponent logs={logs} onClearLogs={handleClearLogs} />
+      )}
+      
+      {!hasLogs && showLogs && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Inga loggar</CardTitle>
+            <CardDescription>
+              Det finns inga loggar sparade för denna körning.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {!hasResults ? (
         <Card className="mb-6">
