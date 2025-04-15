@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -30,6 +30,13 @@ interface ResultRow {
   [key: string]: any;
 }
 
+interface LogEntry {
+  timestamp: string;
+  eventId: string | number;
+  url: string;
+  status: string;
+}
+
 const FileUploader = () => {
   const { toast } = useToast();
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -37,6 +44,8 @@ const FileUploader = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState("");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -46,6 +55,22 @@ const FileUploader = () => {
         description: `Vald fil: ${e.target.files[0].name}`,
       });
     }
+  };
+  
+  const addLog = (eventId: string | number, url: string, status: string) => {
+    const timestamp = new Date().toISOString().substring(11, 23);
+    setLogs(prev => [...prev, { timestamp, eventId, url, status }]);
+    
+    // Scroll to bottom of logs
+    setTimeout(() => {
+      if (logsEndRef.current) {
+        logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+  
+  const clearLogs = () => {
+    setLogs([]);
   };
   
   const processFile = async () => {
@@ -61,6 +86,7 @@ const FileUploader = () => {
     setIsProcessing(true);
     setProgress(0);
     setCurrentStatus("Läser in fil...");
+    clearLogs();
     
     try {
       // Läs in Excel-filen
@@ -125,8 +151,16 @@ const FileUploader = () => {
         try {
           // Hämta banlängd och antal startande från Eventor
           const eventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${eventId}&groupBy=EventClass`;
+          addLog(eventId, eventorUrl, "Påbörjar hämtning");
+          
           const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(eventorUrl)}`);
+          if (!response.ok) {
+            addLog(eventId, eventorUrl, `Fel: ${response.status} ${response.statusText}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const html = await response.text();
+          addLog(eventId, eventorUrl, `OK: ${html.length} tecken`);
           
           // Skapa en tillfällig DOM för parsing
           const parser = new DOMParser();
@@ -134,19 +168,26 @@ const FileUploader = () => {
           
           // Hitta klassen
           const className = resultRow.class;
+          addLog(eventId, eventorUrl, `Söker klass: "${className}"`);
+          
           let courseLength = 0;
           let totalParticipants = 0;
           
           // Hitta tabell som innehåller klassen
           const tables = doc.querySelectorAll("table");
+          addLog(eventId, eventorUrl, `Hittade ${tables.length} tabeller`);
+          
           let relevantTable = null;
           let foundClass = false;
           
           // Leta igenom tabeller och rubriker för att hitta rätt klass
           const classHeaders = Array.from(doc.querySelectorAll("h3"));
+          addLog(eventId, eventorUrl, `Söker i ${classHeaders.length} rubriker`);
+          
           for (const header of classHeaders) {
             if (header.textContent?.includes(className)) {
               foundClass = true;
+              addLog(eventId, eventorUrl, `Hittade klass i rubrik: "${header.textContent}"`);
               
               // Hitta närmaste tabell efter denna rubrik
               let element = header.nextElementSibling;
@@ -162,12 +203,14 @@ const FileUploader = () => {
                 const lengthMatch = headerText.match(/(\d[\d\s]+)\s*m/i);
                 if (lengthMatch && lengthMatch[1]) {
                   courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+                  addLog(eventId, eventorUrl, `Hittade banlängd i rubrik: ${courseLength}m`);
                 }
                 
                 // Räkna antal rader i tabellen för att få antal startande
                 if (relevantTable) {
                   const rows = relevantTable.querySelectorAll("tr");
                   totalParticipants = Math.max(0, rows.length - 1); // Ta bort rubrikraden
+                  addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
                 }
                 
                 break;
@@ -177,20 +220,24 @@ const FileUploader = () => {
           
           // Om vi inte hittade via rubriker, leta genom tabeller direkt
           if (!foundClass && className) {
+            addLog(eventId, eventorUrl, `Söker klass i tabellbeskrivningar`);
             for (const table of tables) {
               const caption = table.querySelector("caption");
               if (caption && caption.textContent?.includes(className)) {
                 relevantTable = table;
+                addLog(eventId, eventorUrl, `Hittade klass i tabellbeskrivning: "${caption.textContent}"`);
                 
                 // Räkna antal rader för antal startande
                 const rows = table.querySelectorAll("tr");
                 totalParticipants = Math.max(0, rows.length - 1);
+                addLog(eventId, eventorUrl, `Hittade antal startande: ${totalParticipants}`);
                 
                 // Leta efter banlängd i närliggande element
                 if (caption.textContent) {
                   const lengthMatch = caption.textContent.match(/(\d[\d\s]+)\s*m/i);
                   if (lengthMatch && lengthMatch[1]) {
                     courseLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+                    addLog(eventId, eventorUrl, `Hittade banlängd i tabellbeskrivning: ${courseLength}m`);
                   }
                 }
                 
@@ -199,14 +246,53 @@ const FileUploader = () => {
             }
           }
           
+          // Om vi fortfarande inte hittat någon information, sök i alla textsträngar
+          if ((!courseLength || !totalParticipants) && className) {
+            addLog(eventId, eventorUrl, `Söker i hela HTML-dokumentet`);
+            
+            // Leta efter text som innehåller klassnamnet och eventuell banlängd
+            const bodyText = doc.body.textContent || "";
+            const classPattern = new RegExp(`${className}[\\s\\S]{0,100}(\\d[\\d\\s]+)\\s*m`, 'i');
+            const fullMatch = bodyText.match(classPattern);
+            
+            if (fullMatch && fullMatch[1]) {
+              courseLength = parseInt(fullMatch[1].replace(/\s/g, ''));
+              addLog(eventId, eventorUrl, `Hittade banlängd i text: ${courseLength}m`);
+            }
+            
+            // Räkna deltagare genom att hitta rader som innehåller klassnamnet
+            if (!totalParticipants) {
+              const rows = doc.querySelectorAll('tr');
+              let count = 0;
+              
+              rows.forEach(row => {
+                if (row.textContent?.includes(className)) {
+                  count++;
+                }
+              });
+              
+              if (count > 0) {
+                totalParticipants = count;
+                addLog(eventId, eventorUrl, `Räknade träffar för klassnamn: ${totalParticipants}`);
+              }
+            }
+          }
+          
           // Uppdatera raden med den nya informationen
           resultRow.length = courseLength;
           resultRow.totalParticipants = totalParticipants;
+          
+          if (!courseLength && !totalParticipants) {
+            addLog(eventId, eventorUrl, `VARNING: Kunde inte hitta data för klassen "${className}"`);
+          } else {
+            addLog(eventId, eventorUrl, `Slutresultat - Längd: ${courseLength}m, Antal startande: ${totalParticipants}`);
+          }
           
           enrichedResults.push(resultRow);
           processedRows++;
         } catch (error) {
           console.error(`Fel vid hämtning för tävlings-id ${eventId}:`, error);
+          addLog(eventId, "", `Fel vid hämtning: ${error}`);
           // Lägg ändå till raden utan banlängd och antal startande
           enrichedResults.push(resultRow);
           processedRows++;
@@ -224,6 +310,7 @@ const FileUploader = () => {
       });
     } catch (error) {
       console.error("Fel vid bearbetning av fil:", error);
+      addLog("", "", `Fel vid bearbetning: ${error}`);
       toast({
         title: "Fel vid bearbetning",
         description: "Ett fel uppstod vid bearbetning av filen",
@@ -265,6 +352,7 @@ const FileUploader = () => {
     setFile(null);
     setProgress(0);
     setCurrentStatus("");
+    clearLogs();
     
     toast({
       title: "Resultat rensade",
@@ -335,6 +423,35 @@ const FileUploader = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {logs.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>URL-loggning</CardTitle>
+              <CardDescription>
+                Loggning av förfrågningar till Eventor
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearLogs}>
+              Rensa logg
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-muted p-4 rounded-md max-h-[300px] overflow-y-auto text-xs font-mono">
+              {logs.map((log, index) => (
+                <div key={index} className={`py-1 ${index % 2 === 0 ? 'bg-muted/50' : ''}`}>
+                  <span className="text-muted-foreground">[{log.timestamp}]</span>{' '}
+                  <span className="text-blue-500">[ID {log.eventId}]</span>{' '}
+                  {log.url && <span className="text-green-500">{log.url.substring(0, 60)}...</span>}{' '}
+                  <span>{log.status}</span>
+                </div>
+              ))}
+              <div ref={logsEndRef} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {results.length > 0 && (
         <>
