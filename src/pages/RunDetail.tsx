@@ -46,11 +46,11 @@ const RunDetail = () => {
 
         console.log("Retrieved basic run data:", runData);
         
-        // 2. Fetch processed results from the new table
+        // 2. Fetch processed results from the table
         const processedResults = await fetchProcessedResults(id);
         console.log(`Fetched ${processedResults.length} processed results from database`);
         
-        // 3. Fetch logs from the new table
+        // 3. Fetch logs from the table
         const processingLogs = await fetchProcessingLogs(id);
         console.log(`Fetched ${processingLogs.length} logs from database`);
         

@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import { addLog } from '../components/LogComponent';
 import { extractCourseInfo } from '@/lib/eventor-parser/course-utils';
+import { extractEventAndOrganizerInfo } from '@/lib/eventor-parser/event-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export type ResultRow = {
@@ -137,11 +138,24 @@ export const processExcelFile = async (
         });
       }
       
-      // Create a temporary DOM for parsing
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
+      // Extract event name and organizer information
+      const eventInfo = extractEventAndOrganizerInfo(html);
+      if (eventInfo.organizer && !resultRow.organizer) {
+        resultRow.organizer = eventInfo.organizer;
+        addLog(eventId, currentEventorUrl, `Hittade arrangör: "${eventInfo.organizer}"`);
+        
+        if (runId) {
+          await supabase.from('processing_logs').insert({
+            run_id: runId,
+            timestamp: new Date().toISOString().substring(11, 23),
+            event_id: eventId.toString(),
+            url: currentEventorUrl,
+            status: `Hittade arrangör: "${eventInfo.organizer}"`
+          });
+        }
+      }
       
-      // Find the class
+      // Use the utility function to extract course info
       const className = resultRow.class;
       addLog(eventId, currentEventorUrl, `Söker klass: "${className}"`);
       
@@ -156,7 +170,6 @@ export const processExcelFile = async (
         });
       }
       
-      // Use the utility function to extract course info
       const courseInfo = extractCourseInfo(html, className);
       
       if (courseInfo.length > 0 && courseInfo.participants > 0) {
@@ -208,8 +221,9 @@ export const processExcelFile = async (
             total_participants: resultRow.totalParticipants,
             time: resultRow.time,
             time_after: resultRow.timeAfterWinner,
-            time_after_seconds: resultRow.timeInSeconds, // Actually this is just time in seconds
+            time_after_seconds: resultRow.timeInSeconds, 
             course_length: resultRow.length,
+            organizer: resultRow.organizer, // Add organizer to the saved data
             started: resultRow.started === true || resultRow.started === 'true' || resultRow.started === '1' ? 1 : 0
           };
           
@@ -320,6 +334,7 @@ export const processExcelFile = async (
             time_after: resultRow.timeAfterWinner,
             time_after_seconds: resultRow.timeInSeconds,
             course_length: resultRow.length,
+            organizer: resultRow.organizer, // Add organizer to the saved data
             started: resultRow.started === true || resultRow.started === 'true' || resultRow.started === '1' ? 1 : 0
           };
           
@@ -393,7 +408,7 @@ export const exportResultsToExcel = (results: ResultRow[]): void => {
   XLSX.writeFile(workbook, "berikade_resultat.xlsx");
 };
 
-// New function to fetch processed results from database
+// Function to fetch processed results from database
 export const fetchProcessedResults = async (runId: string): Promise<ResultRow[]> => {
   try {
     const { data, error } = await supabase
@@ -420,7 +435,7 @@ export const fetchProcessedResults = async (runId: string): Promise<ResultRow[]>
       date: row.event_date,
       time: row.time,
       position: row.position,
-      organizer: '', // Not stored directly
+      organizer: row.organizer || '', // Handle organizer field
       timeInSeconds: row.time_after_seconds,
       timeAfterWinner: row.time_after,
       length: row.course_length,
@@ -438,7 +453,7 @@ export const fetchProcessedResults = async (runId: string): Promise<ResultRow[]>
   }
 };
 
-// New function to fetch logs from database
+// Function to fetch logs from database
 export const fetchProcessingLogs = async (runId: string): Promise<any[]> => {
   try {
     const { data, error } = await supabase
