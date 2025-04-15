@@ -21,7 +21,6 @@ const RunDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
-  // Fetch run details from Supabase
   const { data: run, isLoading, error, refetch } = useQuery({
     queryKey: ['run', id],
     queryFn: async () => {
@@ -35,10 +34,8 @@ const RunDetail = () => {
       
       if (error) throw error;
       
-      // Cast the data to include our logs type
       const runWithLogs = data as unknown as RunWithLogs;
       
-      // Set the current name for editing
       setNewName(runWithLogs.name);
       
       return runWithLogs;
@@ -46,7 +43,6 @@ const RunDetail = () => {
   });
 
   const handleExport = () => {
-    // Check if run.results exists and is an array before accessing its length
     if (run?.results && Array.isArray(run.results) && run.results.length > 0) {
       exportResultsToExcel(run.results as ResultRow[]);
       toast({
@@ -81,7 +77,6 @@ const RunDetail = () => {
           description: `Körningen "${run.name}" har tagits bort`,
         });
         
-        // Navigate back to home after deletion
         navigate("/");
       } catch (error: any) {
         console.error("Error deleting run:", error);
@@ -123,7 +118,7 @@ const RunDetail = () => {
       });
       
       setIsEditing(false);
-      refetch(); // Refresh the data
+      refetch();
     } catch (error: any) {
       console.error("Error updating run name:", error);
       toast({
@@ -138,7 +133,6 @@ const RunDetail = () => {
     setShowLogs(!showLogs);
   };
 
-  // Clear logs function (if needed)
   const handleClearLogs = () => {
     toast({
       title: "Kan inte rensa loggar",
@@ -175,15 +169,12 @@ const RunDetail = () => {
     );
   }
 
-  // Ensure results is an array before passing it to ResultsTable
   const results = Array.isArray(run?.results) ? run.results : [];
   const hasResults = results.length > 0;
   
-  // Get logs from run.logs (if available) or default to empty array
   const logs: LogEntry[] = run?.logs && Array.isArray(run.logs) ? run.logs : [];
   const hasLogs = logs.length > 0;
 
-  // If the run was canceled or had an error, show a notice
   const wasCanceled = logs.some(log => 
     log.status === "Användaren avbröt körningen" || 
     log.status.includes("avbruten av användaren")

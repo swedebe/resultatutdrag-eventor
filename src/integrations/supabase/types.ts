@@ -16,6 +16,7 @@ export type Database = {
           email: string | null
           event_count: number
           id: string
+          logs: Json | null
           name: string
           results: Json
           user_id: string
@@ -26,6 +27,7 @@ export type Database = {
           email?: string | null
           event_count: number
           id?: string
+          logs?: Json | null
           name: string
           results: Json
           user_id: string
@@ -36,6 +38,7 @@ export type Database = {
           email?: string | null
           event_count?: number
           id?: string
+          logs?: Json | null
           name?: string
           results?: Json
           user_id?: string
