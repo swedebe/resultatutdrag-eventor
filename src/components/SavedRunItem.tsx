@@ -1,12 +1,13 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { sv } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
-import { Trash2, Eye } from "lucide-react";
+import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface SavedRunItemProps {
   id: string;
@@ -19,7 +20,9 @@ interface SavedRunItemProps {
 const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount, onDelete }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(name);
 
   const formattedDate = React.useMemo(() => {
     try {
@@ -70,22 +73,90 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const handleView = () => {
     navigate(`/run/${id}`);
   };
+  
+  const startEditing = () => {
+    setIsEditing(true);
+    setNewName(name);
+  };
+  
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+  
+  const saveNewName = async () => {
+    if (newName.trim() === "") {
+      toast({
+        title: "Ogiltigt namn",
+        description: "Namnet får inte vara tomt",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('runs')
+        .update({ name: newName.trim() })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Namn uppdaterat",
+        description: "Körningens namn har uppdaterats",
+      });
+      
+      onDelete(); // Refresh the list
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error updating run name:", error);
+      toast({
+        title: "Fel vid namnbyte",
+        description: error.message || "Ett fel uppstod vid namnbyte av körningen",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
-      <div className="space-y-1">
-        <h3 className="font-medium">{name}</h3>
-        <p className="text-sm text-muted-foreground">
-          {eventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
-        </p>
-      </div>
+      {isEditing ? (
+        <div className="flex-1 flex gap-2 items-center">
+          <Input 
+            value={newName} 
+            onChange={(e) => setNewName(e.target.value)} 
+            autoFocus
+            className="flex-1"
+          />
+          <Button variant="ghost" size="icon" onClick={saveNewName}>
+            <Check className="h-4 w-4 text-green-600" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={cancelEditing}>
+            <X className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <h3 className="font-medium">{name}</h3>
+          <p className="text-sm text-muted-foreground">
+            {eventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
+          </p>
+        </div>
+      )}
       <div className="flex space-x-2">
-        <Button variant="outline" size="icon" onClick={handleView}>
-          <Eye className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={handleDelete} disabled={isDeleting}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        {!isEditing && (
+          <>
+            <Button variant="outline" size="icon" onClick={handleView} title="Visa">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={startEditing} title="Byt namn">
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleDelete} disabled={isDeleting} title="Ta bort">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

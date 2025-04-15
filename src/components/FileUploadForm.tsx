@@ -12,7 +12,6 @@ interface FileUploadFormProps {
   currentStatus: string;
   onFileChange: (file: File | null) => void;
   onProcessFile: () => void;
-  onExport: () => void;
   onClear: () => void;
   hasResults: boolean;
   delay: number;
@@ -25,7 +24,6 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({
   currentStatus,
   onFileChange,
   onProcessFile,
-  onExport,
   onClear,
   hasResults,
   delay,
@@ -90,15 +88,6 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({
             className="w-40"
           >
             {isProcessing ? "Bearbetar..." : "Bearbeta fil"}
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={onExport}
-            disabled={!hasResults || isProcessing}
-            className="w-40"
-          >
-            Exportera resultat
           </Button>
           
           <Button 

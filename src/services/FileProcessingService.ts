@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 import { addLog } from '../components/LogComponent';
 import { extractCourseInfo } from '@/lib/eventor-parser/course-utils';
@@ -32,7 +33,8 @@ export const processExcelFile = async (
   file: File, 
   setProgress: (value: number) => void, 
   setCurrentStatus: (status: string) => void,
-  delaySeconds: number = 30
+  delaySeconds: number = 15,  // Changed default to 15 seconds
+  onPartialResults?: (results: ResultRow[]) => Promise<void> // New callback parameter
 ): Promise<ResultRow[]> => {
   setProgress(0);
   setCurrentStatus("Läser in fil...");
@@ -132,6 +134,12 @@ export const processExcelFile = async (
 
       enrichedResults.push(resultRow);
       
+      // Call the partial results callback if provided
+      // Save at regular intervals (e.g., every 5 entries)
+      if (onPartialResults && (i % 5 === 0 || i === jsonData.length - 1)) {
+        await onPartialResults([...enrichedResults]);
+      }
+      
       // Använd delay mellan anrop för att undvika rate limit
       if (i < jsonData.length - 1 && delaySeconds > 0) {
         const waitMessage = `Väntar ${delaySeconds} sekunder innan nästa anrop (för att undvika rate limiting)...`;
@@ -145,6 +153,11 @@ export const processExcelFile = async (
       addLog(eventId, currentEventorUrl, `Fel vid hämtning: ${error}`);
       // Add the row without course length and participant count
       enrichedResults.push(resultRow);
+      
+      // Call the partial results callback if provided
+      if (onPartialResults && (i % 5 === 0 || i === jsonData.length - 1)) {
+        await onPartialResults([...enrichedResults]);
+      }
       
       // Använd delay även efter fel för att undvika rate limit
       if (i < jsonData.length - 1 && delaySeconds > 0) {
