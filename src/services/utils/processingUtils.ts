@@ -37,6 +37,18 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
+  // Get the value for started as it appears in the Excel file
+  // The value could be boolean, string or number, so handle all cases
+  const startedValue = resultRow.started;
+  
+  // Determine the correct value: 1 if it's true/"true"/"1"/1 etc., 0 otherwise
+  const startedNumber = (
+    startedValue === true || 
+    startedValue === 'true' || 
+    startedValue === '1' || 
+    startedValue === 1
+  ) ? 1 : 0;
+  
   return {
     run_id: runId,
     event_date: resultRow.date,
@@ -55,6 +67,6 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
     time_after_seconds: resultRow.timeInSeconds,
     course_length: resultRow.length,
     organizer: resultRow.organizer,
-    started: resultRow.started === true || resultRow.started === 'true' || resultRow.started === '1' ? 1 : 0
+    started: startedNumber
   };
 };

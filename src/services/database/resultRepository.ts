@@ -11,7 +11,25 @@ import { dbRowToResultRow, resultRowToDbFormat } from '../utils/processingUtils'
  */
 export const saveResultToDatabase = async (resultRow: ResultRow, runId: string): Promise<boolean> => {
   try {
+    // First, get user info from the run
+    const { data: runData, error: runError } = await supabase
+      .from('runs')
+      .select('name, club_name')
+      .eq('id', runId)
+      .single();
+    
+    if (runError) {
+      console.error('Error fetching run data:', runError);
+    }
+    
+    // Process the result and add user info
     const processedResult = resultRowToDbFormat(resultRow, runId);
+    
+    // Add user name and club from the run if available
+    if (runData) {
+      processedResult.user_name = runData.name || null;
+      processedResult.user_club = runData.club_name || null;
+    }
     
     const { error } = await supabase.from('processed_results').insert(processedResult);
     

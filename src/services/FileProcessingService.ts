@@ -36,6 +36,9 @@ export const processExcelFile = async (
       // Map Excel row to ResultRow
       const resultRow = mapExcelRowToResultRow(row);
       
+      // Log the original started value for debugging
+      console.log(`Row ${i+1}: Original 'started' value:`, resultRow.started);
+      
       setProgress(10 + Math.floor(80 * (i / jsonData.length)));
       setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${jsonData.length})...`);
       
@@ -46,7 +49,8 @@ export const processExcelFile = async (
       if (runId) {
         const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
         const saveMessage = savedSuccessfully 
-          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen`
+          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen` + 
+            ` (started=${enhancedResultRow.started ? '1' : '0'})`
           : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
           
         addLog(resultRow.eventId, currentEventorUrl, saveMessage);
