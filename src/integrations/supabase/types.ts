@@ -20,6 +20,7 @@ export type Database = {
           event_name: string | null
           event_type: string | null
           id: string
+          organizer: string | null
           person_id: number | null
           position: number | null
           run_id: string
@@ -41,6 +42,7 @@ export type Database = {
           event_name?: string | null
           event_type?: string | null
           id?: string
+          organizer?: string | null
           person_id?: number | null
           position?: number | null
           run_id: string
@@ -62,6 +64,7 @@ export type Database = {
           event_name?: string | null
           event_type?: string | null
           id?: string
+          organizer?: string | null
           person_id?: number | null
           position?: number | null
           run_id?: string

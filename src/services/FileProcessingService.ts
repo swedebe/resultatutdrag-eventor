@@ -1,4 +1,3 @@
-
 import * as XLSX from 'xlsx';
 import { addLog } from '../components/LogComponent';
 import { extractCourseInfo } from '@/lib/eventor-parser/course-utils';
@@ -223,7 +222,7 @@ export const processExcelFile = async (
             time_after: resultRow.timeAfterWinner,
             time_after_seconds: resultRow.timeInSeconds, 
             course_length: resultRow.length,
-            organizer: resultRow.organizer, // Add organizer to the saved data
+            organizer: resultRow.organizer, 
             started: resultRow.started === true || resultRow.started === 'true' || resultRow.started === '1' ? 1 : 0
           };
           
@@ -334,7 +333,7 @@ export const processExcelFile = async (
             time_after: resultRow.timeAfterWinner,
             time_after_seconds: resultRow.timeInSeconds,
             course_length: resultRow.length,
-            organizer: resultRow.organizer, // Add organizer to the saved data
+            organizer: resultRow.organizer,
             started: resultRow.started === true || resultRow.started === 'true' || resultRow.started === '1' ? 1 : 0
           };
           
@@ -435,7 +434,7 @@ export const fetchProcessedResults = async (runId: string): Promise<ResultRow[]>
       date: row.event_date,
       time: row.time,
       position: row.position,
-      organizer: row.organizer || '', // Handle organizer field
+      organizer: row.organizer || '', // Properly handle organizer field
       timeInSeconds: row.time_after_seconds,
       timeAfterWinner: row.time_after,
       length: row.course_length,
