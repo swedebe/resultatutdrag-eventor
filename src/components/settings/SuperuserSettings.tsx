@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,8 @@ interface ExpiredRun {
   date: string;
 }
 
+const CATEGORY_ORDER = ['homepage', 'fileupload', 'settings', 'general', 'auth'];
+
 const SuperuserSettings: React.FC = () => {
   const { toast } = useToast();
   const [appTexts, setAppTexts] = useState<AppText[]>([]);
@@ -30,6 +31,43 @@ const SuperuserSettings: React.FC = () => {
   const [loadingTexts, setLoadingTexts] = useState(true);
   const [loadingExpired, setLoadingExpired] = useState(true);
   const [savingTexts, setSavingTexts] = useState(false);
+
+  const groupedTexts = React.useMemo(() => {
+    if (!appTexts.length) return {};
+    
+    const grouped: Record<string, AppText[]> = {};
+    
+    appTexts.forEach(text => {
+      if (!grouped[text.category]) {
+        grouped[text.category] = [];
+      }
+      grouped[text.category].push(text);
+    });
+    
+    Object.keys(grouped).forEach(category => {
+      grouped[category].sort((a, b) => a.key.localeCompare(b.key));
+    });
+    
+    return grouped;
+  }, [appTexts]);
+
+  const orderedCategories = React.useMemo(() => {
+    const categories = Object.keys(groupedTexts);
+    
+    return categories.sort((a, b) => {
+      const aIndex = CATEGORY_ORDER.indexOf(a);
+      const bIndex = CATEGORY_ORDER.indexOf(b);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      
+      return a.localeCompare(b);
+    });
+  }, [groupedTexts]);
 
   useEffect(() => {
     const fetchAppTexts = async () => {
@@ -148,13 +186,10 @@ const SuperuserSettings: React.FC = () => {
 
   return (
     <>
-      {/* User Management */}
       <UserManagement />
       
-      {/* Add User Form */}
       <AddUserForm />
       
-      {/* App Texts */}
       <Card>
         <CardHeader>
           <CardTitle>Applikationstexter</CardTitle>
@@ -171,7 +206,6 @@ const SuperuserSettings: React.FC = () => {
                 variant="outline" 
                 onClick={() => {
                   setLoadingTexts(true);
-                  // Fix: Replace chain of .then().catch() with async/await pattern
                   (async () => {
                     try {
                       await supabase.rpc('populate_app_texts');
@@ -179,7 +213,6 @@ const SuperuserSettings: React.FC = () => {
                         title: "Texter skapade",
                         description: "Applikationstexter har skapats i databasen.",
                       });
-                      // Refetch texts
                       const { data } = await supabase.from('app_texts').select('*');
                       if (data) {
                         setAppTexts(data);
@@ -202,20 +235,25 @@ const SuperuserSettings: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="space-y-4 mb-4">
-                {appTexts.map(text => (
-                  <div key={text.id} className="space-y-2">
-                    <Label htmlFor={`text-${text.id}`}>
-                      {text.key} ({text.category})
-                    </Label>
-                    <Input 
-                      id={`text-${text.id}`}
-                      value={text.value}
-                      onChange={(e) => handleTextChange(text.id, e.target.value)}
-                    />
+              {orderedCategories.map(category => (
+                <div key={category} className="mb-6">
+                  <h3 className="text-lg font-medium mb-2 capitalize">{category}</h3>
+                  <div className="space-y-4">
+                    {groupedTexts[category].map(text => (
+                      <div key={text.id} className="space-y-2">
+                        <Label htmlFor={`text-${text.id}`}>
+                          {text.key}
+                        </Label>
+                        <Input 
+                          id={`text-${text.id}`}
+                          value={text.value}
+                          onChange={(e) => handleTextChange(text.id, e.target.value)}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
               <Button 
                 onClick={saveAppTexts}
                 disabled={savingTexts}
@@ -228,7 +266,6 @@ const SuperuserSettings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Expired Runs */}
       <Card>
         <CardHeader>
           <CardTitle>Utgångna körningar (äldre än 2 år)</CardTitle>
