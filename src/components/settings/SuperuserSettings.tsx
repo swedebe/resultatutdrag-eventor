@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Save, AlertCircle, Trash2 } from "lucide-react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { format, sub } from "date-fns";
 import { AppText } from "@/types/appText";
+import { AppTextService } from "@/services/appText/appTextService";
 
 interface ExpiredRun {
   id: string;
@@ -28,17 +28,11 @@ const SuperuserSettings: React.FC = () => {
   const [loadingExpired, setLoadingExpired] = useState(true);
   const [savingTexts, setSavingTexts] = useState(false);
 
-  // Fetch app texts and expired runs on component mount
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        // Use fetch API directly to get app_texts
-        const { data, error } = await supabase.from('app_texts').select('*');
-        
-        if (error) throw error;
-        
-        // Cast the data to our AppText type
-        setAppTexts(data as unknown as AppText[]);
+        const data = await AppTextService.getAllAppTexts();
+        setAppTexts(data);
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
         toast({
@@ -53,7 +47,6 @@ const SuperuserSettings: React.FC = () => {
 
     const fetchExpiredRuns = async () => {
       try {
-        // Calculate date 2 years ago
         const twoYearsAgo = sub(new Date(), { years: 2 });
         
         const { data, error } = await supabase
@@ -68,7 +61,6 @@ const SuperuserSettings: React.FC = () => {
 
         if (error) throw error;
 
-        // Get users for each run
         const formattedRuns: ExpiredRun[] = [];
         for (const run of data || []) {
           const { data: userData, error: userError } = await supabase
@@ -115,21 +107,11 @@ const SuperuserSettings: React.FC = () => {
   const saveAppTexts = async () => {
     setSavingTexts(true);
     try {
-      // Bulk update of app texts
       const updatePromises = appTexts.map(text => 
-        supabase
-          .from('app_texts')
-          .update({ value: text.value } as any) // Cast to any to bypass TypeScript checking
-          .eq('id', text.id)
+        AppTextService.updateAppText(text.id, text.value)
       );
 
-      const results = await Promise.all(updatePromises);
-
-      // Check for any errors
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        throw errors[0].error;
-      }
+      await Promise.all(updatePromises);
 
       toast({
         title: "Texter sparade",
@@ -149,7 +131,6 @@ const SuperuserSettings: React.FC = () => {
 
   return (
     <>
-      {/* App Texts Section */}
       <Card>
         <CardHeader>
           <CardTitle>Applikationstexter</CardTitle>
@@ -191,7 +172,6 @@ const SuperuserSettings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Expired Runs Section */}
       <Card>
         <CardHeader>
           <CardTitle>Utgångna körningar (äldre än 2 år)</CardTitle>
