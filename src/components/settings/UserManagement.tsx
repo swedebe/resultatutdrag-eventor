@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,37 +58,37 @@ const UserManagement: React.FC = () => {
   const [editRole, setEditRole] = useState<string>("");
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Fetching users...");
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('email');
 
-  const fetchUsers = async () => {
-    try {
-      setIsLoading(true);
-      console.log("Fetching users...");
-      
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('email');
-
-      if (error) {
+        if (error) {
+          console.error("Error fetching users:", error);
+          throw error;
+        }
+        
+        console.log("Users fetched successfully:", data);
+        setUsers(data || []);
+      } catch (error: any) {
         console.error("Error fetching users:", error);
-        throw error;
+        toast({
+          title: "Fel vid hämtning av användare",
+          description: error.message || "Kunde inte hämta användarlistan",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      console.log("Users fetched successfully:", data);
-      setUsers(data || []);
-    } catch (error: any) {
-      console.error("Error fetching users:", error);
-      toast({
-        title: "Fel vid hämtning av användare",
-        description: error.message || "Kunde inte hämta användarlistan",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    fetchUsers();
+  }, [toast]);
 
   const handleChangeRole = async (user: User, newRole: string) => {
     try {
@@ -303,7 +302,6 @@ const UserManagement: React.FC = () => {
           </div>
         )}
         
-        {/* Delete User Dialog */}
         <AlertDialog open={!!userToDelete} onOpenChange={() => !isDeleting && closeDeleteDialog()}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -338,7 +336,6 @@ const UserManagement: React.FC = () => {
           </AlertDialogContent>
         </AlertDialog>
         
-        {/* Edit User Dialog */}
         <Dialog open={!!userToEdit} onOpenChange={() => !isUpdating && closeEditDialog()}>
           <DialogContent>
             <DialogHeader>
