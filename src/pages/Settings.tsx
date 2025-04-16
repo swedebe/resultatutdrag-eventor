@@ -30,35 +30,69 @@ const Settings = () => {
           return;
         }
 
-        console.log("Authenticated user:", user.email);
+        console.log("Authenticated user:", user.id, user.email);
         
-        // Fetch user profile from the users table
-        const { data, error } = await supabase
+        // Check first if the user exists in the users table and how many records exist
+        const { data: checkData, error: checkError, count } = await supabase
           .from('users')
-          .select('id, email, name, club_name')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user profile:", error);
-          throw error;
+          .select('*', { count: 'exact' })
+          .eq('id', user.id);
+          
+        console.log("User check results:", { count, records: checkData?.length });
+        
+        if (checkError) {
+          console.error("Error checking user profile:", checkError);
+          throw checkError;
         }
         
-        if (!data) {
-          console.error("User profile not found in the users table");
-          throw new Error("User profile not found");
+        // If no user exists, we need to create one
+        if (!checkData || checkData.length === 0) {
+          console.log("User profile does not exist, creating one...");
+          
+          const { data: insertData, error: insertError } = await supabase
+            .from('users')
+            .insert({
+              id: user.id,
+              email: user.email || '',
+              club_name: 'Din klubb' // Default value
+            })
+            .select('*')
+            .single();
+            
+          if (insertError) {
+            console.error("Error creating user profile:", insertError);
+            throw insertError;
+          }
+          
+          console.log("Created new user profile:", insertData);
+          
+          // Set user as superuser if email is david@vram.se
+          const isSuperuser = user.email === 'david@vram.se';
+          console.log("Is superuser:", isSuperuser);
+          
+          setUserProfile({
+            ...insertData,
+            role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
+          });
         }
-        
-        console.log("User profile fetched:", data);
-        
-        // Set user as superuser if email is david@vram.se
-        const isSuperuser = data.email === 'david@vram.se';
-        console.log("Is superuser:", isSuperuser);
-        
-        setUserProfile({
-          ...data,
-          role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
-        });
+        // If multiple users exist, handle the error
+        else if (checkData.length > 1) {
+          console.error("Multiple user profiles found:", checkData);
+          throw new Error("Multiple user profiles found");
+        }
+        // If exactly one user exists, use that
+        else {
+          console.log("User profile found:", checkData[0]);
+          
+          // Set user as superuser if email is david@vram.se
+          const isSuperuser = checkData[0].email === 'david@vram.se';
+          console.log("Is superuser:", isSuperuser);
+          
+          setUserProfile({
+            ...checkData[0],
+            role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
+          });
+        }
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         toast({
