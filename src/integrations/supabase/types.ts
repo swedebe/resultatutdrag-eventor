@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_texts: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       processed_results: {
         Row: {
           birth_year: string | null
@@ -197,6 +224,7 @@ export type Database = {
           email: string
           id: string
           name: string | null
+          role: string | null
         }
         Insert: {
           club_name: string
@@ -204,6 +232,7 @@ export type Database = {
           email: string
           id?: string
           name?: string | null
+          role?: string | null
         }
         Update: {
           club_name?: string
@@ -211,6 +240,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
+          role?: string | null
         }
         Relationships: []
       }
@@ -219,6 +249,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_user_from_admin: {
+        Args: {
+          user_email: string
+          user_password: string
+          user_name: string
+          user_club_name?: string
+          user_role?: string
+        }
+        Returns: Json
+      }
       create_user_if_not_exists: {
         Args: { user_id: string; user_email: string; user_club_name: string }
         Returns: boolean

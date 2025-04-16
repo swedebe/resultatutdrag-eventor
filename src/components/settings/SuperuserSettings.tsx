@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { format, sub } from "date-fns";
 import { AppText } from "@/types/appText";
 import { AppTextService } from "@/services/appText/appTextService";
+import AddUserForm from "./AddUserForm";
 
 interface ExpiredRun {
   id: string;
@@ -131,6 +133,10 @@ const SuperuserSettings: React.FC = () => {
 
   return (
     <>
+      {/* Add User Form */}
+      <AddUserForm />
+      
+      {/* App Texts */}
       <Card>
         <CardHeader>
           <CardTitle>Applikationstexter</CardTitle>
@@ -172,6 +178,7 @@ const SuperuserSettings: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Expired Runs */}
       <Card>
         <CardHeader>
           <CardTitle>Utgångna körningar (äldre än 2 år)</CardTitle>

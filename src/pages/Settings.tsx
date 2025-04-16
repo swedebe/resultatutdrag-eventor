@@ -111,9 +111,9 @@ const Settings = () => {
           userRecord = newUserData;
         }
         
-        // Set user as superuser if email is david@vram.se
-        const isSuperuser = userRecord.email === 'david@vram.se';
-        console.log("Is superuser:", isSuperuser);
+        // Use the role field from the database instead of email check
+        const isSuperuser = userRecord.role === 'superuser';
+        console.log("Is superuser based on role:", isSuperuser);
         
         setUserProfile({
           ...userRecord,
