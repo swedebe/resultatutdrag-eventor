@@ -160,36 +160,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_processing_state: {
-        Row: {
-          cancellation_cleared_at: string | null
-          cancellation_flag: boolean
-          cancellation_set_at: string | null
-          created_at: string
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          cancellation_cleared_at?: string | null
-          cancellation_flag?: boolean
-          cancellation_set_at?: string | null
-          created_at?: string
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          cancellation_cleared_at?: string | null
-          cancellation_flag?: boolean
-          cancellation_set_at?: string | null
-          created_at?: string
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       users: {
         Row: {
           club_name: string

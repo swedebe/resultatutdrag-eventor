@@ -1,10 +1,11 @@
+
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
 import { parseExcelFile, mapExcelRowToResultRow, exportResultsToExcel } from './excel/excelService';
 import { fetchEventorData } from './eventor/eventorService';
 import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveLogToDatabase } from './database/resultRepository';
-import { getUserCancellationFlag } from './database/processingStateService';
 
 export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
@@ -30,18 +31,6 @@ export const processExcelFile = async (
   const enrichedResults: ResultRow[] = [];
   
   for (let i = 0; i < jsonData.length; i++) {
-    // Check for cancellation from database
-    const isCancelled = await getUserCancellationFlag();
-    if (isCancelled) {
-      addLog("system", "", "Bearbetning avbruten av användaren (enligt databasflagg)");
-      
-      if (runId) {
-        await saveLogToDatabase(runId, "system", "", "Bearbetning avbruten av användaren (enligt databasflagg)");
-      }
-      
-      break;
-    }
-    
     const row = jsonData[i];
     
     try {
