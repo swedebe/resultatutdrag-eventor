@@ -9,11 +9,13 @@ import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
 import { Trash2, PlusCircle, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useAllAppTexts } from "@/hooks/useAppText";
 
 const Index = () => {
   const { toast } = useToast();
+  const { texts, processText } = useAllAppTexts();
   
-  // Fetch user info from Supabase - remove the 'role' field which doesn't exist
+  // Fetch user info from Supabase - include the name field
   const { data: userData } = useQuery({
     queryKey: ['user-profile'],
     queryFn: async () => {
@@ -21,7 +23,7 @@ const Index = () => {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('club_name')
+          .select('name, club_name')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -77,7 +79,9 @@ const Index = () => {
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-4xl font-bold">Resultatanalys</h1>
+        <h1 className="text-4xl font-bold">
+          {texts.main_title || "Resultatanalys"}
+        </h1>
         <div className="flex gap-4">
           <Link to="/settings">
             <Button variant="outline" className="flex items-center gap-2">
@@ -90,15 +94,15 @@ const Index = () => {
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Välkommen {userData?.club_name}</CardTitle>
+          <CardTitle>{processText('welcome_message', userData) || `Välkommen ${userData?.name || ''}`}</CardTitle>
           <CardDescription>
-            Med detta verktyg kan du använda en eportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil.
+            {texts.tool_description || "Med detta verktyg kan du använda en eportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <p>
-              Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil.
+              {texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."}
             </p>
             <div className="flex justify-center mt-4">
               <Link to="/file-upload">
@@ -115,9 +119,9 @@ const Index = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Dina sparade körningar</CardTitle>
+            <CardTitle>{texts.your_runs_title || "Dina sparade körningar"}</CardTitle>
             <CardDescription>
-              Tidigare sparade körningar och analyser
+              {texts.your_runs_subtitle || "Tidigare sparade körningar och analyser"}
             </CardDescription>
           </div>
           {savedRuns && savedRuns.length > 0 && (

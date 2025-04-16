@@ -1,9 +1,11 @@
 
 import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import FileUploadForm from "@/components/FileUploadForm";
 import { Button } from "@/components/ui/button";
-import { XCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAllAppTexts } from "@/hooks/useAppText";
 
 interface FileUploadSectionProps {
   isProcessing: boolean;
@@ -30,38 +32,105 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
   hasResults,
   delay,
   onDelayChange,
-  onCancelProcessing,
+  onCancelProcessing
 }) => {
+  const { texts } = useAllAppTexts();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onFileChange(e.target.files[0]);
+    } else {
+      onFileChange(null);
+    }
+  };
+
+  const handleDelayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDelay = parseInt(e.target.value, 10) || 0;
+    if (newDelay >= 0) {
+      onDelayChange(newDelay);
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle>Ladda upp resultatfil (Excel)</CardTitle>
+        <CardTitle>{texts.upload_title || "Filuppladdning"}</CardTitle>
         <CardDescription>
-          Ladda upp en Excel-fil med resultat för att automatiskt berika dem med banlängd och antal startande
+          {texts.upload_description || "Ladda upp en Excel-fil med resultat för att automatiskt berika dem..."}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <FileUploadForm
-          isProcessing={isProcessing}
-          progress={progress}
-          currentStatus={currentStatus}
-          onFileChange={onFileChange}
-          onProcessFile={onProcessFile}
-          onClear={onClear}
-          hasResults={hasResults}
-          delay={delay}
-          onDelayChange={onDelayChange}
-        />
-        
-        {isProcessing && (
-          <Button 
-            variant="destructive" 
-            onClick={onCancelProcessing}
-            className="mt-4"
-          >
-            <XCircle className="mr-2 h-4 w-4" /> Avbryt körning
-          </Button>
-        )}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="file-upload">
+              {texts.upload_label || "Ladda upp resultatfil (Excel)"}
+            </Label>
+            <input 
+              id="file-upload"
+              type="file" 
+              accept=".xlsx, .xls" 
+              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary file:text-white
+                hover:file:bg-primary/90"
+            />
+          </div>
+          
+          <div className="flex gap-3 items-center">
+            <Label htmlFor="delay-input">
+              {texts.delay_label || "Delay mellan anrop (sekunder):"}
+            </Label>
+            <Input 
+              id="delay-input"
+              type="number" 
+              min="0"
+              value={delay} 
+              onChange={handleDelayChange}
+              className="w-20"
+              disabled={isProcessing}
+            />
+            <div className="text-xs text-muted-foreground">
+              {texts.delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <Button 
+              onClick={onProcessFile} 
+              disabled={isProcessing || !file}
+              className="w-40"
+            >
+              {isProcessing ? "Bearbetar..." : "Bearbeta fil"}
+            </Button>
+            
+            {isProcessing ? (
+              <Button 
+                variant="destructive" 
+                onClick={onCancelProcessing}
+              >
+                Avbryt
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                onClick={onClear}
+                disabled={!hasResults && !isProcessing}
+              >
+                Rensa
+              </Button>
+            )}
+          </div>
+          
+          {isProcessing && (
+            <div className="mt-4 space-y-2">
+              <Progress value={progress} className="w-full" />
+              <p className="text-sm text-muted-foreground">{currentStatus}</p>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
