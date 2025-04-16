@@ -2,13 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { UserRole, UserProfile } from "@/types/user";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import SuperuserSettings from "@/components/settings/SuperuserSettings";
 import UserProfileSettings from "@/components/settings/UserProfileSettings";
 
@@ -21,35 +19,51 @@ const Settings = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // Get current authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError) throw authError;
         
         if (!user) {
+          console.error("No authenticated user found");
           navigate('/auth');
           return;
         }
 
+        console.log("Authenticated user:", user.email);
+        
+        // Fetch user profile from the users table
         const { data, error } = await supabase
           .from('users')
-          .select('*')
+          .select('id, email, name, club_name')
           .eq('id', user.id)
           .single();
 
         if (error) {
+          console.error("Error fetching user profile:", error);
           throw error;
         }
         
+        if (!data) {
+          console.error("User profile not found in the users table");
+          throw new Error("User profile not found");
+        }
+        
+        console.log("User profile fetched:", data);
+        
         // Set user as superuser if email is david@vram.se
         const isSuperuser = data.email === 'david@vram.se';
+        console.log("Is superuser:", isSuperuser);
         
         setUserProfile({
           ...data,
-          role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR // Set as superuser if email matches
+          role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
         });
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load user profile',
+          description: 'Failed to load user profile: ' + (error.message || error),
           variant: 'destructive',
         });
       } finally {
