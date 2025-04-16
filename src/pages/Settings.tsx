@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,79 +32,87 @@ const Settings = () => {
 
         console.log("Authenticated user:", user.id, user.email);
         
-        let existingProfile = null;
+        // Try to find the user profile - first by ID, then by email
+        let userRecord = null;
         
-        // Step 1: Check if a profile exists with the current user ID
+        // Check by ID first
         const { data: idCheckData, error: idCheckError } = await supabase
           .from('users')
           .select('*')
           .eq('id', user.id)
           .maybeSingle();
           
-        if (idCheckError) {
+        if (idCheckError && idCheckError.code !== 'PGRST116') {
+          // PGRST116 is the "Zero rows returned" error, which is expected if no user exists with this ID
           console.error("Error checking user profile by ID:", idCheckError);
-        } else if (idCheckData) {
-          console.log("User profile found by ID:", idCheckData);
-          existingProfile = idCheckData;
+          throw idCheckError;
         }
         
-        // Step 2: If not found by ID and user has email, check by email
-        if (!existingProfile && user.email) {
+        if (idCheckData) {
+          console.log("User profile found by ID:", idCheckData);
+          userRecord = idCheckData;
+        } else if (user.email) {
+          // If not found by ID, check by email
           const { data: emailCheckData, error: emailCheckError } = await supabase
             .from('users')
             .select('*')
             .eq('email', user.email)
             .maybeSingle();
             
-          if (emailCheckError) {
+          if (emailCheckError && emailCheckError.code !== 'PGRST116') {
             console.error("Error checking user profile by email:", emailCheckError);
-          } else if (emailCheckData) {
+            throw emailCheckError;
+          }
+          
+          if (emailCheckData) {
             console.log("User profile found by email:", emailCheckData);
-            existingProfile = emailCheckData;
+            userRecord = emailCheckData;
           }
         }
         
-        // If we found an existing profile, use it
-        if (existingProfile) {
-          // Set user as superuser if email is david@vram.se
-          const isSuperuser = existingProfile.email === 'david@vram.se';
-          console.log("Is superuser:", isSuperuser);
+        // Create a new user record if none found
+        if (!userRecord) {
+          console.log("No existing user profile found, creating one...");
           
-          setUserProfile({
-            ...existingProfile,
-            role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
-          });
+          // We need to use a raw query with ON CONFLICT DO NOTHING to handle potential race conditions
+          const { data: insertData, error: insertError } = await supabase
+            .rpc('create_user_if_not_exists', { 
+              user_id: user.id,
+              user_email: user.email || '',
+              user_club_name: 'Din klubb' // Default value
+            });
+            
+          if (insertError) {
+            console.error("Error creating user profile:", insertError);
+            throw insertError;
+          }
           
-          setLoading(false);
-          return;
+          // Now fetch the user profile that was just created or already existed
+          const { data: newUserData, error: newUserError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', user.email)
+            .maybeSingle();
+            
+          if (newUserError) {
+            console.error("Error fetching created/existing user profile:", newUserError);
+            throw newUserError;
+          }
+          
+          if (!newUserData) {
+            throw new Error("Failed to create or retrieve user profile");
+          }
+          
+          console.log("Retrieved user profile:", newUserData);
+          userRecord = newUserData;
         }
-        
-        // If no existing profile was found, create a new one
-        console.log("No existing user profile found, creating one...");
-        
-        const { data: insertData, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            email: user.email || '',
-            club_name: 'Din klubb' // Default value
-          })
-          .select('*')
-          .single();
-          
-        if (insertError) {
-          console.error("Error creating user profile:", insertError);
-          throw insertError;
-        }
-        
-        console.log("Created new user profile:", insertData);
         
         // Set user as superuser if email is david@vram.se
-        const isSuperuser = user.email === 'david@vram.se';
+        const isSuperuser = userRecord.email === 'david@vram.se';
         console.log("Is superuser:", isSuperuser);
         
         setUserProfile({
-          ...insertData,
+          ...userRecord,
           role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
         });
       } catch (error: any) {
