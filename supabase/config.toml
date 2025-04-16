@@ -4,3 +4,6 @@ project_id = "pxbtnzgsogrpkkurcvzv"
 
 [functions.create-user]
 verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
