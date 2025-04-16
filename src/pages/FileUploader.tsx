@@ -120,7 +120,9 @@ const FileUploader = () => {
     if (results.length === 0) return;
     
     try {
-      exportResultsToExcel(results, saveName || "exported-results");
+      // Fix here: The exportResultsToExcel function is being called with two arguments, but it should only have one
+      // Looking at the service definition, it only expects an array of ResultRow objects
+      exportResultsToExcel(results);
       toast({
         title: "Exporterad",
         description: "Resultaten har exporterats till Excel."
