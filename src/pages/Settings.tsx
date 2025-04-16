@@ -37,10 +37,13 @@ const Settings = () => {
         if (error) {
           throw error;
         }
-
+        
+        // Set user as superuser if email is david@vram.se
+        const isSuperuser = data.email === 'david@vram.se';
+        
         setUserProfile({
           ...data,
-          role: data.role || UserRole.REGULAR // Default to regular if role is not set
+          role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR // Set as superuser if email matches
         });
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
@@ -108,10 +111,10 @@ const Settings = () => {
 
       <div className="space-y-6">
         {/* User Profile settings for all users */}
-        <UserProfileSettings userProfile={userProfile} />
+        {userProfile && <UserProfileSettings userProfile={userProfile} />}
         
         {/* Superuser settings */}
-        {userProfile.role === UserRole.SUPERUSER && (
+        {userProfile && userProfile.role === UserRole.SUPERUSER && (
           <SuperuserSettings />
         )}
       </div>

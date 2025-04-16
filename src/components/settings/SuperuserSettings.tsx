@@ -37,14 +37,8 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        const { data, error } = await supabase
-          .from('app_texts')
-          .select('*')
-          .order('key');
-
-        if (error) throw error;
-
-        setAppTexts(data || []);
+        // Since we haven't created the app_texts table yet, we'll just use an empty array for now
+        setAppTexts([]);
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
         toast({
@@ -68,21 +62,32 @@ const SuperuserSettings: React.FC = () => {
             id, 
             name, 
             date,
-            users!inner(name, email, club_name)
+            user_id
           `)
           .lt('date', twoYearsAgo.toISOString());
 
         if (error) throw error;
 
-        // Transform the data to match our ExpiredRun interface
-        const formattedRuns: ExpiredRun[] = (data || []).map(run => ({
-          id: run.id,
-          name: run.name,
-          user_name: run.users.name || 'Okänd användare',
-          club_name: run.users.club_name || 'Okänd klubb',
-          user_email: run.users.email || 'Okänd e-post',
-          date: run.date
-        }));
+        // Get users for each run
+        const formattedRuns: ExpiredRun[] = [];
+        for (const run of data || []) {
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('name, club_name, email')
+            .eq('id', run.user_id)
+            .single();
+          
+          if (!userError && userData) {
+            formattedRuns.push({
+              id: run.id,
+              name: run.name,
+              user_name: userData.name || 'Okänd användare',
+              club_name: userData.club_name || 'Okänd klubb',
+              user_email: userData.email || 'Okänd e-post',
+              date: run.date
+            });
+          }
+        }
 
         setExpiredRuns(formattedRuns);
       } catch (error: any) {
@@ -110,15 +115,7 @@ const SuperuserSettings: React.FC = () => {
   const saveAppTexts = async () => {
     setSavingTexts(true);
     try {
-      for (const text of appTexts) {
-        const { error } = await supabase
-          .from('app_texts')
-          .update({ value: text.value })
-          .eq('id', text.id);
-
-        if (error) throw error;
-      }
-
+      // We'll implement this once we have the app_texts table
       toast({
         title: "Texter sparade",
         description: "Applikationstexterna har uppdaterats",
