@@ -13,21 +13,25 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Debug function to check JWT claims
+    // Enhanced debug function to check JWT claims
     const checkUserClaims = async () => {
       const { data } = await supabase.auth.getUser();
       if (data && data.user) {
         console.log("✅ AuthWrapper - User authenticated:", data.user.email);
         console.log("✅ AuthWrapper - User ID:", data.user.id);
-        console.log("✅ AuthWrapper - User role:", data.user.app_metadata?.role || "No role in app_metadata");
         
-        // Get JWT token for more detailed debugging
+        // Detailed JWT token logging
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData && sessionData.session) {
-          console.log("✅ AuthWrapper - JWT exists:", !!sessionData.session.access_token);
-          
-          // Print first characters of JWT for reference
           const token = sessionData.session.access_token;
+          const decodedToken = JSON.parse(atob(token.split('.')[1]));
+          
+          console.log("✅ AuthWrapper - Full JWT Payload:", decodedToken);
+          console.log("✅ AuthWrapper - User Role from app_metadata:", 
+            decodedToken.app_metadata?.role || 'No role found in app_metadata'
+          );
+          
+          // Log first characters of JWT for reference
           console.log("✅ AuthWrapper - JWT preview:", token.substring(0, 15) + "...");
         }
       }

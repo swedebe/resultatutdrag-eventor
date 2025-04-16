@@ -263,6 +263,10 @@ export type Database = {
         Args: { user_id: string; user_email: string; user_club_name: string }
         Returns: boolean
       }
+      debug_jwt: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       populate_app_texts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
