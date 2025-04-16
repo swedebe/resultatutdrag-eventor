@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -170,31 +171,30 @@ const SuperuserSettings: React.FC = () => {
                 variant="outline" 
                 onClick={() => {
                   setLoadingTexts(true);
-                  supabase.rpc('populate_app_texts')
-                    .then(() => {
+                  // Fix: Replace chain of .then().catch() with async/await pattern
+                  (async () => {
+                    try {
+                      await supabase.rpc('populate_app_texts');
                       toast({
                         title: "Texter skapade",
                         description: "Applikationstexter har skapats i databasen.",
                       });
                       // Refetch texts
-                      return supabase.from('app_texts').select('*');
-                    })
-                    .then(({ data }) => {
+                      const { data } = await supabase.from('app_texts').select('*');
                       if (data) {
                         setAppTexts(data);
                       }
-                    })
-                    .catch(error => {
+                    } catch (error: any) {
                       console.error("Error creating app texts:", error);
                       toast({
                         title: "Fel vid skapande av texter",
                         description: error.message || "Kunde inte skapa applikationstexter",
                         variant: "destructive",
                       });
-                    })
-                    .finally(() => {
+                    } finally {
                       setLoadingTexts(false);
-                    });
+                    }
+                  })();
                 }}
               >
                 Skapa standardtexter
