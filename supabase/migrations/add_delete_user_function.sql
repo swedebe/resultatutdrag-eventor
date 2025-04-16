@@ -1,4 +1,7 @@
 
+-- This function is no longer used as we're now using an Edge Function for user deletion
+-- The Edge Function approach provides better security and flexibility
+
 -- Create function to delete a user from auth.users (must be run as superuser)
 CREATE OR REPLACE FUNCTION public.delete_user(user_id UUID)
 RETURNS BOOLEAN

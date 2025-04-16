@@ -3,10 +3,10 @@ import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -23,6 +23,9 @@ const formSchema = z.object({
   password: z.string().min(6, {
     message: "Lösenord måste vara minst 6 tecken.",
   }),
+  role: z.enum(["regular", "superuser"], {
+    required_error: "Välj en användarroll.",
+  })
 });
 
 const AddUserForm = () => {
@@ -36,6 +39,7 @@ const AddUserForm = () => {
       email: "",
       club: "",
       password: "",
+      role: "regular"
     },
   });
 
@@ -47,7 +51,8 @@ const AddUserForm = () => {
         user_email: values.email,
         user_password: values.password,
         user_name: values.name,
-        user_club_name: values.club || "Din klubb"
+        user_club_name: values.club || "Din klubb",
+        user_role: values.role
       });
 
       if (error) {
@@ -60,12 +65,12 @@ const AddUserForm = () => {
         return;
       }
 
-      // Safely check if data is an object with a success property
+      // Check if the response is an object with a success property
       if (data && typeof data === 'object' && 'success' in data) {
         if (data.success === true) {
           toast({
             title: "Användare skapad",
-            description: `Användaren ${values.name} har skapats med e-post ${values.email}`,
+            description: `Användaren ${values.name} har skapats med e-post ${values.email} och roll: ${values.role === 'superuser' ? 'Superanvändare' : 'Användare'}.`,
           });
           form.reset();
         } else {
@@ -141,6 +146,31 @@ const AddUserForm = () => {
                   <FormControl>
                     <Input placeholder="Klubbnamn" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Användarroll</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Välj roll" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="regular">Användare</SelectItem>
+                      <SelectItem value="superuser">Superanvändare</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Superanvändare kan hantera andra användare och systemkonfiguration.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

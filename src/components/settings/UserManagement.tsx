@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ShieldAlert, ShieldCheck, Edit, Trash2, UserCog } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -162,9 +163,10 @@ const UserManagement = () => {
 
       if (usersError) throw usersError;
 
-      // Then use a RPC function to delete from auth.users
-      const { error: authError } = await supabase
-        .rpc('delete_user', { user_id: selectedUser.id });
+      // Call our custom delete_user function through Supabase
+      const { error: authError } = await supabase.functions.invoke('delete-user', {
+        body: { userId: selectedUser.id }
+      });
 
       if (authError) {
         // If we couldn't delete from auth.users, we should inform the user but continue
@@ -172,7 +174,7 @@ const UserManagement = () => {
         toast({
           title: "Användaren togs bort från systemet",
           description: "Men kunde inte tas bort från autentiseringssystemet.",
-          variant: "warning",
+          variant: "destructive",
         });
       }
 
