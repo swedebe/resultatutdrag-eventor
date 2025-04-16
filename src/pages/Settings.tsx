@@ -32,16 +32,41 @@ const Settings = () => {
 
         console.log("Authenticated user:", user.id, user.email);
         
-        // Check first if the user exists in the users table and how many records exist
+        // First check if the user exists by email (to handle cases where the same email might have multiple accounts)
+        if (user.email) {
+          const { data: emailCheckData, error: emailCheckError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', user.email)
+            .single();
+            
+          if (emailCheckData && !emailCheckError) {
+            console.log("User profile found by email:", emailCheckData);
+            
+            // Set user as superuser if email is david@vram.se
+            const isSuperuser = emailCheckData.email === 'david@vram.se';
+            console.log("Is superuser:", isSuperuser);
+            
+            setUserProfile({
+              ...emailCheckData,
+              role: isSuperuser ? UserRole.SUPERUSER : UserRole.REGULAR
+            });
+            
+            setLoading(false);
+            return; // Exit early as we found the user
+          }
+        }
+        
+        // If we didn't find by email, check by ID
         const { data: checkData, error: checkError, count } = await supabase
           .from('users')
           .select('*', { count: 'exact' })
           .eq('id', user.id);
           
-        console.log("User check results:", { count, records: checkData?.length });
+        console.log("User check results by ID:", { count, records: checkData?.length });
         
         if (checkError) {
-          console.error("Error checking user profile:", checkError);
+          console.error("Error checking user profile by ID:", checkError);
           throw checkError;
         }
         
