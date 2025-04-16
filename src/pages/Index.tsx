@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 const Index = () => {
   const { toast } = useToast();
   
-  // Fetch user info from Supabase
+  // Fetch user info from Supabase - remove the 'role' field which doesn't exist
   const { data: userData } = useQuery({
     queryKey: ['user-profile'],
     queryFn: async () => {
@@ -21,7 +21,7 @@ const Index = () => {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('club_name, role')
+          .select('club_name')
           .eq('id', user.id)
           .maybeSingle();
         
