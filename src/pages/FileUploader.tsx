@@ -9,7 +9,6 @@ import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/Fi
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
 import PreviewSection from "@/components/file-uploader/PreviewSection";
-import { getUserCancellationFlag, setUserCancellationFlag } from "@/services/database/processingStateService";
 
 const FileUploader = () => {
   const { toast } = useToast();
@@ -29,14 +28,6 @@ const FileUploader = () => {
   
   useEffect(() => {
     setLogsUpdateFunction(updateLogs);
-    
-    const checkCancellationFlag = async () => {
-      const isCancelled = await getUserCancellationFlag();
-      setCancelProcessing(isCancelled);
-    };
-    
-    checkCancellationFlag();
-    
     return () => setLogsUpdateFunction(null);
   }, []);
 
@@ -141,14 +132,13 @@ const FileUploader = () => {
     }
   };
 
-  const handleCancelProcessing = async () => {
+  const handleCancelProcessing = () => {
     if (isProcessing) {
       setCancelProcessing(true);
-      await setUserCancellationFlag(true);
-      
       addCancellationLog();
       setCurrentStatus("Avbryter körning...");
       
+      // Immediately set processing to false to stop the current operation
       setIsProcessing(false);
       
       toast({
@@ -196,11 +186,13 @@ const FileUploader = () => {
       return;
     }
     
+    // IMPORTANT: Explicitly reset the cancellation flag when starting a new processing job
+    // This is the key fix to prevent automatic cancellations
     setCancelProcessing(false);
-    await setUserCancellationFlag(false);
     
     setIsProcessing(true);
     
+    // Preserve any cancellation logs
     const cancellationLogs = logs.filter(log => 
       log.eventId === "system" && log.status === "Användaren avbröt körningen"
     );
@@ -216,6 +208,7 @@ const FileUploader = () => {
     setRunId(newRunId);
     
     try {
+      // Use a local variable to track if processing was cancelled
       let wasCancelled = false;
       
       const enrichedResults = await processExcelFile(
@@ -226,10 +219,9 @@ const FileUploader = () => {
         async (partialResults: ResultRow[]) => {
           setResults(partialResults);
           
-          const isCancelled = await getUserCancellationFlag();
-          if (isCancelled || !isProcessing) {
-            console.log("Cancellation detected from database, stopping processing");
-            setCancelProcessing(true);
+          // Check if cancellation was requested or if processing was stopped
+          if (cancelProcessing || !isProcessing) {
+            console.log("Cancellation detected, stopping processing");
             wasCancelled = true;
             return false;
           }
@@ -239,6 +231,7 @@ const FileUploader = () => {
         newRunId
       );
       
+      // Only update results and show success toast if not cancelled
       if (!wasCancelled) {
         setResults(enrichedResults);
         
@@ -257,8 +250,8 @@ const FileUploader = () => {
     } catch (error: any) {
       console.error("Fel vid bearbetning av fil:", error);
       
-      const isCancelled = await getUserCancellationFlag();
-      if (isCancelled) {
+      // Check if cancellation was requested
+      if (cancelProcessing) {
         toast({
           title: "Körning avbruten",
           description: "Körningen avbröts av användaren",
@@ -272,6 +265,8 @@ const FileUploader = () => {
       }
     } finally {
       setIsProcessing(false);
+      // Also reset the cancellation flag after processing has completed
+      setCancelProcessing(false);
     }
   };
   
@@ -349,7 +344,7 @@ const FileUploader = () => {
     }
   };
   
-  const handleClearResults = async () => {
+  const handleClearResults = () => {
     if (runId) {
       handleDeleteRun();
     }
@@ -359,6 +354,7 @@ const FileUploader = () => {
     setProgress(0);
     setCurrentStatus("");
     
+    // Preserve any cancellation logs
     const cancellationLogs = logs.filter(log => 
       log.eventId === "system" && log.status === "Användaren avbröt körningen"
     );
@@ -367,8 +363,8 @@ const FileUploader = () => {
     setSaveName("");
     setRunId(null);
     
+    // Make sure to reset the cancellation flag when clearing results
     setCancelProcessing(false);
-    await setUserCancellationFlag(false);
     
     toast({
       title: "Resultat rensade",
