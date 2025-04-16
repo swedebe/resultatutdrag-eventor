@@ -51,6 +51,7 @@ const UserManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   // Form fields for editing
   const [editName, setEditName] = useState("");
@@ -58,11 +59,33 @@ const UserManagement: React.FC = () => {
   const [editClub, setEditClub] = useState("");
   const [editRole, setEditRole] = useState<string>("");
 
+  // Get current user ID for debugging
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data && data.user) {
+        console.log("Current user ID:", data.user.id);
+        console.log("User metadata:", data.user.app_metadata);
+        setCurrentUserId(data.user.id);
+      }
+    };
+    
+    fetchCurrentUser();
+  }, []);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
         console.log("Fetching users...");
+        
+        // Get the current user JWT for debugging
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData && sessionData.session) {
+          console.log("JWT role claim:", 
+            sessionData.session.user.app_metadata?.role || 
+            "No role found in app_metadata");
+        }
         
         // Simple query with no filters - rely on RLS policies to limit data access
         const { data, error } = await supabase
@@ -76,6 +99,7 @@ const UserManagement: React.FC = () => {
         }
         
         console.log("Users fetched successfully:", data ? data.length : 0, "users");
+        console.log("Users data:", data);
         setUsers(data || []);
       } catch (error: any) {
         console.error("Error fetching users:", error);
@@ -243,65 +267,73 @@ const UserManagement: React.FC = () => {
             Inga användare hittades
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Namn</TableHead>
-                  <TableHead>E-post</TableHead>
-                  <TableHead>Klubb</TableHead>
-                  <TableHead>Roll</TableHead>
-                  <TableHead className="text-right">Åtgärder</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.name || "-"}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.club_name}</TableCell>
-                    <TableCell>
-                      {user.role === "superuser" ? (
-                        <Badge variant="default" className="bg-amber-500 hover:bg-amber-600">
-                          <ShieldAlert className="h-3 w-3 mr-1" /> Superanvändare
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          <Shield className="h-3 w-3 mr-1" /> Användare
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleChangeRole(user, user.role === "superuser" ? "regular" : "superuser")}
-                      >
-                        {user.role === "superuser" ? "Gör till användare" : "Gör till superanvändare"}
-                      </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => openDeleteDialog(user)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+          <>
+            <div className="mb-4 p-4 bg-muted rounded-md">
+              <p className="text-sm font-mono">
+                <strong>Debug Info:</strong> Current User ID: {currentUserId || 'Not loaded'}<br />
+                Total Users: {users.length}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Namn</TableHead>
+                    <TableHead>E-post</TableHead>
+                    <TableHead>Klubb</TableHead>
+                    <TableHead>Roll</TableHead>
+                    <TableHead className="text-right">Åtgärder</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.name || "-"}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.club_name}</TableCell>
+                      <TableCell>
+                        {user.role === "superuser" ? (
+                          <Badge variant="default" className="bg-amber-500 hover:bg-amber-600">
+                            <ShieldAlert className="h-3 w-3 mr-1" /> Superanvändare
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            <Shield className="h-3 w-3 mr-1" /> Användare
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleChangeRole(user, user.role === "superuser" ? "regular" : "superuser")}
+                        >
+                          {user.role === "superuser" ? "Gör till användare" : "Gör till superanvändare"}
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => openEditDialog(user)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => openDeleteDialog(user)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
         
         <AlertDialog open={!!userToDelete} onOpenChange={() => !isDeleting && closeDeleteDialog()}>

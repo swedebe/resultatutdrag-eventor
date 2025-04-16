@@ -13,11 +13,34 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Debug function to check JWT claims
+    const checkUserClaims = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data && data.user) {
+        console.log("✅ AuthWrapper - User authenticated:", data.user.email);
+        console.log("✅ AuthWrapper - User ID:", data.user.id);
+        console.log("✅ AuthWrapper - User role:", data.user.app_metadata?.role || "No role in app_metadata");
+        
+        // Get JWT token for more detailed debugging
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData && sessionData.session) {
+          console.log("✅ AuthWrapper - JWT exists:", !!sessionData.session.access_token);
+          
+          // Print first characters of JWT for reference
+          const token = sessionData.session.access_token;
+          console.log("✅ AuthWrapper - JWT preview:", token.substring(0, 15) + "...");
+        }
+      }
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_, session) => {
         setUser(session?.user || null);
         setLoading(false);
+        if (session?.user) {
+          checkUserClaims();
+        }
       }
     );
 
@@ -25,6 +48,9 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
       setLoading(false);
+      if (session?.user) {
+        checkUserClaims();
+      }
     });
 
     return () => subscription.unsubscribe();
