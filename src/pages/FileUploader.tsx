@@ -186,13 +186,13 @@ const FileUploader = () => {
       return;
     }
     
-    // Reset the cancellation flag when starting a new processing job
+    // IMPORTANT: Explicitly reset the cancellation flag when starting a new processing job
+    // This is the key fix to prevent automatic cancellations
     setCancelProcessing(false);
     
     setIsProcessing(true);
     
-    // Modified: Don't clear all logs, preserve any cancellation logs
-    // Instead of using clearLogs(), we'll filter out only non-cancellation logs
+    // Preserve any cancellation logs
     const cancellationLogs = logs.filter(log => 
       log.eventId === "system" && log.status === "Användaren avbröt körningen"
     );
@@ -265,7 +265,8 @@ const FileUploader = () => {
       }
     } finally {
       setIsProcessing(false);
-      // Don't reset cancelProcessing here since we want to preserve its state
+      // Also reset the cancellation flag after processing has completed
+      setCancelProcessing(false);
     }
   };
   
@@ -353,7 +354,7 @@ const FileUploader = () => {
     setProgress(0);
     setCurrentStatus("");
     
-    // Modified: Don't clear all logs, preserve any cancellation logs
+    // Preserve any cancellation logs
     const cancellationLogs = logs.filter(log => 
       log.eventId === "system" && log.status === "Användaren avbröt körningen"
     );
