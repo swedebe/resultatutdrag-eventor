@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ const UserManagement: React.FC = () => {
         setIsLoading(true);
         console.log("Fetching users...");
         
+        // Simple query with no filters - rely on RLS policies to limit data access
         const { data, error } = await supabase
           .from('users')
           .select('*')
@@ -73,7 +75,7 @@ const UserManagement: React.FC = () => {
           throw error;
         }
         
-        console.log("Users fetched successfully:", data);
+        console.log("Users fetched successfully:", data ? data.length : 0, "users");
         setUsers(data || []);
       } catch (error: any) {
         console.error("Error fetching users:", error);
