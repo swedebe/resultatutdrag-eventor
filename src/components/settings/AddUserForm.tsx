@@ -52,18 +52,27 @@ const AddUserForm = () => {
       
       console.log("Creating user with values:", { ...values, password: "***" });
       
-      const { data, error } = await supabase.rpc('create_user_from_admin', {
-        user_email: values.email,
-        user_password: values.password,
-        user_name: values.name,
-        user_club_name: values.club || "Din klubb",
-        user_role: values.role
+      // Get the current session for auth header
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        throw new Error("You must be logged in to create users");
+      }
+
+      // Call the edge function to create the user
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: values.email,
+          password: values.password,
+          name: values.name,
+          club_name: values.club || "Din klubb",
+          role: values.role
+        }
       });
       
-      console.log("RPC response:", data, error);
+      console.log("Edge function response:", data, error);
 
       if (error) {
-        console.error("Error creating user:", error);
+        console.error("Error from edge function:", error);
         setErrorMessage(`Fel från servern: ${error.message || "Okänt fel"}`);
         toast({
           title: "Det gick inte att skapa användaren",
