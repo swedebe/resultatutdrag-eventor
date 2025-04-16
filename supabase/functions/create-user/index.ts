@@ -147,19 +147,44 @@ serve(async (req: Request) => {
       );
     }
 
-    // First check if user with this email already exists
-    console.log("Checking if user with email exists:", email);
-    const { data: existingUsers, error: existingError } = await supabaseAdmin
+    // First check if user with this email already exists in either table
+    console.log("Checking if user with email exists in public.users:", email);
+    const { data: existingPublicUsers, error: existingPublicError } = await supabaseAdmin
       .from("users")
-      .select("id")
+      .select("id, email")
       .eq("email", email);
 
-    if (existingError) {
-      console.error("Error checking existing users:", existingError);
+    if (existingPublicError) {
+      console.error("Error checking existing users in public.users:", existingPublicError);
     }
 
-    if (existingUsers && existingUsers.length > 0) {
-      console.log("User with this email already exists");
+    // Check if user exists in auth.users
+    console.log("Checking if user with email exists in auth.users:", email);
+    const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (authUsersError) {
+      console.error("Error listing auth users:", authUsersError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Failed to check existing users",
+          details: authUsersError
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
+    const existingAuthUser = authUsers.users.find(u => u.email === email);
+
+    // Check for inconsistent state - user exists in one table but not the other
+    const existsInPublic = existingPublicUsers && existingPublicUsers.length > 0;
+    const existsInAuth = !!existingAuthUser;
+
+    if (existsInPublic && existsInAuth) {
+      console.log("User already exists in both auth.users and public.users");
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -170,6 +195,61 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Handle inconsistent state - clean up if needed
+    if (existsInPublic && !existsInAuth) {
+      console.log("INCONSISTENT STATE: User exists in public.users but not in auth.users");
+      console.log("Cleaning up public.users entry before creating new user");
+      
+      const publicUserId = existingPublicUsers[0].id;
+      const { error: deleteError } = await supabaseAdmin
+        .from("users")
+        .delete()
+        .eq("id", publicUserId);
+        
+      if (deleteError) {
+        console.error("Failed to clean up inconsistent user in public.users:", deleteError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Failed to clean up inconsistent user state",
+            details: deleteError
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      console.log("Successfully cleaned up inconsistent public.users entry");
+    }
+    
+    if (!existsInPublic && existsInAuth) {
+      console.log("INCONSISTENT STATE: User exists in auth.users but not in public.users");
+      console.log("Cleaning up auth.users entry before creating new user");
+      
+      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(
+        existingAuthUser.id
+      );
+        
+      if (deleteAuthError) {
+        console.error("Failed to clean up inconsistent user in auth.users:", deleteAuthError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Failed to clean up inconsistent user state",
+            details: deleteAuthError
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      console.log("Successfully cleaned up inconsistent auth.users entry");
     }
 
     console.log("Creating new user with email:", email);
@@ -202,54 +282,89 @@ serve(async (req: Request) => {
 
     console.log("User created successfully in auth.users with ID:", newUser.user.id);
 
-    // Now insert into public.users with the new user ID
-    console.log("Inserting user into public.users table");
-    const { data: publicUser, error: publicError } = await supabaseAdmin
-      .from("users")
-      .insert({
-        id: newUser.user.id,
-        email,
-        name,
-        club_name: club_name || "Din klubb",
-        role,
-      })
-      .select()
-      .single();
-
-    if (publicError) {
-      console.error("Public users insert error:", publicError);
-      
-      // Try to delete the auth user if adding to public.users failed
-      console.log("Attempting to delete auth user due to public.users insert failure");
-      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
-      
+    try {
+      // Now insert into public.users with the new user ID
+      console.log("Inserting user into public.users table");
+      const { data: publicUser, error: publicError } = await supabaseAdmin
+        .from("users")
+        .insert({
+          id: newUser.user.id,
+          email,
+          name,
+          club_name: club_name || "Din klubb",
+          role,
+        })
+        .select()
+        .single();
+  
+      if (publicError) {
+        console.error("Public users insert error:", publicError);
+        
+        // Roll back by deleting the auth user if adding to public.users failed
+        console.log("ROLLBACK: Attempting to delete auth user due to public.users insert failure");
+        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+        
+        if (deleteError) {
+          console.error("CRITICAL ERROR: Failed to delete auth user during rollback:", deleteError);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              message: "Failed to complete user creation and rollback failed",
+              details: {
+                publicError,
+                rollbackError: deleteError
+              }
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        
+        console.log("Rollback successful: Auth user deleted after public.users insert failure");
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Failed to complete user creation (rolled back auth user creation)",
+            details: publicError
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+  
+      console.log("User successfully added to public.users table");
+      console.log("Complete user record:", publicUser);
+  
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: publicError.message || "Failed to complete user creation",
-          details: publicError
+        JSON.stringify({
+          success: true,
+          user_id: newUser.user.id,
+          message: "User created successfully",
         }),
         {
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    }
-
-    console.log("User successfully added to public.users table");
-    console.log("Complete user record:", publicUser);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user_id: newUser.user.id,
-        message: "User created successfully",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    } catch (insertError) {
+      // Handle any unexpected errors during public.users insertion
+      console.error("Unexpected error during public.users insertion:", insertError);
+      
+      // Roll back by deleting the auth user
+      console.log("ROLLBACK: Attempting to delete auth user due to exception");
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+        console.log("Rollback successful: Auth user deleted after exception");
+      } catch (rollbackError) {
+        console.error("CRITICAL ERROR: Rollback failed:", rollbackError);
       }
-    );
+      
+      throw insertError; // Re-throw to be caught by the outer try-catch
+    }
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
