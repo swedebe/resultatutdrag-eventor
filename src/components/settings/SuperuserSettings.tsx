@@ -12,6 +12,7 @@ import { format, sub } from "date-fns";
 import { AppText } from "@/types/appText";
 import { AppTextService } from "@/services/appText/appTextService";
 import AddUserForm from "./AddUserForm";
+import UserManagement from "./UserManagement";
 
 interface ExpiredRun {
   id: string;
@@ -133,6 +134,9 @@ const SuperuserSettings: React.FC = () => {
 
   return (
     <>
+      {/* User Management */}
+      <UserManagement />
+      
       {/* Add User Form */}
       <AddUserForm />
       

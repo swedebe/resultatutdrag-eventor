@@ -60,16 +60,26 @@ const AddUserForm = () => {
         return;
       }
 
-      if (data && data.success) {
-        toast({
-          title: "Användare skapad",
-          description: `Användaren ${values.name} har skapats med e-post ${values.email}`,
-        });
-        form.reset();
+      // Safely check if data is an object with a success property
+      if (data && typeof data === 'object' && 'success' in data) {
+        if (data.success === true) {
+          toast({
+            title: "Användare skapad",
+            description: `Användaren ${values.name} har skapats med e-post ${values.email}`,
+          });
+          form.reset();
+        } else {
+          toast({
+            title: "Det gick inte att skapa användaren",
+            description: typeof data.message === 'string' ? data.message : "Ett okänt fel inträffade",
+            variant: "destructive",
+          });
+        }
       } else {
+        // Handle unexpected response format
         toast({
-          title: "Det gick inte att skapa användaren",
-          description: data?.message || "Ett okänt fel inträffade",
+          title: "Oväntat svar från servern",
+          description: "Kunde inte tolka serverns svar",
           variant: "destructive",
         });
       }
