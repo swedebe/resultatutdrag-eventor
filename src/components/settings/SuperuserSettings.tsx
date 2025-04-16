@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, Trash2 } from "lucide-react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { format, sub } from "date-fns";
 
@@ -14,6 +14,7 @@ interface AppText {
   id: string;
   key: string;
   value: string;
+  category: string;
 }
 
 interface ExpiredRun {
@@ -37,8 +38,13 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        // Since we haven't created the app_texts table yet, we'll just use an empty array for now
-        setAppTexts([]);
+        const { data, error } = await supabase
+          .from('app_texts')
+          .select('*')
+          .order('key');
+        
+        if (error) throw error;
+        setAppTexts(data || []);
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
         toast({
@@ -115,7 +121,22 @@ const SuperuserSettings: React.FC = () => {
   const saveAppTexts = async () => {
     setSavingTexts(true);
     try {
-      // We'll implement this once we have the app_texts table
+      // Bulk update of app texts
+      const updatePromises = appTexts.map(text => 
+        supabase
+          .from('app_texts')
+          .update({ value: text.value })
+          .eq('id', text.id)
+      );
+
+      const results = await Promise.all(updatePromises);
+
+      // Check for any errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw errors[0].error;
+      }
+
       toast({
         title: "Texter sparade",
         description: "Applikationstexterna har uppdaterats",
@@ -146,14 +167,16 @@ const SuperuserSettings: React.FC = () => {
           ) : appTexts.length === 0 ? (
             <div className="flex flex-col items-center gap-4">
               <AlertCircle className="h-8 w-8 text-amber-500" />
-              <p className="text-muted-foreground">Inga texter hittades. Skapa texterna i databasen först.</p>
+              <p className="text-muted-foreground">Inga texter hittades. Texterna har skapats i databasen.</p>
             </div>
           ) : (
-            <>
+            <div className="space-y-6">
               <div className="space-y-4 mb-4">
                 {appTexts.map(text => (
                   <div key={text.id} className="space-y-2">
-                    <Label htmlFor={`text-${text.id}`}>{text.key}</Label>
+                    <Label htmlFor={`text-${text.id}`}>
+                      {text.key} ({text.category})
+                    </Label>
                     <Input 
                       id={`text-${text.id}`}
                       value={text.value}
@@ -169,7 +192,7 @@ const SuperuserSettings: React.FC = () => {
                 <Save className="mr-2 h-4 w-4" />
                 {savingTexts ? "Sparar..." : "Spara texter"}
               </Button>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
