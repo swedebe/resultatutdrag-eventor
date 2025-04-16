@@ -127,7 +127,9 @@ serve(async (req: Request) => {
     console.log("User has superuser role");
 
     // Parse request body
-    const { email, password, name, club_name = "Din klubb", role = "regular" } = requestBody as AdminCreateUserPayload;
+    const { email, password, name, club_name = "Din klubb" } = requestBody as AdminCreateUserPayload;
+    // Always set role to 'regular' regardless of what was sent in the request
+    const role = "regular";
 
     if (!email || !password || !name) {
       console.error("Missing required fields:", { 
@@ -303,7 +305,7 @@ serve(async (req: Request) => {
       }
     
       // Now insert into public.users with the new user ID
-      console.log("Inserting user into public.users table");
+      console.log("Inserting user into public.users table with role 'regular'");
       const { data: publicUser, error: publicError } = await supabaseAdmin
         .from("users")
         .insert({
@@ -311,7 +313,7 @@ serve(async (req: Request) => {
           email,
           name,
           club_name: club_name || "Din klubb",
-          role,
+          role, // This will always be "regular"
         })
         .select()
         .single();
@@ -355,7 +357,7 @@ serve(async (req: Request) => {
         );
       }
   
-      console.log("User successfully added to public.users table");
+      console.log("User successfully added to public.users table with role 'regular'");
       console.log("Complete user record:", publicUser);
   
       return new Response(

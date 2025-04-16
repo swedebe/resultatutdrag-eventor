@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -22,9 +22,6 @@ const formSchema = z.object({
   club: z.string().optional(),
   password: z.string().min(6, {
     message: "Lösenord måste vara minst 6 tecken.",
-  }),
-  role: z.enum(["regular", "superuser"], {
-    required_error: "Välj en användarroll.",
   })
 });
 
@@ -39,8 +36,7 @@ const AddUserForm = () => {
       name: "",
       email: "",
       club: "",
-      password: "",
-      role: "regular"
+      password: ""
     },
   });
 
@@ -57,14 +53,14 @@ const AddUserForm = () => {
         throw new Error("You must be logged in to create users");
       }
 
-      // Call the edge function to create the user
+      // Call the edge function to create the user (role is always "regular")
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: values.email,
           password: values.password,
           name: values.name,
           club_name: values.club || "Din klubb",
-          role: values.role
+          role: "regular" // Default to regular for all new users
         }
       });
       
@@ -86,7 +82,7 @@ const AddUserForm = () => {
         if (data.success === true) {
           toast({
             title: "Användare skapad",
-            description: `Användaren ${values.name} har skapats med e-post ${values.email} och roll: ${values.role === 'superuser' ? 'Superanvändare' : 'Användare'}.`,
+            description: `Användaren ${values.name} har skapats med e-post ${values.email}.`,
           });
           form.reset();
           setErrorMessage(null);
@@ -130,7 +126,7 @@ const AddUserForm = () => {
     <Card>
       <CardHeader>
         <CardTitle>Skapa ny användare</CardTitle>
-        <CardDescription>Lägg till en ny användare i systemet</CardDescription>
+        <CardDescription>Lägg till en ny användare i systemet (standard behörighet)</CardDescription>
       </CardHeader>
       <CardContent>
         {errorMessage && (
@@ -180,31 +176,6 @@ const AddUserForm = () => {
                   <FormControl>
                     <Input placeholder="Klubbnamn" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Användarroll</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Välj roll" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="regular">Användare</SelectItem>
-                      <SelectItem value="superuser">Superanvändare</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Superanvändare kan hantera andra användare och systemkonfiguration.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

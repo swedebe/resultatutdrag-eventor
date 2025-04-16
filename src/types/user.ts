@@ -16,3 +16,8 @@ export interface UserProfile {
 export const isUserSuperuser = (userRole?: string): boolean => {
   return userRole === UserRole.SUPERUSER;
 };
+
+// Add helper function to check if user is regular
+export const isUserRegular = (userRole?: string): boolean => {
+  return userRole === UserRole.REGULAR;
+};
