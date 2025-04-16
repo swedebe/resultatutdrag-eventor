@@ -74,12 +74,16 @@ const Settings = () => {
         if (!userRecord) {
           console.log("No existing user profile found, creating one...");
           
-          // We need to use a raw query with ON CONFLICT DO NOTHING to handle potential race conditions
+          // Fix: Call the RPC function with correct parameter typing
           const { data: insertData, error: insertError } = await supabase
             .rpc('create_user_if_not_exists', { 
               user_id: user.id,
               user_email: user.email || '',
-              user_club_name: 'Din klubb' // Default value
+              user_club_name: 'Din klubb'
+            } as {
+              user_id: string; 
+              user_email: string; 
+              user_club_name: string;
             });
             
           if (insertError) {
