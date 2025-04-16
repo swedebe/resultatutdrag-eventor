@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -34,10 +33,9 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         className="bg-green-600 hover:bg-green-700"
       >
         <Save className="mr-2 h-4 w-4" />
-        {isSaving ? "Sparar..." : "Slutför"}
+        {isSaving ? "Sparar..." : "Spara resultat"}
       </Button>
       
-      {/* Link component with a button that's properly disabled during processing */}
       <Button 
         variant="outline"
         disabled={isProcessing}
