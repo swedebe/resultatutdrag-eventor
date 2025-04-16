@@ -8,9 +8,11 @@ import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/Fi
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
 import PreviewSection from "@/components/file-uploader/PreviewSection";
+import { useAllAppTexts } from "@/hooks/useAppText";
 
 const FileUploader = () => {
   const { toast } = useToast();
+  const { texts } = useAllAppTexts();
   const [results, setResults] = useState<ResultRow[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,7 +43,6 @@ const FileUploader = () => {
         throw new Error("No authenticated user");
       }
 
-      // Try to create a new processing state or get the existing one
       const { data, error } = await supabase
         .from('user_processing_state')
         .insert({
@@ -52,7 +53,6 @@ const FileUploader = () => {
         .single();
 
       if (error) {
-        // If error is unique constraint violation, just fetch the existing state
         if (error.code === '23505') {
           const { data: existingState } = await supabase
             .from('user_processing_state')
@@ -60,7 +60,6 @@ const FileUploader = () => {
             .eq('user_id', user.id)
             .single();
           
-          // Update existing state to reset flags
           await supabase
             .from('user_processing_state')
             .update({
@@ -97,7 +96,6 @@ const FileUploader = () => {
       return;
     }
     
-    // Create processing state and get job ID
     const processingState = await createUserProcessingState();
     if (!processingState) return;
 
@@ -121,7 +119,6 @@ const FileUploader = () => {
         setCurrentStatus, 
         delay,
         async (partialResults: ResultRow[]) => {
-          // Check database for cancellation
           if (processingState) {
             const { data } = await supabase
               .from('user_processing_state')
@@ -140,7 +137,6 @@ const FileUploader = () => {
         newRunId
       );
       
-      // Final cancellation check
       const { data } = await supabase
         .from('user_processing_state')
         .select('cancellation_flag')
@@ -175,7 +171,6 @@ const FileUploader = () => {
         variant: "destructive",
       });
     } finally {
-      // Clear processing state
       if (processingState) {
         await supabase
           .from('user_processing_state')
@@ -194,7 +189,6 @@ const FileUploader = () => {
     if (!jobId) return;
     
     try {
-      // Update cancellation flag in database
       await supabase
         .from('user_processing_state')
         .update({ 
@@ -424,7 +418,7 @@ const FileUploader = () => {
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-4xl font-bold">Resultatanalys - Filuppladdning</h1>
+        <h1 className="text-4xl font-bold">{texts.upload_title || "Resultatanalys - Filuppladdning"}</h1>
         <Link to="/">
           <Button variant="outline" className="flex items-center gap-2" disabled={isProcessing}>
             <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
