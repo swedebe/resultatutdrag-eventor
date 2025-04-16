@@ -190,7 +190,13 @@ const FileUploader = () => {
     setCancelProcessing(false);
     
     setIsProcessing(true);
-    clearLogs();
+    
+    // Modified: Don't clear all logs, preserve any cancellation logs
+    // Instead of using clearLogs(), we'll filter out only non-cancellation logs
+    const cancellationLogs = logs.filter(log => 
+      log.eventId === "system" && log.status === "Användaren avbröt körningen"
+    );
+    setLogs(cancellationLogs);
     
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
@@ -259,7 +265,7 @@ const FileUploader = () => {
       }
     } finally {
       setIsProcessing(false);
-      setCancelProcessing(false);  // Reset the cancellation flag when processing is complete
+      // Don't reset cancelProcessing here since we want to preserve its state
     }
   };
   
@@ -346,7 +352,13 @@ const FileUploader = () => {
     setFile(null);
     setProgress(0);
     setCurrentStatus("");
-    clearLogs();
+    
+    // Modified: Don't clear all logs, preserve any cancellation logs
+    const cancellationLogs = logs.filter(log => 
+      log.eventId === "system" && log.status === "Användaren avbröt körningen"
+    );
+    setLogs(cancellationLogs);
+    
     setSaveName("");
     setRunId(null);
     
