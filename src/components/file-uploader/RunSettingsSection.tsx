@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Save } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 interface RunSettingsSectionProps {
   saveName: string;
@@ -12,6 +12,7 @@ interface RunSettingsSectionProps {
   onRenameRun: () => void;
   isRenaming: boolean;
   runId: string | null;
+  isProcessing: boolean;
 }
 
 const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
@@ -20,6 +21,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
   onRenameRun,
   isRenaming,
   runId,
+  isProcessing,
 }) => {
   return (
     <Card className="mb-6">
@@ -40,10 +42,11 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                   value={saveName} 
                   onChange={(e) => onSaveNameChange(e.target.value)}
                   placeholder="Ange ett beskrivande namn för denna körning" 
+                  disabled={isProcessing}
                 />
                 <Button 
                   onClick={onRenameRun} 
-                  disabled={isRenaming || !saveName.trim() || !runId}
+                  disabled={isRenaming || !saveName.trim() || !runId || isProcessing}
                   variant="secondary"
                 >
                   <Pencil className="mr-2 h-4 w-4" />
