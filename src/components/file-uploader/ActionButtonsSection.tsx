@@ -33,7 +33,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         className="bg-green-600 hover:bg-green-700"
       >
         <Save className="mr-2 h-4 w-4" />
-        {isSaving ? "Sparar..." : "Spara resultat"}
+        {isSaving ? "Sparar..." : "Slutför"}
       </Button>
       
       <Button 
