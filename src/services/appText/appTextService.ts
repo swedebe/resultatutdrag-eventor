@@ -13,11 +13,11 @@ export const AppTextService = {
   async getAllAppTexts(): Promise<AppText[]> {
     // Use the REST API directly to avoid type issues
     const response = await fetch(
-      `${supabase.supabaseUrl}/rest/v1/app_texts`,
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pxbtnzgsogrpkkurcvzv.supabase.co"}/rest/v1/app_texts`,
       {
         headers: {
-          apikey: supabase.supabaseKey,
-          Authorization: `Bearer ${supabase.supabaseKey}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4YnRuemdzb2dycGtrdXJjdnp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Nzc0OTgsImV4cCI6MjA2MDI1MzQ5OH0.NpyAPaU7G9XVRaeS1LPhdHBCOVDiMya8c5Poc7y_hZI",
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4YnRuemdzb2dycGtrdXJjdnp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Nzc0OTgsImV4cCI6MjA2MDI1MzQ5OH0.NpyAPaU7G9XVRaeS1LPhdHBCOVDiMya8c5Poc7y_hZI"}`,
         },
       }
     );
@@ -35,12 +35,12 @@ export const AppTextService = {
    */
   async updateAppText(id: string, value: string): Promise<void> {
     const response = await fetch(
-      `${supabase.supabaseUrl}/rest/v1/app_texts?id=eq.${id}`,
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pxbtnzgsogrpkkurcvzv.supabase.co"}/rest/v1/app_texts?id=eq.${id}`,
       {
         method: 'PATCH',
         headers: {
-          apikey: supabase.supabaseKey,
-          Authorization: `Bearer ${supabase.supabaseKey}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4YnRuemdzb2dycGtrdXJjdnp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Nzc0OTgsImV4cCI6MjA2MDI1MzQ5OH0.NpyAPaU7G9XVRaeS1LPhdHBCOVDiMya8c5Poc7y_hZI",
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4YnRuemdzb2dycGtrdXJjdnp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Nzc0OTgsImV4cCI6MjA2MDI1MzQ5OH0.NpyAPaU7G9XVRaeS1LPhdHBCOVDiMya8c5Poc7y_hZI"}`,
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal'
         },
