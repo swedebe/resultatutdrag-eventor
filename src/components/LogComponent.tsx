@@ -29,12 +29,15 @@ export const addLog = (eventId: string | number, url: string, status: string) =>
   if (logsUpdateFunction) {
     logsUpdateFunction(currentLogs);
   }
+
+  // Log to console for debugging
+  console.log(`[LOG] ${timestamp} - ID: ${eventId}, Status: ${status}`);
 };
 
 export const clearLogs = () => {
   currentLogs = [];
   if (logsUpdateFunction) {
-    logsUpdateFunction(currentLogs);
+    logsUpdateFunction([]);
   }
 };
 
@@ -53,7 +56,17 @@ const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
     }
   }, [logs]);
   
-  console.log("LogComponent rendering with logs:", logs);
+  // Set the logs update function when the component mounts
+  useEffect(() => {
+    setLogsUpdateFunction((newLogs) => {
+      // Empty function to prevent errors if component is unmounted
+    });
+    
+    return () => {
+      // Cleanup on unmount
+      setLogsUpdateFunction(null);
+    };
+  }, []);
 
   if (!logs || logs.length === 0) {
     return null;

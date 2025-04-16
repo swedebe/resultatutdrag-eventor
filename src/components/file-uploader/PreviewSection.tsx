@@ -1,8 +1,6 @@
 
 import React from "react";
 import ResultsPreview from "@/components/ResultsPreview";
-import RunSettingsSection from "./RunSettingsSection";
-import ActionButtonsSection from "./ActionButtonsSection";
 import { ResultRow } from "@/types/results";
 
 interface PreviewSectionProps {
@@ -39,26 +37,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   }
 
   return (
-    <>
-      <ResultsPreview results={results} />
-      <RunSettingsSection
-        saveName={saveName}
-        onSaveNameChange={onSaveNameChange}
-        onRenameRun={onRenameRun}
-        isRenaming={isRenaming}
-        runId={runId}
-      />
-      <ActionButtonsSection
-        onSaveResults={onSaveResults}
-        onExportResults={onExportResults}
-        onDeleteRun={onDeleteRun}
-        onCancelProcessing={onCancelProcessing}
-        isSaving={isSaving}
-        isProcessing={isProcessing}
-        resultsLength={results.length}
-        runId={runId}
-      />
-    </>
+    <ResultsPreview results={results} />
   );
 };
 

@@ -1,16 +1,17 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
 import PreviewSection from "@/components/file-uploader/PreviewSection";
-import ActionButtonsSection from "@/components/file-uploader/ActionButtonsSection";
 import RunSettingsSection from "@/components/file-uploader/RunSettingsSection";
+import ActionButtonsSection from "@/components/file-uploader/ActionButtonsSection";
 import { useAllAppTexts } from "@/hooks/useAppText";
 import { ResultRow } from "@/types/results";
 import { useToast } from "@/components/ui/use-toast";
 import { processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
+import LogComponent, { LogEntry, addLog, clearLogs, setLogsUpdateFunction } from "@/components/LogComponent";
 
 const FileUploader = () => {
   const { texts } = useAllAppTexts();
@@ -28,6 +29,25 @@ const FileUploader = () => {
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [delay, setDelay] = useState<number>(15); // Default delay of 15 seconds
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [showLogs, setShowLogs] = useState<boolean>(true);
+  
+  // Set up logs update function
+  useEffect(() => {
+    // Define the update function for logs
+    const updateLogs = (newLogs: LogEntry[]) => {
+      setLogs([...newLogs]);
+    };
+    
+    // Register the log update function
+    setLogsUpdateFunction(updateLogs);
+    clearLogs();
+    
+    return () => {
+      // Clean up
+      setLogsUpdateFunction(null);
+    };
+  }, []);
   
   // Handlers
   const handleFileChange = (newFile: File | null) => {
@@ -46,6 +66,7 @@ const FileUploader = () => {
       setIsProcessing(true);
       setProgress(0);
       setCurrentStatus("Startar bearbetning...");
+      clearLogs();
       
       // Process the file
       const processedResults = await processExcelFile(
@@ -55,7 +76,7 @@ const FileUploader = () => {
         delay,
         async (partialResults) => {
           setResults([...partialResults]);
-          return true; // Continue processing
+          return !isProcessing; // Continue processing if not cancelled
         },
         null // No runId for now, it will be generated when saving
       );
@@ -85,11 +106,13 @@ const FileUploader = () => {
     setCurrentStatus("");
     setRunId(null);
     setSaveName("");
+    clearLogs();
   };
   
   const handleCancelProcessing = () => {
     // Logic to cancel processing
     setIsProcessing(false);
+    addLog("system", "", "Bearbetning avbruten av användaren");
     toast({
       title: "Avbruten",
       description: "Bearbetningen har avbrutits."
@@ -173,15 +196,24 @@ const FileUploader = () => {
     }, 1000);
   };
   
+  const handleClearLogs = () => {
+    clearLogs();
+  };
+  
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">{uploadTitle}</h1>
-        <Link to="/">
-          <Button variant="outline" className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2"
+          disabled={isProcessing}
+          asChild
+        >
+          <Link to="/">
             <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -200,6 +232,11 @@ const FileUploader = () => {
             onCancelProcessing={handleCancelProcessing}
           />
           
+          {/* Show logs during processing */}
+          {(isProcessing || logs.length > 0) && (
+            <LogComponent logs={logs} onClearLogs={handleClearLogs} />
+          )}
+          
           {results.length > 0 && (
             <PreviewSection 
               results={results}
@@ -211,31 +248,35 @@ const FileUploader = () => {
               onSaveResults={handleSaveResults}
               onExportResults={handleExportResults}
               onDeleteRun={handleDeleteRun}
-              onCancelProcessing={handleCancelProcessing}
+              onCancelProcessing={isProcessing ? handleCancelProcessing : undefined}
               isSaving={isSaving}
               isProcessing={isProcessing}
             />
           )}
         </div>
-        <div className="space-y-6">
-          <RunSettingsSection 
-            saveName={saveName}
-            onSaveNameChange={setSaveName}
-            onRenameRun={handleRenameRun}
-            isRenaming={isRenaming}
-            runId={runId}
-          />
-          <ActionButtonsSection 
-            onSaveResults={handleSaveResults}
-            onExportResults={handleExportResults}
-            onDeleteRun={handleDeleteRun}
-            onCancelProcessing={isProcessing ? handleCancelProcessing : undefined}
-            isSaving={isSaving}
-            isProcessing={isProcessing}
-            resultsLength={results.length}
-            runId={runId}
-          />
-        </div>
+        
+        {/* Only show RunSettingsSection and ActionButtonsSection in the sidebar when there are results */}
+        {results.length > 0 && (
+          <div className="space-y-6">
+            <RunSettingsSection 
+              saveName={saveName}
+              onSaveNameChange={setSaveName}
+              onRenameRun={handleRenameRun}
+              isRenaming={isRenaming}
+              runId={runId}
+            />
+            <ActionButtonsSection
+              onSaveResults={handleSaveResults}
+              onExportResults={handleExportResults}
+              onDeleteRun={handleDeleteRun}
+              onCancelProcessing={isProcessing ? handleCancelProcessing : undefined}
+              isSaving={isSaving}
+              isProcessing={isProcessing}
+              resultsLength={results.length}
+              runId={runId}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
