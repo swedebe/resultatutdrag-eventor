@@ -147,7 +147,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // First check if user with this email already exists in either table
+    // First check if user with this email already exists in public.users
     console.log("Checking if user with email exists in public.users:", email);
     const { data: existingPublicUsers, error: existingPublicError } = await supabaseAdmin
       .from("users")
@@ -156,6 +156,46 @@ serve(async (req: Request) => {
 
     if (existingPublicError) {
       console.error("Error checking existing users in public.users:", existingPublicError);
+      return new Response(
+        JSON.stringify({
+          success: false, 
+          message: "Error checking existing users", 
+          details: existingPublicError
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Handle the case where the email exists in public.users
+    if (existingPublicUsers && existingPublicUsers.length > 0) {
+      console.log("Email already exists in public.users, attempting to clean up...");
+      
+      for (const existingUser of existingPublicUsers) {
+        console.log(`Deleting user with id ${existingUser.id} from public.users`);
+        const { error: deleteError } = await supabaseAdmin
+          .from("users")
+          .delete()
+          .eq("id", existingUser.id);
+          
+        if (deleteError) {
+          console.error(`Failed to delete existing user ${existingUser.id} from public.users:`, deleteError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: "Failed to clean up existing user in public.users",
+              details: deleteError
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        console.log(`Successfully deleted user ${existingUser.id} from public.users`);
+      }
     }
 
     // Check if user exists in auth.users
@@ -167,7 +207,7 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Failed to check existing users",
+          message: "Failed to check existing users in auth",
           details: authUsersError
         }),
         {
@@ -179,67 +219,20 @@ serve(async (req: Request) => {
     
     const existingAuthUser = authUsers.users.find(u => u.email === email);
 
-    // Check for inconsistent state - user exists in one table but not the other
-    const existsInPublic = existingPublicUsers && existingPublicUsers.length > 0;
-    const existsInAuth = !!existingAuthUser;
-
-    if (existsInPublic && existsInAuth) {
-      console.log("User already exists in both auth.users and public.users");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "User with this email already exists" 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Handle inconsistent state - clean up if needed
-    if (existsInPublic && !existsInAuth) {
-      console.log("INCONSISTENT STATE: User exists in public.users but not in auth.users");
-      console.log("Cleaning up public.users entry before creating new user");
-      
-      const publicUserId = existingPublicUsers[0].id;
-      const { error: deleteError } = await supabaseAdmin
-        .from("users")
-        .delete()
-        .eq("id", publicUserId);
-        
-      if (deleteError) {
-        console.error("Failed to clean up inconsistent user in public.users:", deleteError);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: "Failed to clean up inconsistent user state",
-            details: deleteError
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      
-      console.log("Successfully cleaned up inconsistent public.users entry");
-    }
-    
-    if (!existsInPublic && existsInAuth) {
-      console.log("INCONSISTENT STATE: User exists in auth.users but not in public.users");
-      console.log("Cleaning up auth.users entry before creating new user");
+    // If user exists in auth.users, delete it to ensure clean state
+    if (existingAuthUser) {
+      console.log(`User already exists in auth.users with ID ${existingAuthUser.id}, attempting to delete...`);
       
       const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(
         existingAuthUser.id
       );
         
       if (deleteAuthError) {
-        console.error("Failed to clean up inconsistent user in auth.users:", deleteAuthError);
+        console.error("Failed to delete existing user from auth.users:", deleteAuthError);
         return new Response(
           JSON.stringify({
             success: false,
-            message: "Failed to clean up inconsistent user state",
+            message: "Failed to clean up existing user in auth.users",
             details: deleteAuthError
           }),
           {
@@ -249,9 +242,10 @@ serve(async (req: Request) => {
         );
       }
       
-      console.log("Successfully cleaned up inconsistent auth.users entry");
+      console.log("Successfully deleted existing user from auth.users");
     }
 
+    // Now attempt to create the new user with a clean slate
     console.log("Creating new user with email:", email);
 
     // Create user with the Admin API
@@ -283,6 +277,31 @@ serve(async (req: Request) => {
     console.log("User created successfully in auth.users with ID:", newUser.user.id);
 
     try {
+      // Double check that email doesn't already exist in public.users 
+      // (in case another process created it between our delete and insert)
+      const { data: finalCheck, error: finalCheckError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("email", email);
+        
+      if (finalCheckError) {
+        console.error("Error during final email check:", finalCheckError);
+      } else if (finalCheck && finalCheck.length > 0) {
+        console.log("Email still exists in public.users even after cleanup, attempting final delete");
+        
+        const { error: finalDeleteError } = await supabaseAdmin
+          .from("users")
+          .delete()
+          .eq("email", email);
+          
+        if (finalDeleteError) {
+          console.error("Failed final cleanup attempt:", finalDeleteError);
+          // We'll still try to insert, might work if the constraint is on a different field
+        } else {
+          console.log("Successfully performed final cleanup");
+        }
+      }
+    
       // Now insert into public.users with the new user ID
       console.log("Inserting user into public.users table");
       const { data: publicUser, error: publicError } = await supabaseAdmin
