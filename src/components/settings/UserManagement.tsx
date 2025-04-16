@@ -65,13 +65,19 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching users...");
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('email');
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
+      }
       
+      console.log("Users fetched successfully:", data);
       setUsers(data || []);
     } catch (error: any) {
       console.error("Error fetching users:", error);
@@ -126,12 +132,19 @@ const UserManagement: React.FC = () => {
     
     setIsDeleting(true);
     try {
+      console.log("Deleting user:", userToDelete.email);
+      
       // Call the delete-user edge function
       const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { userId: userToDelete.id }
+        body: { userId: userToDelete.id, userEmail: userToDelete.email }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function error:", error);
+        throw error;
+      }
+      
+      console.log("Delete user response:", data);
       
       if (data && data.success) {
         toast({
@@ -143,7 +156,7 @@ const UserManagement: React.FC = () => {
         setUsers(users.filter(u => u.id !== userToDelete.id));
         closeDeleteDialog();
       } else {
-        throw new Error(data?.error || "Ett okänt fel inträffade vid borttagning av användare");
+        throw new Error(data?.message || "Ett okänt fel inträffade vid borttagning av användare");
       }
     } catch (error: any) {
       console.error("Error deleting user:", error);
