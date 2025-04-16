@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,8 +33,22 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        const data = await AppTextService.getAllAppTexts();
-        setAppTexts(data);
+        const { data, error } = await supabase.from('app_texts').select('*');
+        
+        if (error) {
+          console.error("Error from direct Supabase query:", error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          console.log("App texts fetched directly:", data);
+          setAppTexts(data);
+        } else {
+          console.log("No data from direct query, trying AppTextService");
+          const serviceData = await AppTextService.getAllAppTexts();
+          console.log("App texts fetched via service:", serviceData);
+          setAppTexts(serviceData);
+        }
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
         toast({
@@ -152,7 +165,40 @@ const SuperuserSettings: React.FC = () => {
           ) : appTexts.length === 0 ? (
             <div className="flex flex-col items-center gap-4">
               <AlertCircle className="h-8 w-8 text-amber-500" />
-              <p className="text-muted-foreground">Inga texter hittades. Texterna har skapats i databasen.</p>
+              <p className="text-muted-foreground">Inga texter hittades. Detta kan bero på ett problem med databasen.</p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setLoadingTexts(true);
+                  supabase.rpc('populate_app_texts')
+                    .then(() => {
+                      toast({
+                        title: "Texter skapade",
+                        description: "Applikationstexter har skapats i databasen.",
+                      });
+                      // Refetch texts
+                      return supabase.from('app_texts').select('*');
+                    })
+                    .then(({ data }) => {
+                      if (data) {
+                        setAppTexts(data);
+                      }
+                    })
+                    .catch(error => {
+                      console.error("Error creating app texts:", error);
+                      toast({
+                        title: "Fel vid skapande av texter",
+                        description: error.message || "Kunde inte skapa applikationstexter",
+                        variant: "destructive",
+                      });
+                    })
+                    .finally(() => {
+                      setLoadingTexts(false);
+                    });
+                }}
+              >
+                Skapa standardtexter
+              </Button>
             </div>
           ) : (
             <div className="space-y-6">

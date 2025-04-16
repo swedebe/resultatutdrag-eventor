@@ -13,20 +13,23 @@ import { useAllAppTexts } from "@/hooks/useAppText";
 
 const Index = () => {
   const { toast } = useToast();
-  const { texts, processText } = useAllAppTexts();
+  const { texts, processText, isLoading: loadingTexts } = useAllAppTexts();
   
   // Fetch user info from Supabase - include the name field
-  const { data: userData } = useQuery({
+  const { data: userData, isLoading: loadingUser } = useQuery({
     queryKey: ['user-profile'],
     queryFn: async () => {
+      console.log('Fetching user profile data');
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        console.log('User found, fetching name:', user.id);
         const { data } = await supabase
           .from('users')
           .select('name, club_name')
           .eq('id', user.id)
           .maybeSingle();
         
+        console.log('User profile data:', data);
         return data;
       }
       return null;
@@ -94,9 +97,13 @@ const Index = () => {
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>{processText('welcome_message', userData) || `Välkommen ${userData?.name || ''}`}</CardTitle>
+          <CardTitle>
+            {loadingUser || loadingTexts
+              ? "Välkommen"
+              : processText('welcome_message', userData)}
+          </CardTitle>
           <CardDescription>
-            {texts.tool_description || "Med detta verktyg kan du använda en eportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil."}
+            {texts.tool_description || "Med detta verktyg kan du använda en exportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil."}
           </CardDescription>
         </CardHeader>
         <CardContent>

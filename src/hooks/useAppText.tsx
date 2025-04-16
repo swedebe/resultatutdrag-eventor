@@ -17,6 +17,7 @@ export function useAppText(key: string, defaultValue: string = '') {
   useEffect(() => {
     const fetchText = async () => {
       try {
+        console.log(`Fetching app text for key: ${key}`);
         const { data, error } = await supabase
           .from('app_texts')
           .select('value')
@@ -28,8 +29,10 @@ export function useAppText(key: string, defaultValue: string = '') {
           setError(error.message);
           setText(defaultValue);
         } else if (data) {
+          console.log(`Found app text for key ${key}:`, data.value);
           setText(data.value);
         } else {
+          console.log(`No app text found for key ${key}, using default: ${defaultValue}`);
           setText(defaultValue);
         }
       } catch (e: any) {
@@ -47,7 +50,7 @@ export function useAppText(key: string, defaultValue: string = '') {
   // Function to replace USER with actual user name
   const processText = (text: string, userData?: { name?: string | null }) => {
     if (userData && userData.name && text.includes('USER')) {
-      return text.replace('USER', userData.name);
+      return text.replace(/USER/g, userData.name);
     }
     return text;
   };
@@ -67,6 +70,7 @@ export function useAllAppTexts() {
   useEffect(() => {
     const fetchAllTexts = async () => {
       try {
+        console.log('Fetching all app texts');
         const { data, error } = await supabase
           .from('app_texts')
           .select('key, value');
@@ -75,6 +79,7 @@ export function useAllAppTexts() {
           console.error('Error fetching app texts:', error);
           setError(error.message);
         } else if (data) {
+          console.log('App texts fetched successfully:', data);
           const textMap: Record<string, string> = {};
           data.forEach((item: AppText) => {
             textMap[item.key] = item.value;
@@ -96,7 +101,7 @@ export function useAllAppTexts() {
   const processText = (key: string, userData?: { name?: string | null }) => {
     const text = texts[key] || '';
     if (userData && userData.name && text.includes('USER')) {
-      return text.replace('USER', userData.name);
+      return text.replace(/USER/g, userData.name);
     }
     return text;
   };
