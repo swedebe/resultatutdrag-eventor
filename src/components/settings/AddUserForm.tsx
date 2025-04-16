@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,6 +93,9 @@ const AddUserForm = () => {
         } else {
           const message = typeof data.message === 'string' ? data.message : "Ett okänt fel inträffade";
           console.error("Failed to create user:", message);
+          if (data.details) {
+            console.error("Error details:", data.details);
+          }
           setErrorMessage(`Kunde inte skapa användaren: ${message}`);
           toast({
             title: "Det gick inte att skapa användaren",
