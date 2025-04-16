@@ -209,6 +209,8 @@ const FileUploader = () => {
         title: "Avbryter körning",
         description: "Begäran om att avbryta har skickats",
       });
+      
+      addCancellationLog();
     } catch (error) {
       console.error("Fel vid avbrytning:", error);
       toast({
