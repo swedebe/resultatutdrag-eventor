@@ -23,7 +23,7 @@ const FileUploader = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
-  const [cancelProcessing, setCancelProcessing] = useState<boolean>(false);
+  const [jobId, setJobId] = useState<string | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -35,21 +35,218 @@ const FileUploader = () => {
     setLogs(newLogs);
   };
 
-  useEffect(() => {
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-      if (isProcessing && runId) {
-        e.preventDefault();
-        e.returnValue = "Du har en pågående körning. Är du säker på att du vill lämna sidan?";
-        return e.returnValue;
+  const createUserProcessingState = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("No authenticated user");
       }
-    };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+      // Try to create a new processing state or get the existing one
+      const { data, error } = await supabase
+        .from('user_processing_state')
+        .insert({
+          user_id: user.id,
+          cancellation_flag: false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // If error is unique constraint violation, just fetch the existing state
+        if (error.code === '23505') {
+          const { data: existingState } = await supabase
+            .from('user_processing_state')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          
+          // Update existing state to reset flags
+          await supabase
+            .from('user_processing_state')
+            .update({
+              cancellation_flag: false,
+              cancellation_set_at: null,
+              cancellation_cleared_at: null
+            })
+            .eq('user_id', user.id);
+
+          return existingState;
+        }
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error creating processing state:", error);
+      toast({
+        title: "Fel vid start av bearbetning",
+        description: "Kunde inte initiera bearbetningsläge",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
+  const handleProcessFile = async () => {
+    if (!file) {
+      toast({
+        title: "Ingen fil vald",
+        description: "Välj en fil först",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+    // Create processing state and get job ID
+    const processingState = await createUserProcessingState();
+    if (!processingState) return;
+
+    setJobId(processingState.id);
+    setIsProcessing(true);
+    clearLogs();
+    
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const timeStr = today.toTimeString().split(' ')[0];
+    const initialRunName = `Körning ${dateStr} ${timeStr}`;
+    setSaveName(initialRunName);
+    
+    const newRunId = await createNewRun(initialRunName);
+    setRunId(newRunId);
+    
+    try {
+      const enrichedResults = await processExcelFile(
+        file, 
+        setProgress, 
+        setCurrentStatus, 
+        delay,
+        async (partialResults: ResultRow[]) => {
+          // Check database for cancellation
+          if (processingState) {
+            const { data } = await supabase
+              .from('user_processing_state')
+              .select('cancellation_flag')
+              .eq('id', processingState.id)
+              .single();
+            
+            if (data?.cancellation_flag) {
+              return false;
+            }
+          }
+          
+          setResults(partialResults);
+          return true;
+        },
+        newRunId
+      );
+      
+      // Final cancellation check
+      const { data } = await supabase
+        .from('user_processing_state')
+        .select('cancellation_flag')
+        .eq('id', processingState.id)
+        .single();
+      
+      if (!data?.cancellation_flag) {
+        setResults(enrichedResults);
+        
+        if (enrichedResults.length > 0) {
+          toast({
+            title: "Filbearbetning slutförd",
+            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Slutför" för att slutföra körningen.`,
+          });
+        } else {
+          toast({
+            title: "Filbearbetning slutförd",
+            description: "Inga resultat hittades.",
+          });
+        }
+      } else {
+        toast({
+          title: "Bearbetning avbruten",
+          description: "Körningen avbröts av användaren",
+        });
+      }
+    } catch (error: any) {
+      console.error("Fel vid bearbetning av fil:", error);
+      toast({
+        title: "Fel vid bearbetning",
+        description: error.message || "Ett fel uppstod vid bearbetning av filen",
+        variant: "destructive",
+      });
+    } finally {
+      // Clear processing state
+      if (processingState) {
+        await supabase
+          .from('user_processing_state')
+          .update({
+            cancellation_flag: false,
+            cancellation_cleared_at: new Date().toISOString()
+          })
+          .eq('id', processingState.id);
+      }
+      setIsProcessing(false);
+      setJobId(null);
+    }
+  };
+
+  const handleCancelProcessing = async () => {
+    if (!jobId) return;
+    
+    try {
+      // Update cancellation flag in database
+      await supabase
+        .from('user_processing_state')
+        .update({ 
+          cancellation_flag: true,
+          cancellation_set_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      setCurrentStatus("Avbryter körning...");
+      
+      toast({
+        title: "Avbryter körning",
+        description: "Begäran om att avbryta har skickats",
+      });
+    } catch (error) {
+      console.error("Fel vid avbrytning:", error);
+      toast({
+        title: "Fel vid avbrytning",
+        description: "Kunde inte avbryta körningen",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addCancellationLog = () => {
+    const newLog: LogEntry = {
+      timestamp: new Date().toISOString().substring(11, 23),
+      eventId: "system",
+      url: "",
+      status: "Användaren avbröt körningen"
     };
-  }, [isProcessing, runId]);
+    
+    const updatedLogs = [...logs, newLog];
+    setLogs(updatedLogs);
+    
+    if (runId) {
+      try {
+        supabase
+          .from('processing_logs')
+          .insert({
+            run_id: runId,
+            timestamp: new Date().toISOString().substring(11, 23),
+            event_id: "system",
+            url: "",
+            status: "Användaren avbröt körningen"
+          });
+      } catch (error) {
+        console.error("Error saving cancellation log:", error);
+      }
+    }
+  };
   
   const createNewRun = async (initialName: string): Promise<string | null> => {
     try {
@@ -132,130 +329,6 @@ const FileUploader = () => {
     }
   };
 
-  const handleCancelProcessing = () => {
-    if (isProcessing) {
-      setCancelProcessing(true);
-      addCancellationLog();
-      setCurrentStatus("Avbryter körning...");
-      
-      setTimeout(() => {
-        setIsProcessing(false);
-        setCurrentStatus("Körning avbruten av användaren");
-        toast({
-          title: "Körning avbruten",
-          description: "Körningen avbröts av användaren",
-        });
-      }, 500);
-    }
-  };
-
-  const addCancellationLog = () => {
-    const newLog: LogEntry = {
-      timestamp: new Date().toISOString().substring(11, 23),
-      eventId: "system",
-      url: "",
-      status: "Användaren avbröt körningen"
-    };
-    
-    const updatedLogs = [...logs, newLog];
-    setLogs(updatedLogs);
-    
-    if (runId) {
-      try {
-        supabase
-          .from('processing_logs')
-          .insert({
-            run_id: runId,
-            timestamp: new Date().toISOString().substring(11, 23),
-            event_id: "system",
-            url: "",
-            status: "Användaren avbröt körningen"
-          });
-      } catch (error) {
-        console.error("Error saving cancellation log:", error);
-      }
-    }
-  };
-  
-  const handleProcessFile = async () => {
-    if (!file) {
-      toast({
-        title: "Ingen fil vald",
-        description: "Välj en fil först",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setCancelProcessing(false);
-    setIsProcessing(true);
-    clearLogs();
-    
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
-    const timeStr = today.toTimeString().split(' ')[0];
-    const initialRunName = `Körning ${dateStr} ${timeStr}`;
-    setSaveName(initialRunName);
-    
-    const newRunId = await createNewRun(initialRunName);
-    setRunId(newRunId);
-    
-    try {
-      const enrichedResults = await processExcelFile(
-        file, 
-        setProgress, 
-        setCurrentStatus, 
-        delay,
-        async (partialResults: ResultRow[]) => {
-          setResults(partialResults);
-          
-          console.log("Checking cancellation flag:", cancelProcessing);
-          
-          if (cancelProcessing) {
-            console.log("Cancellation detected, stopping processing");
-            return false;
-          }
-          
-          return true;
-        },
-        newRunId
-      );
-      
-      if (!cancelProcessing) {
-        setResults(enrichedResults);
-        
-        if (enrichedResults.length > 0) {
-          toast({
-            title: "Filbearbetning slutförd",
-            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Slutför" för att slutföra körningen.`,
-          });
-        } else {
-          toast({
-            title: "Filbearbetning slutförd",
-            description: "Inga resultat hittades.",
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error("Fel vid bearbetning av fil:", error);
-      
-      if (cancelProcessing) {
-        toast({
-          title: "Körning avbruten",
-          description: "Körningen avbröts av användaren",
-        });
-      } else {
-        toast({
-          title: "Fel vid bearbetning",
-          description: error.message || "Ett fel uppstod vid bearbetning av filen",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-  
   const handleExport = () => {
     if (results.length === 0) {
       toast({
