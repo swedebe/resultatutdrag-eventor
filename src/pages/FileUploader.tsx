@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
@@ -186,10 +187,8 @@ const FileUploader = () => {
       return;
     }
     
-    // Reset the cancellation flag when starting a new processing job
-    setCancelProcessing(false);
-    
     setIsProcessing(true);
+    setCancelProcessing(false);
     clearLogs();
     
     const today = new Date();
@@ -259,7 +258,7 @@ const FileUploader = () => {
       }
     } finally {
       setIsProcessing(false);
-      setCancelProcessing(false);  // Reset the cancellation flag when processing is complete
+      setCancelProcessing(false);
     }
   };
   
@@ -349,9 +348,6 @@ const FileUploader = () => {
     clearLogs();
     setSaveName("");
     setRunId(null);
-    
-    // Make sure to reset the cancellation flag when clearing results
-    setCancelProcessing(false);
     
     toast({
       title: "Resultat rensade",
