@@ -187,8 +187,8 @@ const FileUploader = () => {
       return;
     }
     
-    setIsProcessing(true);
     setCancelProcessing(false);
+    setIsProcessing(true);
     clearLogs();
     
     const today = new Date();
@@ -208,6 +208,8 @@ const FileUploader = () => {
         delay,
         async (partialResults: ResultRow[]) => {
           setResults(partialResults);
+          
+          console.log("Checking cancellation flag:", cancelProcessing);
           
           if (cancelProcessing) {
             console.log("Cancellation detected, stopping processing");
@@ -251,7 +253,6 @@ const FileUploader = () => {
       }
     } finally {
       setIsProcessing(false);
-      setCancelProcessing(false);
     }
   };
   
