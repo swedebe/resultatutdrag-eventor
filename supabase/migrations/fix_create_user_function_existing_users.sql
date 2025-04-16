@@ -11,6 +11,7 @@ DECLARE
   new_user_id UUID;
   existing_auth_user UUID;
   caller_role TEXT;
+  debug_message TEXT;
 BEGIN
   -- Check if the caller is a superuser
   SELECT role INTO caller_role FROM public.users WHERE id = auth.uid();
@@ -54,7 +55,8 @@ BEGIN
   -- If we got here, user does not exist in auth.users, so create new user
   BEGIN
     RAISE NOTICE 'Creating new user in auth.users with email: %', user_email;
-    -- Create the user in auth.users
+    
+    -- Create the user in auth.users - Use explicit variable to capture the INSERT result
     INSERT INTO auth.users (
       instance_id, 
       email, 
@@ -77,12 +79,13 @@ BEGIN
       false
     ) RETURNING id INTO new_user_id;
     
-    -- Debug logging
-    RAISE NOTICE 'Created auth user with ID: %', new_user_id;
+    -- Debug logging for new_user_id
+    debug_message := 'After auth.users INSERT, new_user_id = ' || COALESCE(new_user_id::text, 'NULL');
+    RAISE NOTICE '%', debug_message;
     
     IF new_user_id IS NULL THEN
       RAISE NOTICE 'Failed to create user in auth.users, returning error';
-      RETURN json_build_object('success', false, 'message', 'Failed to create auth user');
+      RETURN json_build_object('success', false, 'message', 'Failed to create auth user - ID is NULL');
     END IF;
     
     -- Create the user in public.users table

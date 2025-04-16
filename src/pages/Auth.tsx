@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useAppText } from "@/hooks/useAppText";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -18,6 +19,12 @@ const Auth = () => {
   const [showUpdatePassword, setShowUpdatePassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Get dynamic app texts
+  const { text: loginTitle } = useAppText('login_title', 'Logga in');
+  const { text: loginDescription } = useAppText('login_description', 'Logga in för att hantera din klubbs resultat');
+  const { text: resetPasswordTitle } = useAppText('reset_password_title', 'Återställ lösenord');
+  const { text: updatePasswordTitle } = useAppText('update_password_title', 'Skapa nytt lösenord');
   
   // Check if user is already logged in and handle recovery token
   useEffect(() => {
@@ -184,17 +191,17 @@ const Auth = () => {
         <CardHeader>
           <CardTitle>
             {showUpdatePassword 
-              ? "Skapa nytt lösenord" 
+              ? updatePasswordTitle
               : showResetPassword 
-                ? "Återställ lösenord" 
-                : "Logga in"}
+                ? resetPasswordTitle
+                : loginTitle}
           </CardTitle>
           <CardDescription>
             {showUpdatePassword
               ? "Ange och bekräfta ditt nya lösenord"
               : showResetPassword 
                 ? "Ange din e-post för att få en länk att återställa ditt lösenord" 
-                : "Logga in för att hantera din klubbs resultat"}
+                : loginDescription}
           </CardDescription>
         </CardHeader>
         

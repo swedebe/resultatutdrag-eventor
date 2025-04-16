@@ -11,6 +11,7 @@ DECLARE
   new_user_id UUID;
   caller_role TEXT;
   auth_user RECORD;
+  debug_message TEXT;
 BEGIN
   -- Check if the caller is a superuser
   SELECT role INTO caller_role FROM public.users WHERE id = auth.uid();
@@ -19,7 +20,39 @@ BEGIN
     RETURN json_build_object('success', false, 'message', 'Only superusers can create users');
   END IF;
 
+  -- First check if a user with this email already exists in auth.users
+  SELECT id INTO auth_user FROM auth.users WHERE email = user_email;
+  debug_message := 'Checking for existing auth user: ' || COALESCE(auth_user.id::text, 'NULL');
+  RAISE NOTICE '%', debug_message;
+  
+  IF auth_user IS NOT NULL THEN
+    -- User exists in auth.users, check if it exists in public.users
+    DECLARE
+      public_user_exists BOOLEAN;
+    BEGIN
+      SELECT EXISTS(SELECT 1 FROM public.users WHERE id = auth_user.id) INTO public_user_exists;
+      debug_message := 'User exists in auth.users, checking public.users: ' || public_user_exists;
+      RAISE NOTICE '%', debug_message;
+      
+      IF public_user_exists THEN
+        RETURN json_build_object('success', false, 'message', 'User already exists with this email');
+      ELSE
+        -- Add to public.users only
+        INSERT INTO public.users (id, email, name, club_name, role)
+        VALUES (
+          auth_user.id, 
+          user_email, 
+          user_name, 
+          COALESCE(user_club_name, 'Din klubb'), 
+          user_role
+        );
+        RETURN json_build_object('success', true, 'user_id', auth_user.id, 'message', 'User added to public.users');
+      END IF;
+    END;
+  END IF;
+
   -- Create the user in auth.users
+  RAISE NOTICE 'Creating new user in auth.users: %', user_email;
   INSERT INTO auth.users (
     instance_id, 
     email, 
@@ -43,7 +76,12 @@ BEGIN
   ) RETURNING id INTO new_user_id;
   
   -- Debug logging
-  RAISE NOTICE 'Created auth user with ID: %', new_user_id;
+  debug_message := 'Created auth user with ID: ' || COALESCE(new_user_id::text, 'NULL');
+  RAISE NOTICE '%', debug_message;
+  
+  IF new_user_id IS NULL THEN
+    RAISE EXCEPTION 'Failed to create user in auth.users - returned NULL ID';
+  END IF;
   
   -- Create the user in public.users table
   INSERT INTO public.users (id, email, name, club_name, role)
@@ -55,7 +93,7 @@ BEGIN
     user_role
   );
 
-  RETURN json_build_object('success', true, 'user_id', new_user_id);
+  RETURN json_build_object('success', true, 'user_id', new_user_id, 'message', 'User created successfully');
 EXCEPTION 
   WHEN others THEN
     RAISE NOTICE 'Error creating user: %', SQLERRM;
@@ -95,9 +133,11 @@ BEGIN
   -- Auth page texts
   INSERT INTO app_texts (key, value, category) VALUES
     ('login_title', 'Logga in', 'auth'),
-    ('register_title', 'Skapa konto', 'auth'),
-    ('email_label', 'E-post', 'auth'),
-    ('password_label', 'Lösenord', 'auth');
+    ('login_description', 'Logga in för att hantera din klubbs resultat', 'auth'),
+    ('reset_password_title', 'Återställ lösenord', 'auth'),
+    ('update_password_title', 'Skapa nytt lösenord', 'auth'),
+    ('password_label', 'Lösenord', 'auth'),
+    ('email_label', 'E-post', 'auth');
 END;
 $$;
 

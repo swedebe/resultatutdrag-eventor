@@ -21,6 +21,7 @@ export const AppTextService = {
       }
       
       if (data && data.length > 0) {
+        console.log(`Retrieved ${data.length} app texts with Supabase client`);
         return data as AppText[];
       }
       
@@ -41,11 +42,12 @@ export const AppTextService = {
       }
 
       const restData = await response.json();
-      console.log("Data from REST API:", restData);
+      console.log(`Retrieved ${restData?.length || 0} app texts with REST API`);
       return restData as AppText[];
     } catch (error) {
       console.error("All methods failed to fetch app texts:", error);
-      throw error;
+      // Return empty array instead of throwing to prevent cascading errors
+      return [];
     }
   },
 
@@ -95,6 +97,45 @@ export const AppTextService = {
         console.error("Both update methods failed:", restError);
         throw restError;
       }
+    }
+  },
+  
+  /**
+   * Create or update app text by key
+   */
+  async createOrUpdateAppTextByKey(key: string, value: string, category: string = 'general'): Promise<void> {
+    try {
+      // First check if the text exists
+      const { data, error } = await supabase
+        .from('app_texts')
+        .select('id')
+        .eq('key', key)
+        .maybeSingle();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error(`Error checking if app text ${key} exists:`, error);
+        throw error;
+      }
+      
+      if (data?.id) {
+        // Text exists, update it
+        return this.updateAppText(data.id, value);
+      } else {
+        // Text doesn't exist, create it
+        const { error: insertError } = await supabase
+          .from('app_texts')
+          .insert({ key, value, category });
+          
+        if (insertError) {
+          console.error(`Error creating app text ${key}:`, insertError);
+          throw insertError;
+        }
+        
+        console.log(`Created app text ${key} successfully`);
+      }
+    } catch (error) {
+      console.error(`Failed to create or update app text ${key}:`, error);
+      throw error;
     }
   }
 };
