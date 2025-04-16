@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -31,6 +32,7 @@ const formSchema = z.object({
 const AddUserForm = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,6 +48,9 @@ const AddUserForm = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsSubmitting(true);
+      setErrorMessage(null);
+      
+      console.log("Creating user with values:", { ...values, password: "***" });
       
       const { data, error } = await supabase.rpc('create_user_from_admin', {
         user_email: values.email,
@@ -54,9 +59,12 @@ const AddUserForm = () => {
         user_club_name: values.club || "Din klubb",
         user_role: values.role
       });
+      
+      console.log("RPC response:", data, error);
 
       if (error) {
         console.error("Error creating user:", error);
+        setErrorMessage(`Fel från servern: ${error.message || "Okänt fel"}`);
         toast({
           title: "Det gick inte att skapa användaren",
           description: error.message,
@@ -73,15 +81,21 @@ const AddUserForm = () => {
             description: `Användaren ${values.name} har skapats med e-post ${values.email} och roll: ${values.role === 'superuser' ? 'Superanvändare' : 'Användare'}.`,
           });
           form.reset();
+          setErrorMessage(null);
         } else {
+          const message = typeof data.message === 'string' ? data.message : "Ett okänt fel inträffade";
+          console.error("Failed to create user:", message);
+          setErrorMessage(`Kunde inte skapa användaren: ${message}`);
           toast({
             title: "Det gick inte att skapa användaren",
-            description: typeof data.message === 'string' ? data.message : "Ett okänt fel inträffade",
+            description: message,
             variant: "destructive",
           });
         }
       } else {
         // Handle unexpected response format
+        console.error("Unexpected response format:", data);
+        setErrorMessage("Kunde inte tolka serverns svar");
         toast({
           title: "Oväntat svar från servern",
           description: "Kunde inte tolka serverns svar",
@@ -90,6 +104,7 @@ const AddUserForm = () => {
       }
     } catch (error: any) {
       console.error("Error in form submission:", error);
+      setErrorMessage(`Oväntat fel: ${error.message || "Okänt fel"}`);
       toast({
         title: "Ett fel inträffade",
         description: error.message,
@@ -107,6 +122,14 @@ const AddUserForm = () => {
         <CardDescription>Lägg till en ny användare i systemet</CardDescription>
       </CardHeader>
       <CardContent>
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Felmeddelande</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField

@@ -30,7 +30,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
       <Button 
         onClick={onSaveResults}
         variant="default"
-        disabled={isSaving || resultsLength === 0 || !runId || isProcessing}
+        disabled={isSaving || resultsLength === 0 || isProcessing}
         className="bg-green-600 hover:bg-green-700"
       >
         <Save className="mr-2 h-4 w-4" />

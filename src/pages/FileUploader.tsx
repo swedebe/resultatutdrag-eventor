@@ -30,7 +30,7 @@ const FileUploader = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [delay, setDelay] = useState<number>(15); // Default delay of 15 seconds
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [showLogs, setShowLogs] = useState<boolean>(true);
+  const [shouldCancel, setShouldCancel] = useState<boolean>(false);
   
   // Set up logs update function
   useEffect(() => {
@@ -66,6 +66,7 @@ const FileUploader = () => {
       setIsProcessing(true);
       setProgress(0);
       setCurrentStatus("Startar bearbetning...");
+      setShouldCancel(false);
       clearLogs();
       
       // Process the file
@@ -76,18 +77,27 @@ const FileUploader = () => {
         delay,
         async (partialResults) => {
           setResults([...partialResults]);
-          return !isProcessing; // Continue processing if not cancelled
+          // Check if cancellation was requested
+          if (shouldCancel) {
+            console.log("Processing canceled by user");
+            return false; // Return false to stop processing
+          }
+          return true; // Continue processing if not cancelled
         },
         null // No runId for now, it will be generated when saving
       );
       
-      setResults(processedResults);
-      setIsProcessing(false);
+      // Only update results if we didn't cancel
+      if (!shouldCancel) {
+        setResults(processedResults);
+        
+        toast({
+          title: "Bearbetning slutförd",
+          description: `${processedResults.length} rader har bearbetats.`
+        });
+      }
       
-      toast({
-        title: "Bearbetning slutförd",
-        description: `${processedResults.length} rader har bearbetats.`
-      });
+      setIsProcessing(false);
     } catch (error) {
       console.error("Error processing file:", error);
       setIsProcessing(false);
@@ -110,12 +120,13 @@ const FileUploader = () => {
   };
   
   const handleCancelProcessing = () => {
-    // Logic to cancel processing
-    setIsProcessing(false);
-    addLog("system", "", "Bearbetning avbruten av användaren");
+    // Set cancellation flag
+    setShouldCancel(true);
+    
+    addLog("system", "", "Bearbetning avbryts, vänta tills nuvarande operation är klar...");
     toast({
-      title: "Avbruten",
-      description: "Bearbetningen har avbrutits."
+      title: "Avbryter...",
+      description: "Bearbetningen avbryts så snart nuvarande operation är klar."
     });
   };
   
@@ -143,8 +154,6 @@ const FileUploader = () => {
     if (results.length === 0) return;
     
     try {
-      // Fix here: The exportResultsToExcel function is being called with two arguments, but it should only have one
-      // Looking at the service definition, it only expects an array of ResultRow objects
       exportResultsToExcel(results);
       toast({
         title: "Exporterad",
@@ -232,7 +241,7 @@ const FileUploader = () => {
             onCancelProcessing={handleCancelProcessing}
           />
           
-          {/* Show logs during processing */}
+          {/* Show logs during processing or if there are logs */}
           {(isProcessing || logs.length > 0) && (
             <LogComponent logs={logs} onClearLogs={handleClearLogs} />
           )}
