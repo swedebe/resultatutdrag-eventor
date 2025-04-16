@@ -8,6 +8,7 @@ import { sv } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { sub } from "date-fns";
 
 interface SavedRunItemProps {
   id: string;
@@ -24,8 +25,14 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(name);
   const [actualEventCount, setActualEventCount] = useState(eventCount);
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
+    // Check if the run is expired (older than 2 years)
+    const runDate = new Date(date);
+    const twoYearsAgo = sub(new Date(), { years: 2 });
+    setIsExpired(runDate < twoYearsAgo);
+
     // Fetch the actual count from processed_results table
     const fetchActualCount = async () => {
       const { count, error } = await supabase
@@ -44,7 +51,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     };
 
     fetchActualCount();
-  }, [id]);
+  }, [id, date]);
 
   const formattedDate = React.useMemo(() => {
     try {
@@ -97,6 +104,15 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   };
   
   const startEditing = () => {
+    if (isExpired) {
+      toast({
+        title: "Kan inte ändra namn",
+        description: "Körningar äldre än två år kan inte namnändras",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsEditing(true);
     setNewName(name);
   };
@@ -141,7 +157,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+    <div className={`flex items-center justify-between p-4 border rounded-lg ${isExpired ? 'bg-red-50' : 'bg-card'}`}>
       {isEditing ? (
         <div className="flex-1 flex gap-2 items-center">
           <Input 
@@ -162,18 +178,23 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
           <h3 className="font-medium">{name}</h3>
           <p className="text-sm text-muted-foreground">
             {actualEventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
+            {isExpired && <span className="ml-2 text-red-500 font-medium">Utgången (äldre än 2 år)</span>}
           </p>
         </div>
       )}
       <div className="flex space-x-2">
         {!isEditing && (
           <>
-            <Button variant="outline" size="icon" onClick={handleView} title="Visa">
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={startEditing} title="Byt namn">
-              <Pencil className="h-4 w-4" />
-            </Button>
+            {!isExpired && (
+              <>
+                <Button variant="outline" size="icon" onClick={handleView} title="Visa">
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={startEditing} title="Byt namn">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="icon" onClick={handleDelete} disabled={isDeleting} title="Ta bort">
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>

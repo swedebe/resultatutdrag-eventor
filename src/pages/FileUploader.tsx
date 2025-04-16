@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction } from "@/components/LogComponent";
-import ResultsTable from "@/components/ResultsTable";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
@@ -463,10 +462,6 @@ const FileUploader = () => {
         isSaving={isSaving}
         isProcessing={isProcessing}
       />
-      
-      {results.length > 0 && (
-        <ResultsTable results={results} />
-      )}
     </div>
   );
 };

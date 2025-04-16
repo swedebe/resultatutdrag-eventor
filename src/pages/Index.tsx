@@ -7,9 +7,12 @@ import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
-import { PlusCircle } from "lucide-react";
+import { Trash2, PlusCircle, Settings } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 const Index = () => {
+  const { toast } = useToast();
+  
   // Fetch user info from Supabase
   const { data: userData } = useQuery({
     queryKey: ['user-profile'],
@@ -18,7 +21,7 @@ const Index = () => {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('club_name')
+          .select('club_name, role')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -42,11 +45,47 @@ const Index = () => {
     }
   });
 
+  const handleDeleteAllRuns = async () => {
+    if (!confirm('Är du säker på att du vill ta bort alla dina körningar? Detta kan inte ångras.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('runs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all runs (without an actual filter)
+
+      if (error) throw error;
+
+      toast({
+        title: "Alla körningar borttagna",
+        description: "Alla dina sparade körningar har tagits bort",
+      });
+
+      refetchRuns();
+    } catch (error: any) {
+      console.error("Error deleting all runs:", error);
+      toast({
+        title: "Fel vid borttagning",
+        description: error.message || "Ett fel uppstod vid borttagning av körningarna",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">Resultatanalys</h1>
-        <AuthStatus />
+        <div className="flex gap-4">
+          <Link to="/settings">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" /> Inställningar
+            </Button>
+          </Link>
+          <AuthStatus />
+        </div>
       </div>
       
       <Card className="mb-6">
@@ -81,6 +120,17 @@ const Index = () => {
               Tidigare sparade körningar och analyser
             </CardDescription>
           </div>
+          {savedRuns && savedRuns.length > 0 && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={handleDeleteAllRuns}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Ta bort alla körningar
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {loadingRuns ? (

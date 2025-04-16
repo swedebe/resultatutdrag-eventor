@@ -1,0 +1,223 @@
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Save, AlertCircle } from "lucide-react";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { format, sub } from "date-fns";
+
+interface AppText {
+  id: string;
+  key: string;
+  value: string;
+}
+
+interface ExpiredRun {
+  id: string;
+  name: string;
+  user_name: string;
+  club_name: string;
+  user_email: string;
+  date: string;
+}
+
+const SuperuserSettings: React.FC = () => {
+  const { toast } = useToast();
+  const [appTexts, setAppTexts] = useState<AppText[]>([]);
+  const [expiredRuns, setExpiredRuns] = useState<ExpiredRun[]>([]);
+  const [loadingTexts, setLoadingTexts] = useState(true);
+  const [loadingExpired, setLoadingExpired] = useState(true);
+  const [savingTexts, setSavingTexts] = useState(false);
+
+  // Fetch app texts and expired runs on component mount
+  useEffect(() => {
+    const fetchAppTexts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_texts')
+          .select('*')
+          .order('key');
+
+        if (error) throw error;
+
+        setAppTexts(data || []);
+      } catch (error: any) {
+        console.error("Error fetching app texts:", error);
+        toast({
+          title: "Fel vid hämtning av texter",
+          description: error.message || "Kunde inte hämta applikationstexter",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingTexts(false);
+      }
+    };
+
+    const fetchExpiredRuns = async () => {
+      try {
+        // Calculate date 2 years ago
+        const twoYearsAgo = sub(new Date(), { years: 2 });
+        
+        const { data, error } = await supabase
+          .from('runs')
+          .select(`
+            id, 
+            name, 
+            date,
+            users!inner(name, email, club_name)
+          `)
+          .lt('date', twoYearsAgo.toISOString());
+
+        if (error) throw error;
+
+        // Transform the data to match our ExpiredRun interface
+        const formattedRuns: ExpiredRun[] = (data || []).map(run => ({
+          id: run.id,
+          name: run.name,
+          user_name: run.users.name || 'Okänd användare',
+          club_name: run.users.club_name || 'Okänd klubb',
+          user_email: run.users.email || 'Okänd e-post',
+          date: run.date
+        }));
+
+        setExpiredRuns(formattedRuns);
+      } catch (error: any) {
+        console.error("Error fetching expired runs:", error);
+        toast({
+          title: "Fel vid hämtning av utgångna körningar",
+          description: error.message || "Kunde inte hämta utgångna körningar",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingExpired(false);
+      }
+    };
+
+    fetchAppTexts();
+    fetchExpiredRuns();
+  }, [toast]);
+
+  const handleTextChange = (id: string, newValue: string) => {
+    setAppTexts(appTexts.map(text => 
+      text.id === id ? { ...text, value: newValue } : text
+    ));
+  };
+
+  const saveAppTexts = async () => {
+    setSavingTexts(true);
+    try {
+      for (const text of appTexts) {
+        const { error } = await supabase
+          .from('app_texts')
+          .update({ value: text.value })
+          .eq('id', text.id);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Texter sparade",
+        description: "Applikationstexterna har uppdaterats",
+      });
+    } catch (error: any) {
+      console.error("Error saving app texts:", error);
+      toast({
+        title: "Fel vid sparande",
+        description: error.message || "Kunde inte spara applikationstexterna",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTexts(false);
+    }
+  };
+
+  return (
+    <>
+      {/* App Texts Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Applikationstexter</CardTitle>
+          <CardDescription>Redigera texter som visas i applikationen</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingTexts ? (
+            <p className="text-center text-muted-foreground">Laddar texter...</p>
+          ) : appTexts.length === 0 ? (
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="h-8 w-8 text-amber-500" />
+              <p className="text-muted-foreground">Inga texter hittades. Skapa texterna i databasen först.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 mb-4">
+                {appTexts.map(text => (
+                  <div key={text.id} className="space-y-2">
+                    <Label htmlFor={`text-${text.id}`}>{text.key}</Label>
+                    <Input 
+                      id={`text-${text.id}`}
+                      value={text.value}
+                      onChange={(e) => handleTextChange(text.id, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button 
+                onClick={saveAppTexts}
+                disabled={savingTexts}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {savingTexts ? "Sparar..." : "Spara texter"}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Expired Runs Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Utgångna körningar (äldre än 2 år)</CardTitle>
+          <CardDescription>Lista över körningar som är äldre än 2 år</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingExpired ? (
+            <p className="text-center text-muted-foreground">Laddar utgångna körningar...</p>
+          ) : expiredRuns.length === 0 ? (
+            <p className="text-center text-muted-foreground">Inga utgångna körningar hittades.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Namn</TableHead>
+                    <TableHead>Användare</TableHead>
+                    <TableHead>Klubb</TableHead>
+                    <TableHead>E-post</TableHead>
+                    <TableHead>Datum</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expiredRuns.map(run => (
+                    <TableRow key={run.id}>
+                      <TableCell>{run.name}</TableCell>
+                      <TableCell>{run.user_name}</TableCell>
+                      <TableCell>{run.club_name}</TableCell>
+                      <TableCell>{run.user_email}</TableCell>
+                      <TableCell>{new Date(run.date).toLocaleDateString("sv-SE")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+};
+
+export default SuperuserSettings;

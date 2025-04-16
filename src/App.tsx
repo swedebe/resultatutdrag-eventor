@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthWrapper from "./components/AuthWrapper";
 import RunDetail from "./pages/RunDetail";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,14 @@ const App = () => (
             element={
               <AuthWrapper>
                 <RunDetail />
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <AuthWrapper>
+                <Settings />
               </AuthWrapper>
             }
           />

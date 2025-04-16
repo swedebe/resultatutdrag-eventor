@@ -36,23 +36,28 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         <Save className="mr-2 h-4 w-4" />
         {isSaving ? "Sparar..." : "Slutför"}
       </Button>
-      <Link to="/">
-        <Button 
-          variant="outline"
-          disabled={isProcessing}
-        >
+      
+      {/* Link component with a button that's properly disabled during processing */}
+      <Button 
+        variant="outline"
+        disabled={isProcessing}
+        asChild
+      >
+        <Link to="/">
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
-        </Button>
-      </Link>
+        </Link>
+      </Button>
+      
       <Button 
         onClick={onExportResults}
         variant="outline"
-        disabled={isProcessing}
+        disabled={isProcessing || resultsLength === 0}
       >
         <FileDown className="mr-2 h-4 w-4" />
         Ladda ner Excel
       </Button>
+      
       <Button 
         onClick={onDeleteRun}
         variant="destructive"
@@ -61,6 +66,7 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         <Trash2 className="mr-2 h-4 w-4" />
         Ta bort körning
       </Button>
+      
       {onCancelProcessing && (
         <Button 
           onClick={onCancelProcessing}
