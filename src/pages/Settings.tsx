@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -179,13 +180,15 @@ const Settings = () => {
       <div className="space-y-6">
         {userProfile && <UserProfileSettings userProfile={userProfile} />}
         
+        <ExpiredRunsSection />
+        
         {userProfile && userProfile.role === UserRole.SUPERUSER && (
           <SuperuserSettings />
         )}
-        {/* Removed the duplicate ExpiredRunsSection */}
       </div>
     </div>
   );
 };
 
 export default Settings;
+
