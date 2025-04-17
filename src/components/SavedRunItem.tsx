@@ -24,8 +24,15 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(name);
+  const [displayName, setDisplayName] = useState(name);
   const [actualEventCount, setActualEventCount] = useState(eventCount);
   const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    // Update local state when props change (after a refetch)
+    setNewName(name);
+    setDisplayName(name);
+  }, [name]);
 
   useEffect(() => {
     // Check if the run is expired (older than 2 years)
@@ -69,7 +76,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   }, [date]);
 
   const handleDelete = async () => {
-    if (window.confirm(`Är du säker på att du vill ta bort körningen "${name}"?`)) {
+    if (window.confirm(`Är du säker på att du vill ta bort körningen "${displayName}"?`)) {
       setIsDeleting(true);
       
       try {
@@ -82,7 +89,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         
         toast({
           title: "Körning borttagen",
-          description: `Körningen "${name}" har tagits bort`,
+          description: `Körningen "${displayName}" har tagits bort`,
         });
         
         onDelete();
@@ -114,11 +121,12 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     }
     
     setIsEditing(true);
-    setNewName(name);
+    setNewName(displayName);
   };
   
   const cancelEditing = () => {
     setIsEditing(false);
+    setNewName(displayName);
   };
   
   const saveNewName = async () => {
@@ -139,13 +147,17 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       
       if (error) throw error;
       
+      // Update local state immediately
+      setDisplayName(newName.trim());
+      setIsEditing(false);
+      
       toast({
         title: "Namn uppdaterat",
         description: "Körningens namn har uppdaterats",
       });
       
-      onDelete(); // Refresh the list
-      setIsEditing(false);
+      // Refresh the parent component's data
+      onDelete();
     } catch (error: any) {
       console.error("Error updating run name:", error);
       toast({
@@ -175,7 +187,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         </div>
       ) : (
         <div className="space-y-1">
-          <h3 className="font-medium">{name}</h3>
+          <h3 className="font-medium">{displayName}</h3>
           <p className="text-sm text-muted-foreground">
             {actualEventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
             {isExpired && <span className="ml-2 text-red-500 font-medium">Utgången (äldre än 2 år)</span>}

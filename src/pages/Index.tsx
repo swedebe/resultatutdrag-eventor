@@ -46,6 +46,7 @@ const Index = () => {
         .order('date', { ascending: false });
       
       if (error) throw error;
+      console.log("Fetched runs:", data);
       return data || [];
     }
   });
@@ -77,6 +78,11 @@ const Index = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleRunUpdate = () => {
+    console.log("Run updated, refetching data...");
+    refetchRuns();
   };
 
   return (
@@ -155,7 +161,7 @@ const Index = () => {
                   name={run.name}
                   date={run.date}
                   eventCount={run.event_count}
-                  onDelete={refetchRuns}
+                  onDelete={handleRunUpdate}
                 />
               ))}
             </div>
