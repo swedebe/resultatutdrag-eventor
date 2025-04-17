@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -131,6 +130,28 @@ export const saveLogToDatabase = async (
     return true;
   } catch (err) {
     console.error('Error saving log entry:', err);
+    return false;
+  }
+};
+
+/**
+ * Function to update a run's name
+ */
+export const updateRunName = async (runId: string, newName: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('runs')
+      .update({ name: newName.trim() })
+      .eq('id', runId);
+      
+    if (error) {
+      console.error('Error updating run name:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Error updating run name:', err);
     return false;
   }
 };

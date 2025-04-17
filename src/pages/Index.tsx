@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -36,10 +35,11 @@ const Index = () => {
     }
   });
 
-  // Fetch saved runs
+  // Fetch saved runs with proper caching disabled to ensure fresh data
   const { data: savedRuns, isLoading: loadingRuns, refetch: refetchRuns } = useQuery({
     queryKey: ['saved-runs'],
     queryFn: async () => {
+      console.log("Fetching runs data fresh from database");
       const { data, error } = await supabase
         .from('runs')
         .select('*')
@@ -48,7 +48,10 @@ const Index = () => {
       if (error) throw error;
       console.log("Fetched runs:", data);
       return data || [];
-    }
+    },
+    // Add staleTime of 0 to ensure we always get fresh data when refetching
+    staleTime: 0,
+    refetchOnWindowFocus: true
   });
 
   const handleDeleteAllRuns = async () => {
@@ -82,6 +85,7 @@ const Index = () => {
 
   const handleRunUpdate = () => {
     console.log("Run updated, refetching data...");
+    // Force a complete refetch by invalidating the query
     refetchRuns();
   };
 

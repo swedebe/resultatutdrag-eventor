@@ -140,12 +140,23 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     }
     
     try {
-      const { error } = await supabase
+      console.log(`Updating run name for ID ${id} to: "${newName.trim()}"`);
+      
+      // Use an explicitly typed update operation
+      const { error, data } = await supabase
         .from('runs')
         .update({ name: newName.trim() })
-        .eq('id', id);
+        .eq('id', id)
+        .select('name'); // Add this to confirm the update worked
+      
+      console.log("Database update response:", { error, data });
       
       if (error) throw error;
+      
+      // Verify the update was successful
+      if (data && data.length > 0) {
+        console.log("Updated name confirmed from database:", data[0].name);
+      }
       
       // Update local state immediately
       setDisplayName(newName.trim());
