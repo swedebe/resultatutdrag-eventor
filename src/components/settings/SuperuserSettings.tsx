@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,31 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, AlertCircle, Trash2 } from "lucide-react";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { format, sub } from "date-fns";
+import { Save, AlertCircle } from "lucide-react";
 import { AppText } from "@/types/appText";
 import { AppTextService } from "@/services/appText/appTextService";
 import AddUserForm from "./AddUserForm";
 import UserManagement from "./UserManagement";
-
-interface ExpiredRun {
-  id: string;
-  name: string;
-  user_name: string;
-  club_name: string;
-  user_email: string;
-  date: string;
-}
 
 const CATEGORY_ORDER = ['homepage', 'fileupload', 'settings', 'general', 'auth'];
 
 const SuperuserSettings: React.FC = () => {
   const { toast } = useToast();
   const [appTexts, setAppTexts] = useState<AppText[]>([]);
-  const [expiredRuns, setExpiredRuns] = useState<ExpiredRun[]>([]);
   const [loadingTexts, setLoadingTexts] = useState(true);
-  const [loadingExpired, setLoadingExpired] = useState(true);
   const [savingTexts, setSavingTexts] = useState(false);
 
   const groupedTexts = React.useMemo(() => {
@@ -100,57 +88,7 @@ const SuperuserSettings: React.FC = () => {
       }
     };
 
-    const fetchExpiredRuns = async () => {
-      try {
-        const twoYearsAgo = sub(new Date(), { years: 2 });
-        
-        const { data, error } = await supabase
-          .from('runs')
-          .select(`
-            id, 
-            name, 
-            date,
-            user_id
-          `)
-          .lt('date', twoYearsAgo.toISOString());
-
-        if (error) throw error;
-
-        const formattedRuns: ExpiredRun[] = [];
-        for (const run of data || []) {
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('name, club_name, email')
-            .eq('id', run.user_id)
-            .single();
-          
-          if (!userError && userData) {
-            formattedRuns.push({
-              id: run.id,
-              name: run.name,
-              user_name: userData.name || 'Okänd användare',
-              club_name: userData.club_name || 'Okänd klubb',
-              user_email: userData.email || 'Okänd e-post',
-              date: run.date
-            });
-          }
-        }
-
-        setExpiredRuns(formattedRuns);
-      } catch (error: any) {
-        console.error("Error fetching expired runs:", error);
-        toast({
-          title: "Fel vid hämtning av utgångna körningar",
-          description: error.message || "Kunde inte hämta utgångna körningar",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingExpired(false);
-      }
-    };
-
     fetchAppTexts();
-    fetchExpiredRuns();
   }, [toast]);
 
   const handleTextChange = (id: string, newValue: string) => {
@@ -261,45 +199,6 @@ const SuperuserSettings: React.FC = () => {
                 <Save className="mr-2 h-4 w-4" />
                 {savingTexts ? "Sparar..." : "Spara texter"}
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Utgångna körningar (äldre än 2 år)</CardTitle>
-          <CardDescription>Lista över körningar som är äldre än 2 år</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingExpired ? (
-            <p className="text-center text-muted-foreground">Laddar utgångna körningar...</p>
-          ) : expiredRuns.length === 0 ? (
-            <p className="text-center text-muted-foreground">Inga utgångna körningar hittades.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Namn</TableHead>
-                    <TableHead>Användare</TableHead>
-                    <TableHead>Klubb</TableHead>
-                    <TableHead>E-post</TableHead>
-                    <TableHead>Datum</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expiredRuns.map(run => (
-                    <TableRow key={run.id}>
-                      <TableCell>{run.name}</TableCell>
-                      <TableCell>{run.user_name}</TableCell>
-                      <TableCell>{run.club_name}</TableCell>
-                      <TableCell>{run.user_email}</TableCell>
-                      <TableCell>{new Date(run.date).toLocaleDateString("sv-SE")}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </div>
           )}
         </CardContent>
