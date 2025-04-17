@@ -40,6 +40,11 @@ const Index = () => {
     queryKey: ['saved-runs'],
     queryFn: async () => {
       console.log("Fetching runs data fresh from database");
+      
+      // Log the current user to help troubleshoot permissions issues
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current authenticated user:", user?.id);
+      
       const { data, error } = await supabase
         .from('runs')
         .select('*')
@@ -49,7 +54,8 @@ const Index = () => {
         console.error("Error fetching runs:", error);
         throw error;
       }
-      console.log("Fetched runs:", data);
+      
+      console.log("Fetched runs:", data?.length);
       return data || [];
     },
     // Add staleTime of 0 to ensure we always get fresh data when refetching

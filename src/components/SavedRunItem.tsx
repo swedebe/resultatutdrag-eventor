@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +29,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [actualEventCount, setActualEventCount] = useState(eventCount);
   const [isExpired, setIsExpired] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Update local state when props change (after a refetch)
@@ -77,11 +79,13 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     
     setIsEditing(true);
     setNewName(displayName);
+    setErrorMessage(null);
   };
   
   const cancelEditing = () => {
     setIsEditing(false);
     setNewName(displayName);
+    setErrorMessage(null);
   };
   
   const saveNewName = async () => {
@@ -91,6 +95,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         description: "Namnet får inte vara tomt",
         variant: "destructive",
       });
+      setErrorMessage("Namnet får inte vara tomt");
       return;
     }
     
@@ -101,9 +106,26 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     }
     
     setIsSaving(true);
+    setErrorMessage(null);
     
     try {
       console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
+      
+      // Verify current user has access to this run
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current user:", user?.id);
+      
+      const { data: runData } = await supabase
+        .from('runs')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+        
+      if (runData && user?.id !== runData.user_id) {
+        console.error("User doesn't have permission to update this run");
+        throw new Error("Saknar behörighet att ändra namnet");
+      }
+      
       const success = await updateRunName(id, newName.trim());
       
       if (!success) {
@@ -123,6 +145,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       onDelete(); // This actually triggers a refetch in the parent
     } catch (error: any) {
       console.error("Error updating run name:", error);
+      setErrorMessage(error.message || "Ett fel uppstod vid namnbyte av körningen");
       toast({
         title: "Fel vid namnbyte",
         description: error.message || "Ett fel uppstod vid namnbyte av körningen",
@@ -207,6 +230,9 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       ) : (
         <div className="space-y-1">
           <h3 className="font-medium">{displayName}</h3>
+          {errorMessage && (
+            <p className="text-sm text-red-500">{errorMessage}</p>
+          )}
           <p className="text-sm text-muted-foreground">
             {actualEventCount} resultat • {formattedDate.relative} • {formattedDate.absolute}
             {isExpired && <span className="ml-2 text-red-500 font-medium">Utgången (äldre än 2 år)</span>}

@@ -1,3 +1,4 @@
+
 /**
  * Database operations for results
  */
@@ -150,19 +151,30 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     // Clear any leading/trailing whitespace
     const trimmedName = newName.trim();
     
+    // Debug output before update
+    console.log(`Attempting to update run with ID: ${runId} to name: "${trimmedName}"`);
+    
     // Execute the update with detailed logging
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('runs')
       .update({ name: trimmedName })
       .eq('id', runId)
-      .select('name');
+      .select();
     
     // Log the complete response for troubleshooting
-    console.log('Update response:', { data, error });
+    console.log('Supabase update complete. Response:', { 
+      data, 
+      error, 
+      count,
+      dataLength: data?.length || 0,
+      errorMessage: error?.message,
+      errorCode: error?.code,
+      errorDetails: error?.details
+    });
       
     if (error) {
       console.error('Error updating run name:', error);
-      console.error('Error details:', error.message);
+      console.error('Error details:', error.message, error.code, error.details);
       return false;
     }
     
@@ -182,7 +194,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     console.log(`Run name successfully updated to "${updatedName}"`);
     return true;
   } catch (err) {
-    console.error('Error updating run name:', err);
+    console.error('Exception in updateRunName:', err);
     return false;
   }
 };
