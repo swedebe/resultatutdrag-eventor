@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +19,7 @@ const RunDetail = () => {
   const [run, setRun] = useState<RunWithLogs | null>(null);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [totalResultCount, setTotalResultCount] = useState<number>(0);
+  const [uniqueEventCount, setUniqueEventCount] = useState<number>(0);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogs, setShowLogs] = useState(false);
@@ -46,8 +46,6 @@ const RunDetail = () => {
           return;
         }
 
-        console.log("Retrieved basic run data:", runData);
-        
         // 2. Get the total count of results for this run
         const { count: totalCount, error: countError } = await supabase
           .from('processed_results')
@@ -59,26 +57,26 @@ const RunDetail = () => {
           throw countError;
         }
         
-        // Set the total count
-        setTotalResultCount(totalCount || 0);
-        console.log(`Total result count: ${totalCount}`);
-        
         // 3. Fetch processed results from the table (limited for performance)
         const processedResults = await fetchProcessedResults(id);
-        console.log(`Fetched ${processedResults.length} processed results from database`);
+        
+        // Calculate unique event count
+        const uniqueEvents = new Set(processedResults.map(result => result.event_id));
         
         // 4. Fetch logs from the table
         const processingLogs = await fetchProcessingLogs(id);
-        console.log(`Fetched ${processingLogs.length} logs from database`);
         
         // 5. Create a combined run object with all data
         const runWithLogs: RunWithLogs = {
           ...runData,
-          logs: processingLogs || []
+          logs: processingLogs || [],
+          event_count: uniqueEvents.size // Set unique event count
         };
         
         setRun(runWithLogs);
         setResults(processedResults);
+        setTotalResultCount(totalCount || 0);
+        setUniqueEventCount(uniqueEvents.size);
         setLogs(processingLogs);
       } catch (error) {
         console.error('Error fetching run details:', error);
@@ -163,4 +161,3 @@ const RunDetail = () => {
 };
 
 export default RunDetail;
-

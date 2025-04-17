@@ -31,32 +31,27 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
   
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll to top of table when changing page
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   const handleSort = (column: string) => {
     if (sortColumn === column) {
-      // Toggle direction if clicking the same column
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      // Default to ascending for new column
       setSortColumn(column);
       setSortDirection("asc");
     }
     
-    // Reset to first page when sorting changes
     setCurrentPage(1);
   };
   
   const renderPaginationItems = () => {
     const items = [];
-    const maxPagesToShow = 5; // Show at most 5 page numbers
+    const maxPagesToShow = 5;
     
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
     
-    // Adjust startPage if we're at the end of the range
     if (endPage - startPage + 1 < maxPagesToShow) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
