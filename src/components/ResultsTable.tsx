@@ -3,8 +3,9 @@ import React, { useState } from "react";
 import { Table } from "@/components/ui/table";
 import ResultsTableHeader from "@/components/table/ResultsTableHeader";
 import ResultsTableBody from "@/components/table/ResultsTableBody";
-import { ResultRow } from "@/services/FileProcessingService";
+import { ResultRow } from "@/types/results";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
+import { sortResults } from "@/utils/resultsUtils";
 
 interface ResultsTableProps {
   results: ResultRow[];
@@ -14,10 +15,16 @@ const RESULTS_PER_PAGE = 100;
 
 const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.ceil(results.length / RESULTS_PER_PAGE);
+  const [sortColumn, setSortColumn] = useState("date");
+  const [sortDirection, setSortDirection] = useState("desc");
+  
+  // Apply sorting to results
+  const sortedResults = sortResults(results, sortColumn, sortDirection);
+  
+  const totalPages = Math.ceil(sortedResults.length / RESULTS_PER_PAGE);
   
   // Get paginated results
-  const paginatedResults = results.slice(
+  const paginatedResults = sortedResults.slice(
     (currentPage - 1) * RESULTS_PER_PAGE, 
     currentPage * RESULTS_PER_PAGE
   );
@@ -26,6 +33,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
     setCurrentPage(page);
     // Scroll to top of table when changing page
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Default to ascending for new column
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
   };
   
   const renderPaginationItems = () => {
@@ -60,7 +81,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
     <div>
       <div className="rounded-md border">
         <Table>
-          <ResultsTableHeader />
+          <ResultsTableHeader 
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
           <ResultsTableBody results={paginatedResults} />
         </Table>
       </div>
