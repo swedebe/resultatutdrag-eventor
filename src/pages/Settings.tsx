@@ -16,6 +16,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { text: settingsTitle } = useAppText('settings_title', 'Inställningar');
+  const { text: expiredRunsTitle } = useAppText('expiredruns_title', 'Utgångna körningar (äldre än 2 år)');
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -177,6 +178,12 @@ const Settings = () => {
 
       <div className="space-y-6">
         {userProfile && <UserProfileSettings userProfile={userProfile} />}
+        
+        <Card>
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-semibold mb-2">{expiredRunsTitle}</h2>
+          </CardContent>
+        </Card>
         
         {userProfile && userProfile.role === UserRole.SUPERUSER && (
           <SuperuserSettings />

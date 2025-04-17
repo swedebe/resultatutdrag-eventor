@@ -2,13 +2,17 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RunWithLogs } from "@/types/database";
+import { ResultRow } from "@/types/results";
 
 interface RunInfoCardProps {
   run: RunWithLogs;
-  resultsCount: number;
+  results: ResultRow[];
 }
 
-const RunInfoCard: React.FC<RunInfoCardProps> = ({ run, resultsCount }) => {
+const RunInfoCard: React.FC<RunInfoCardProps> = ({ run, results }) => {
+  // Count unique event IDs
+  const uniqueEventIds = new Set(results.map(result => result.eventId)).size;
+  
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -27,18 +31,13 @@ const RunInfoCard: React.FC<RunInfoCardProps> = ({ run, resultsCount }) => {
           </div>
           <div>
             <p className="text-sm font-medium">Antal evenemang:</p>
-            <p className="text-lg">{run.event_count}</p>
+            <p className="text-lg">{uniqueEventIds}</p>
           </div>
-          {run.club_name && (
-            <div>
-              <p className="text-sm font-medium">Klubb:</p>
-              <p className="text-lg">{run.club_name}</p>
-            </div>
-          )}
         </div>
         <div className="mt-4">
           <p className="text-sm font-medium">Antal resultat:</p>
-          <p className="text-lg">{resultsCount}</p>
+          <p className="text-lg">{results.length}</p>
+          <p className="text-sm text-muted-foreground">Totalt {results.length} resultat för klubben</p>
         </div>
       </CardContent>
     </Card>

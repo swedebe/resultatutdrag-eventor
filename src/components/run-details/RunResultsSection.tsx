@@ -6,9 +6,10 @@ import { ResultRow } from "@/services/FileProcessingService";
 
 interface RunResultsSectionProps {
   results: ResultRow[];
+  totalCount: number;
 }
 
-const RunResultsSection: React.FC<RunResultsSectionProps> = ({ results }) => {
+const RunResultsSection: React.FC<RunResultsSectionProps> = ({ results, totalCount }) => {
   if (results.length === 0) {
     return (
       <Card>

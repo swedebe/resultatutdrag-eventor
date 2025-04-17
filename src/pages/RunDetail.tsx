@@ -11,9 +11,11 @@ import RunLogSection from '@/components/run-details/RunLogSection';
 import RunResultsSection from '@/components/run-details/RunResultsSection';
 import RunDetailSkeleton from '@/components/run-details/RunDetailSkeleton';
 import RunNotFound from '@/components/run-details/RunNotFound';
+import { useAppText } from '@/hooks/useAppText';
 
 const RunDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { text: pageTitle } = useAppText('rundetails_page_title', 'Körningsdetaljer');
   const { toast } = useToast();
   const [run, setRun] = useState<RunWithLogs | null>(null);
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -121,7 +123,7 @@ const RunDetail = () => {
 
   return (
     <div className="container py-8">
-      <h1 className="text-4xl font-bold mb-6">Körningsdetaljer: {run.name}</h1>
+      <h1 className="text-4xl font-bold mb-6">{pageTitle}: {run.name}</h1>
       
       <RunActionButtons
         onExport={handleExport}
@@ -131,7 +133,7 @@ const RunDetail = () => {
         onToggleLogs={toggleShowLogs}
       />
 
-      <RunInfoCard run={run} resultsCount={results.length} />
+      <RunInfoCard run={run} results={results} />
       
       <RunLogSection 
         logs={logs}
@@ -139,7 +141,7 @@ const RunDetail = () => {
         onClearLogs={clearLogs}
       />
 
-      <RunResultsSection results={results} />
+      <RunResultsSection results={results} totalCount={results.length} />
     </div>
   );
 };
