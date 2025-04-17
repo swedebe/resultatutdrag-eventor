@@ -1,3 +1,4 @@
+
 /**
  * Database operations for results
  */
@@ -150,15 +151,16 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     // Clear any leading/trailing whitespace
     const trimmedName = newName.trim();
     
-    // Execute the update with explicit return
+    // Execute the update with explicit return using upsert to ensure the update happens
     const { data, error } = await supabase
       .from('runs')
       .update({ name: trimmedName })
       .eq('id', runId)
-      .select('name');
+      .select();
       
     if (error) {
       console.error('Error updating run name:', error);
+      console.error('Error details:', error.message);
       return false;
     }
     

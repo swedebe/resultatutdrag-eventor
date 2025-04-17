@@ -31,11 +31,12 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     
     setLocalIsRenaming(true);
     try {
+      console.log(`RunSettingsSection: Attempting to rename run ${runId} to "${saveName}"`);
       // Use the repository function instead of direct Supabase call
       const success = await updateRunName(runId, saveName.trim());
       
       if (!success) {
-        throw new Error("Failed to update run name");
+        throw new Error("Kunde inte byta namnet");
       }
       
       toast({

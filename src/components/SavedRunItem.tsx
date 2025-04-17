@@ -144,7 +144,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     setIsSaving(true);
     
     try {
-      // Use the repository function instead of direct Supabase call
+      console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
       const success = await updateRunName(id, newName.trim());
       
       if (!success) {
@@ -160,7 +160,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         description: "Körningens namn har uppdaterats",
       });
       
-      // Refresh the parent component's data
+      // Force refresh to ensure the changes are reflected in the UI
       onDelete(); // This actually triggers a refetch in the parent
     } catch (error: any) {
       console.error("Error updating run name:", error);
