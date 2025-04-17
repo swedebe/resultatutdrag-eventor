@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserRole, UserProfile } from "@/types/user";
 import { Link, useNavigate } from "react-router-dom";
@@ -9,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import SuperuserSettings from "@/components/settings/SuperuserSettings";
 import UserProfileSettings from "@/components/settings/UserProfileSettings";
 import { useAppText } from "@/hooks/useAppText";
+import ExpiredRunsSection from "@/components/settings/ExpiredRunsSection";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -16,7 +18,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { text: settingsTitle } = useAppText('settings_title', 'Inställningar');
-  const { text: expiredRunsTitle } = useAppText('expiredruns_title', 'Utgångna körningar (äldre än 2 år)');
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -179,11 +180,7 @@ const Settings = () => {
       <div className="space-y-6">
         {userProfile && <UserProfileSettings userProfile={userProfile} />}
         
-        <Card>
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-semibold mb-2">{expiredRunsTitle}</h2>
-          </CardContent>
-        </Card>
+        <ExpiredRunsSection />
         
         {userProfile && userProfile.role === UserRole.SUPERUSER && (
           <SuperuserSettings />

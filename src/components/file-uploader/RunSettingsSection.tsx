@@ -1,10 +1,12 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Save } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface RunSettingsSectionProps {
   saveName: string;
@@ -21,6 +23,40 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
   isRenaming,
   runId,
 }) => {
+  const { toast } = useToast();
+  const [localIsRenaming, setLocalIsRenaming] = useState(false);
+
+  const handleRename = async () => {
+    if (!runId || !saveName.trim()) return;
+    
+    setLocalIsRenaming(true);
+    try {
+      const { error } = await supabase
+        .from('runs')
+        .update({ name: saveName.trim() })
+        .eq('id', runId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Namn uppdaterat",
+        description: "Körningens namn har uppdaterats",
+      });
+      
+      // Call the parent's onRenameRun function to refresh data if needed
+      onRenameRun();
+    } catch (error: any) {
+      console.error("Error renaming run:", error);
+      toast({
+        title: "Fel vid namnbyte",
+        description: error.message || "Ett fel uppstod vid namnbyte av körningen",
+        variant: "destructive",
+      });
+    } finally {
+      setLocalIsRenaming(false);
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -42,12 +78,12 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                   placeholder="Ange ett beskrivande namn för denna körning" 
                 />
                 <Button 
-                  onClick={onRenameRun} 
-                  disabled={isRenaming || !saveName.trim() || !runId}
+                  onClick={handleRename} 
+                  disabled={localIsRenaming || isRenaming || !saveName.trim() || !runId}
                   variant="secondary"
                 >
                   <Pencil className="mr-2 h-4 w-4" />
-                  Byt namn
+                  {localIsRenaming ? "Sparar..." : "Byt namn"}
                 </Button>
               </div>
             </div>

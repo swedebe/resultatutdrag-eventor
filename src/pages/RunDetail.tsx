@@ -19,6 +19,7 @@ const RunDetail = () => {
   const { toast } = useToast();
   const [run, setRun] = useState<RunWithLogs | null>(null);
   const [results, setResults] = useState<ResultRow[]>([]);
+  const [totalResultCount, setTotalResultCount] = useState<number>(0);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogs, setShowLogs] = useState(false);
@@ -47,15 +48,30 @@ const RunDetail = () => {
 
         console.log("Retrieved basic run data:", runData);
         
-        // 2. Fetch processed results from the table
+        // 2. Get the total count of results for this run
+        const { count: totalCount, error: countError } = await supabase
+          .from('processed_results')
+          .select('*', { count: 'exact', head: true })
+          .eq('run_id', id);
+          
+        if (countError) {
+          console.error("Error counting results:", countError);
+          throw countError;
+        }
+        
+        // Set the total count
+        setTotalResultCount(totalCount || 0);
+        console.log(`Total result count: ${totalCount}`);
+        
+        // 3. Fetch processed results from the table (limited for performance)
         const processedResults = await fetchProcessedResults(id);
         console.log(`Fetched ${processedResults.length} processed results from database`);
         
-        // 3. Fetch logs from the table
+        // 4. Fetch logs from the table
         const processingLogs = await fetchProcessingLogs(id);
         console.log(`Fetched ${processingLogs.length} logs from database`);
         
-        // 4. Create a combined run object with all data
+        // 5. Create a combined run object with all data
         const runWithLogs: RunWithLogs = {
           ...runData,
           logs: processingLogs || []
@@ -133,7 +149,7 @@ const RunDetail = () => {
         onToggleLogs={toggleShowLogs}
       />
 
-      <RunInfoCard run={run} results={results} />
+      <RunInfoCard run={run} results={results} totalCount={totalResultCount} />
       
       <RunLogSection 
         logs={logs}
@@ -141,7 +157,7 @@ const RunDetail = () => {
         onClearLogs={clearLogs}
       />
 
-      <RunResultsSection results={results} totalCount={results.length} />
+      <RunResultsSection results={results} totalCount={totalResultCount} />
     </div>
   );
 };
