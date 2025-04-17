@@ -27,12 +27,19 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
   const [localIsRenaming, setLocalIsRenaming] = useState(false);
 
   const handleRename = async () => {
-    if (!runId || !saveName.trim()) return;
+    if (!runId || !saveName.trim()) {
+      toast({
+        title: "Ogiltigt namn",
+        description: "Körningen måste ha ett namn",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setLocalIsRenaming(true);
     try {
       console.log(`RunSettingsSection: Attempting to rename run ${runId} to "${saveName}"`);
-      // Use the repository function instead of direct Supabase call
+      
       const success = await updateRunName(runId, saveName.trim());
       
       if (!success) {
@@ -44,7 +51,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
         description: "Körningens namn har uppdaterats",
       });
       
-      // Call the parent's onRenameRun function to refresh data if needed
+      // Call the parent's onRenameRun function to refresh data
       onRenameRun();
     } catch (error: any) {
       console.error("Error renaming run:", error);

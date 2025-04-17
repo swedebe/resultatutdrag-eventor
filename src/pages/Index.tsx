@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -45,7 +46,10 @@ const Index = () => {
         .select('*')
         .order('date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching runs:", error);
+        throw error;
+      }
       console.log("Fetched runs:", data);
       return data || [];
     },
@@ -85,7 +89,7 @@ const Index = () => {
 
   const handleRunUpdate = () => {
     console.log("Run updated, refetching data...");
-    // Force a complete refetch by invalidating the query
+    // Force a complete refetch of the data
     refetchRuns();
   };
 

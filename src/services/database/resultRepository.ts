@@ -151,12 +151,11 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     // Clear any leading/trailing whitespace
     const trimmedName = newName.trim();
     
-    // Execute the update with explicit return using upsert to ensure the update happens
-    const { data, error } = await supabase
+    // Execute the update and check for success
+    const { error } = await supabase
       .from('runs')
       .update({ name: trimmedName })
-      .eq('id', runId)
-      .select();
+      .eq('id', runId);
       
     if (error) {
       console.error('Error updating run name:', error);
@@ -164,12 +163,24 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
       return false;
     }
     
-    // Verify the update succeeded
-    if (data && data.length > 0) {
-      console.log(`Run name successfully updated to "${data[0].name}"`);
+    // Verify the update was successful by fetching the updated record
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('runs')
+      .select('name')
+      .eq('id', runId)
+      .single();
+    
+    if (verifyError) {
+      console.error('Error verifying run name update:', verifyError);
+      return false;
+    }
+    
+    // Check if the name was actually updated
+    if (verifyData && verifyData.name === trimmedName) {
+      console.log(`Run name successfully updated to "${verifyData.name}"`);
       return true;
     } else {
-      console.error('Run name update failed: No rows returned');
+      console.error('Run name verification failed. Expected name not found after update.');
       return false;
     }
   } catch (err) {
