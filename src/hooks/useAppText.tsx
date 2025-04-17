@@ -63,11 +63,20 @@ export function useAppText(key: string, defaultValue: string = '') {
     fetchText();
   }, [key, defaultValue]);
 
-  // Function to replace USER with actual user name
+  // Function to replace placeholders like {0}, {1} etc. with actual values
   const processText = (text: string, userData?: { name?: string | null }) => {
+    if (!text) return '';
+    
+    // Replace {0} with user name if available
+    if (userData && userData.name && text.includes('{0}')) {
+      return text.replace(/\{0\}/g, userData.name);
+    }
+    
+    // Legacy support for USER placeholder
     if (userData && userData.name && text.includes('USER')) {
       return text.replace(/USER/g, userData.name);
     }
+    
     return text;
   };
 
@@ -143,12 +152,21 @@ export function useAllAppTexts() {
     fetchAllTexts();
   }, []);
 
-  // Function to replace USER with actual user name
+  // Function to replace placeholders like {0}, {1} etc. with actual values
   const processText = (key: string, userData?: { name?: string | null }) => {
     const text = texts[key] || '';
+    if (!text) return '';
+    
+    // Replace {0} with user name if available
+    if (userData && userData.name && text.includes('{0}')) {
+      return text.replace(/\{0\}/g, userData.name);
+    }
+    
+    // Legacy support for USER placeholder
     if (userData && userData.name && text.includes('USER')) {
       return text.replace(/USER/g, userData.name);
     }
+    
     return text;
   };
 
