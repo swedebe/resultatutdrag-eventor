@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -151,11 +150,15 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     // Clear any leading/trailing whitespace
     const trimmedName = newName.trim();
     
-    // Execute the update and check for success
-    const { error } = await supabase
+    // Execute the update with detailed logging
+    const { data, error } = await supabase
       .from('runs')
       .update({ name: trimmedName })
-      .eq('id', runId);
+      .eq('id', runId)
+      .select('name');
+    
+    // Log the complete response for troubleshooting
+    console.log('Update response:', { data, error });
       
     if (error) {
       console.error('Error updating run name:', error);
@@ -163,26 +166,21 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
       return false;
     }
     
-    // Verify the update was successful by fetching the updated record
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('runs')
-      .select('name')
-      .eq('id', runId)
-      .single();
-    
-    if (verifyError) {
-      console.error('Error verifying run name update:', verifyError);
+    // Verify update success by checking if data was returned
+    if (!data || data.length === 0) {
+      console.error('Run name update failed: No rows were updated');
       return false;
     }
     
-    // Check if the name was actually updated
-    if (verifyData && verifyData.name === trimmedName) {
-      console.log(`Run name successfully updated to "${verifyData.name}"`);
-      return true;
-    } else {
-      console.error('Run name verification failed. Expected name not found after update.');
+    // Further verify the name was updated correctly
+    const updatedName = data[0]?.name;
+    if (updatedName !== trimmedName) {
+      console.error(`Name verification failed: Expected "${trimmedName}", got "${updatedName}"`);
       return false;
     }
+    
+    console.log(`Run name successfully updated to "${updatedName}"`);
+    return true;
   } catch (err) {
     console.error('Error updating run name:', err);
     return false;

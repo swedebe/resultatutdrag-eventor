@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,14 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
 }) => {
   const { toast } = useToast();
   const [localIsRenaming, setLocalIsRenaming] = useState(false);
+  const [nameBeforeEdit, setNameBeforeEdit] = useState('');
+
+  // Store the original name to detect actual changes
+  useEffect(() => {
+    if (!localIsRenaming) {
+      setNameBeforeEdit(saveName);
+    }
+  }, [saveName, localIsRenaming]);
 
   const handleRename = async () => {
     if (!runId || !saveName.trim()) {
@@ -32,6 +40,15 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
         title: "Ogiltigt namn",
         description: "Körningen måste ha ett namn",
         variant: "destructive",
+      });
+      return;
+    }
+    
+    // Skip update if name hasn't changed
+    if (saveName.trim() === nameBeforeEdit.trim()) {
+      toast({
+        title: "Inget namnbyte behövs",
+        description: "Du använde samma namn som tidigare",
       });
       return;
     }

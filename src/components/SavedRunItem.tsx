@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -62,6 +61,78 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     fetchActualCount();
   }, [id, date]);
 
+  const handleView = () => {
+    navigate(`/run/${id}`);
+  };
+  
+  const startEditing = () => {
+    if (isExpired) {
+      toast({
+        title: "Kan inte ändra namn",
+        description: "Körningar äldre än två år kan inte namnändras",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsEditing(true);
+    setNewName(displayName);
+  };
+  
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setNewName(displayName);
+  };
+  
+  const saveNewName = async () => {
+    if (newName.trim() === "") {
+      toast({
+        title: "Ogiltigt namn",
+        description: "Namnet får inte vara tomt",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Skip update if name hasn't changed
+    if (newName.trim() === displayName.trim()) {
+      setIsEditing(false);
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
+      const success = await updateRunName(id, newName.trim());
+      
+      if (!success) {
+        throw new Error("Kunde inte uppdatera namnet");
+      }
+      
+      // Update local state
+      setDisplayName(newName.trim());
+      setIsEditing(false);
+      
+      toast({
+        title: "Namn uppdaterat",
+        description: "Körningens namn har uppdaterats",
+      });
+      
+      // Force refresh to ensure the changes are reflected in the UI
+      onDelete(); // This actually triggers a refetch in the parent
+    } catch (error: any) {
+      console.error("Error updating run name:", error);
+      toast({
+        title: "Fel vid namnbyte",
+        description: error.message || "Ett fel uppstod vid namnbyte av körningen",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const formattedDate = React.useMemo(() => {
     try {
       const dateObj = new Date(date);
@@ -105,72 +176,6 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       } finally {
         setIsDeleting(false);
       }
-    }
-  };
-
-  const handleView = () => {
-    navigate(`/run/${id}`);
-  };
-  
-  const startEditing = () => {
-    if (isExpired) {
-      toast({
-        title: "Kan inte ändra namn",
-        description: "Körningar äldre än två år kan inte namnändras",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsEditing(true);
-    setNewName(displayName);
-  };
-  
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setNewName(displayName);
-  };
-  
-  const saveNewName = async () => {
-    if (newName.trim() === "") {
-      toast({
-        title: "Ogiltigt namn",
-        description: "Namnet får inte vara tomt",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSaving(true);
-    
-    try {
-      console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
-      const success = await updateRunName(id, newName.trim());
-      
-      if (!success) {
-        throw new Error("Kunde inte uppdatera namnet");
-      }
-      
-      // Update local state
-      setDisplayName(newName.trim());
-      setIsEditing(false);
-      
-      toast({
-        title: "Namn uppdaterat",
-        description: "Körningens namn har uppdaterats",
-      });
-      
-      // Force refresh to ensure the changes are reflected in the UI
-      onDelete(); // This actually triggers a refetch in the parent
-    } catch (error: any) {
-      console.error("Error updating run name:", error);
-      toast({
-        title: "Fel vid namnbyte",
-        description: error.message || "Ett fel uppstod vid namnbyte av körningen",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
     }
   };
 
