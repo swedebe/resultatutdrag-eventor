@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { updateRunName } from "@/services/database/resultRepository";
 
 interface RunSettingsSectionProps {
   saveName: string;
@@ -31,12 +31,12 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     
     setLocalIsRenaming(true);
     try {
-      const { error } = await supabase
-        .from('runs')
-        .update({ name: saveName.trim() })
-        .eq('id', runId);
-        
-      if (error) throw error;
+      // Use the repository function instead of direct Supabase call
+      const success = await updateRunName(runId, saveName.trim());
+      
+      if (!success) {
+        throw new Error("Failed to update run name");
+      }
       
       toast({
         title: "Namn uppdaterat",

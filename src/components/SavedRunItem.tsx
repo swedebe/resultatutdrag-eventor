@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -9,6 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { sub } from "date-fns";
+import { updateRunName } from "@/services/database/resultRepository";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SavedRunItemProps {
   id: string;
@@ -27,6 +28,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [displayName, setDisplayName] = useState(name);
   const [actualEventCount, setActualEventCount] = useState(eventCount);
   const [isExpired, setIsExpired] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     // Update local state when props change (after a refetch)
@@ -139,26 +141,17 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       return;
     }
     
+    setIsSaving(true);
+    
     try {
-      console.log(`Updating run name for ID ${id} to: "${newName.trim()}"`);
+      // Use the repository function instead of direct Supabase call
+      const success = await updateRunName(id, newName.trim());
       
-      // Use an explicitly typed update operation
-      const { error, data } = await supabase
-        .from('runs')
-        .update({ name: newName.trim() })
-        .eq('id', id)
-        .select('name'); // Add this to confirm the update worked
-      
-      console.log("Database update response:", { error, data });
-      
-      if (error) throw error;
-      
-      // Verify the update was successful
-      if (data && data.length > 0) {
-        console.log("Updated name confirmed from database:", data[0].name);
+      if (!success) {
+        throw new Error("Kunde inte uppdatera namnet");
       }
       
-      // Update local state immediately
+      // Update local state
       setDisplayName(newName.trim());
       setIsEditing(false);
       
@@ -168,7 +161,7 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       });
       
       // Refresh the parent component's data
-      onDelete();
+      onDelete(); // This actually triggers a refetch in the parent
     } catch (error: any) {
       console.error("Error updating run name:", error);
       toast({
@@ -176,6 +169,8 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
         description: error.message || "Ett fel uppstod vid namnbyte av körningen",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -189,8 +184,16 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
             autoFocus
             className="flex-1"
           />
-          <Button variant="ghost" size="icon" onClick={saveNewName}>
-            <Check className="h-4 w-4 text-green-600" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={saveNewName} 
+            disabled={isSaving}
+          >
+            {isSaving ? 
+              <span className="animate-spin">•</span> : 
+              <Check className="h-4 w-4 text-green-600" />
+            }
           </Button>
           <Button variant="ghost" size="icon" onClick={cancelEditing}>
             <X className="h-4 w-4 text-red-600" />

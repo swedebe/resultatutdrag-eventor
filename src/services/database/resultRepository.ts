@@ -139,17 +139,37 @@ export const saveLogToDatabase = async (
  */
 export const updateRunName = async (runId: string, newName: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
+    console.log(`Repository: Updating run ${runId} name to "${newName}"`);
+    
+    // Make sure we have a valid input
+    if (!runId || !newName.trim()) {
+      console.error('Invalid input: runId or name is empty');
+      return false;
+    }
+    
+    // Clear any leading/trailing whitespace
+    const trimmedName = newName.trim();
+    
+    // Execute the update with explicit return
+    const { data, error } = await supabase
       .from('runs')
-      .update({ name: newName.trim() })
-      .eq('id', runId);
+      .update({ name: trimmedName })
+      .eq('id', runId)
+      .select('name');
       
     if (error) {
       console.error('Error updating run name:', error);
       return false;
     }
     
-    return true;
+    // Verify the update succeeded
+    if (data && data.length > 0) {
+      console.log(`Run name successfully updated to "${data[0].name}"`);
+      return true;
+    } else {
+      console.error('Run name update failed: No rows returned');
+      return false;
+    }
   } catch (err) {
     console.error('Error updating run name:', err);
     return false;
