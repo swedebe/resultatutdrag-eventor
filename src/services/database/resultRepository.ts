@@ -135,6 +135,46 @@ export const saveLogToDatabase = async (
 };
 
 /**
+ * SQL Debug Object interface for enhanced debugging
+ */
+interface SqlDebugObject {
+  target: string;
+  table: string;
+  operation: string;
+  fields: { [key: string]: any };
+  conditions: { field: string; operator: string; value: string }[];
+  sql_representation: string;
+  rest_api_representation: string;
+  parameters: { [key: string]: any };
+  pre_verification?: {
+    runExists: boolean;
+    userMatches?: boolean;
+    currentName?: string;
+    error?: any;
+  };
+  response?: {
+    status: number;
+    statusText: string;
+    count: number | null;
+    error: any | null;
+    data: any;
+    executionTime: string;
+    timestamp: string;
+  };
+  post_verification?: {
+    runExists: boolean;
+    userMatches?: boolean;
+    totalRunsWithId?: number;
+    error?: any;
+  };
+  name_verification?: {
+    expected: string;
+    actual: string;
+    success: boolean;
+  };
+}
+
+/**
  * Function to update a run's name, with enhanced debugging and validation
  */
 export const updateRunName = async (runId: string, newName: string): Promise<{ 
@@ -143,7 +183,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
   error?: any; 
   message?: string;
   debug?: any;
-  sql_debug?: any; // Added dedicated SQL debug information
+  sql_debug?: SqlDebugObject; // Updated to use the interface
 }> => {
   try {
     console.log(`==== UPDATE RUN NAME DEBUG LOG ====`);
@@ -218,7 +258,7 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
     console.log('=== END SUPER DETAILED QUERY DEBUG ===');
     
     // Create dedicated SQL debug object that will be returned for display in debug panel
-    const sqlDebugObject = {
+    const sqlDebugObject: SqlDebugObject = {
       target: 'PostgreSQL via Supabase',
       table: 'runs',
       operation: 'UPDATE',
@@ -445,7 +485,7 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
       sql_debug: {
         error: err.message,
         stack: err.stack
-      }
+      } as any // Type assertion to avoid type errors
     };
   }
 };
