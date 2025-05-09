@@ -10,7 +10,7 @@ export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
 
 // Define the batch options type
-interface BatchProcessingOptions {
+export interface BatchProcessingOptions {
   fetchCourseLength: boolean;
   fetchStarters: boolean;
   courseLengthDelay: number;
