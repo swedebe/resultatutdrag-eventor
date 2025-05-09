@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -36,16 +37,25 @@ const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         {isSaving ? "Sparar..." : "Slutför"}
       </Button>
       
-      <Button 
-        variant="outline"
-        disabled={isProcessing}
-        asChild
-      >
-        <Link to="/">
+      {isProcessing ? (
+        <Button 
+          variant="outline" 
+          disabled={true}
+        >
           <Home className="mr-2 h-4 w-4" />
           Tillbaka till startsidan
-        </Link>
-      </Button>
+        </Button>
+      ) : (
+        <Button 
+          variant="outline"
+          asChild
+        >
+          <Link to="/">
+            <Home className="mr-2 h-4 w-4" />
+            Tillbaka till startsidan
+          </Link>
+        </Button>
+      )}
       
       <Button 
         onClick={onExportResults}
