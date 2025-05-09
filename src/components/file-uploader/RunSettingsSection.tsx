@@ -29,6 +29,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
   const { toast } = useToast();
   const [localIsRenaming, setLocalIsRenaming] = useState(false);
   const [nameBeforeEdit, setNameBeforeEdit] = useState('');
+  const [currentDbName, setCurrentDbName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -53,12 +54,44 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     checkUserRole();
   }, []);
 
-  // Store the original name to detect actual changes
+  // Get the current name from the database directly to avoid stale state
   useEffect(() => {
-    if (!localIsRenaming) {
-      setNameBeforeEdit(saveName);
+    if (runId) {
+      const fetchCurrentName = async () => {
+        const { data, error } = await supabase
+          .from('runs')
+          .select('name')
+          .eq('id', runId)
+          .single();
+          
+        if (!error && data) {
+          setCurrentDbName(data.name);
+          setNameBeforeEdit(data.name); // Initialize with fresh DB value
+          
+          setDebugInfo(prev => ({
+            ...prev,
+            dbNameFetch: {
+              success: true,
+              fetchedName: data.name,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        } else {
+          console.error("Error fetching run name:", error);
+          setDebugInfo(prev => ({
+            ...prev,
+            dbNameFetch: {
+              success: false,
+              error,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }
+      };
+      
+      fetchCurrentName();
     }
-  }, [saveName, localIsRenaming]);
+  }, [runId]);
 
   // Debug: Log current user and run ID to help diagnose permissions issues
   useEffect(() => {
@@ -95,6 +128,9 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
             currentRunName: data?.name,
             hasAccess
           }));
+          
+          // Update local state with fresh database value
+          setCurrentDbName(data?.name || '');
         }
       }
     };
@@ -112,6 +148,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     setDebugInfo(prev => ({
       ...prev,
       requestPayload,
+      currentDbName,
       nameBeforeEdit,
       attemptedNewName: saveName.trim(),
       timestamp: new Date().toISOString()
@@ -132,8 +169,8 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       return;
     }
     
-    // Skip update if name hasn't changed
-    if (saveName.trim() === nameBeforeEdit.trim()) {
+    // FIXED: Compare with current DB name instead of local state
+    if (saveName.trim() === currentDbName.trim()) {
       const message = "Du använde samma namn som tidigare";
       toast({
         title: "Inget namnbyte behövs",
@@ -143,6 +180,11 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       setDebugInfo(prev => ({
         ...prev,
         skippedReason: message,
+        comparisonValues: {
+          saveName: saveName.trim(),
+          currentDbName: currentDbName.trim(),
+          areEqual: saveName.trim() === currentDbName.trim()
+        }
       }));
       return;
     }
@@ -174,8 +216,8 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
         description: "Körningens namn har uppdaterats",
       });
       
-      // Set the new name as the "original" name to prevent duplicate updates
-      setNameBeforeEdit(saveName.trim());
+      // Update our tracking of the DB value
+      setCurrentDbName(saveName.trim());
       
       // Call the parent's onRenameRun function to refresh data
       onRenameRun();
@@ -262,9 +304,9 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-amber-800">Original Name</Label>
+                    <Label className="text-xs text-amber-800">Current DB Name</Label>
                     <Input 
-                      value={nameBeforeEdit || 'N/A'} 
+                      value={currentDbName || 'N/A'} 
                       readOnly 
                       className="bg-white text-sm h-8" 
                     />
