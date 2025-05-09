@@ -183,27 +183,71 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     console.log('Query parameters:', JSON.stringify(debugParams, null, 2));
     console.log(`SQL equivalent: UPDATE runs SET name = '${trimmedName}' WHERE id = '${runId}' AND user_id = '${user.id}' RETURNING *`);
     
-    // Execute the update with explicit .select() to return the updated data
-    const { data, error } = await supabase
+    // Before executing update, verify the run exists and belongs to this user
+    console.log('--- PRE-VERIFICATION CHECK ---');
+    const { data: runCheck, error: runCheckError } = await supabase
+      .from('runs')
+      .select('id, name, user_id')
+      .eq('id', runId)
+      .maybeSingle();
+      
+    if (runCheckError) {
+      console.error('Error during run verification:', runCheckError);
+      console.log('--- END PRE-VERIFICATION CHECK ---');
+    } else {
+      console.log('Pre-check result:', {
+        runExists: !!runCheck,
+        runData: runCheck,
+        userMatches: runCheck?.user_id === user.id,
+        currentName: runCheck?.name
+      });
+      console.log('--- END PRE-VERIFICATION CHECK ---');
+    }
+    
+    // Create a prepared query object but don't execute it yet
+    const query = supabase
       .from('runs')
       .update({ name: trimmedName })
       .eq('id', runId)
       .eq('user_id', user.id) // Ensure the user owns this run
       .select();
     
+    // Log the query details - this is as close as we can get to seeing the raw SQL with the Supabase JS client
+    console.log('--- PREPARED QUERY DETAILS ---');
+    console.log('Table: runs');
+    console.log('Operation: UPDATE');
+    console.log('Update payload:', { name: trimmedName });
+    console.log('Filter conditions:', [
+      { column: 'id', operator: 'eq', value: runId },
+      { column: 'user_id', operator: 'eq', value: user.id }
+    ]);
+    console.log('Return data: Yes (using .select())');
+    console.log('RESTful API approximation:', `PATCH /rest/v1/runs?id=eq.${runId}&user_id=eq.${user.id}`);
+    console.log('Request body approximation:', JSON.stringify({ name: trimmedName }));
+    console.log('--- END PREPARED QUERY DETAILS ---');
+    
+    // Now execute the query
+    console.log('--- EXECUTING QUERY ---');
+    const startTime = performance.now();
+    const { data, error, status, statusText, count } = await query;
+    const endTime = performance.now();
+    console.log(`Query execution time: ${(endTime - startTime).toFixed(2)}ms`);
+    
     // Log the complete response for troubleshooting
-    console.log('Supabase update response:', { 
-      error: error ? {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      } : null,
-      data: data,
-      hasData: !!data,
-      dataLength: data?.length || 0,
-      dataContent: data ? JSON.stringify(data) : 'null'
-    });
+    console.log('--- COMPLETE SUPABASE RESPONSE ---');
+    console.log('Status:', status);
+    console.log('Status Text:', statusText);
+    console.log('Count:', count);
+    console.log('Error:', error ? {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    } : null);
+    console.log('Data:', data ? JSON.stringify(data) : 'null');
+    console.log('Has data:', !!data);
+    console.log('Data length:', data?.length || 0);
+    console.log('--- END COMPLETE SUPABASE RESPONSE ---');
       
     if (error) {
       console.error('Error updating run name:', error);
@@ -220,7 +264,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       console.error(`No rows updated for run ID ${runId}`);
       
       // Double check if the run exists and belongs to this user
-      console.log(`Verifying run existence and ownership...`);
+      console.log(`--- VERIFICATION AFTER FAILED UPDATE ---`);
       const { data: runData, error: runError } = await supabase
         .from('runs')
         .select('*')
@@ -239,6 +283,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
         runData: runData,
         error: runError || countError
       });
+      console.log(`--- END VERIFICATION AFTER FAILED UPDATE ---`);
       
       return {
         success: false,
