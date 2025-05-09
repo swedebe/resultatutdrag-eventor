@@ -1,3 +1,4 @@
+
 /**
  * Database operations for results
  */
@@ -142,8 +143,10 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
   data?: any; 
   error?: any; 
   message?: string;
+  debug?: any;
 }> => {
   try {
+    console.log(`==== UPDATE RUN NAME DEBUG LOG ====`);
     console.log(`Repository: Updating run ${runId} name to "${newName}"`);
     
     // Make sure we have a valid input
@@ -171,8 +174,14 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     }
     
     // Debug information
-    console.log(`User ID performing update: ${user.id}`);
-    console.log(`Attempting to update run with ID: ${runId} to name: "${trimmedName}"`);
+    const debugParams = {
+      runId,
+      newName: trimmedName,
+      userId: user.id,
+      timestamp: new Date().toISOString()
+    };
+    console.log('Query parameters:', JSON.stringify(debugParams, null, 2));
+    console.log(`SQL equivalent: UPDATE runs SET name = '${trimmedName}' WHERE id = '${runId}' AND user_id = '${user.id}' RETURNING *`);
     
     // Execute the update with explicit .select() to return the updated data
     const { data, error } = await supabase
@@ -184,10 +193,16 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     
     // Log the complete response for troubleshooting
     console.log('Supabase update response:', { 
-      data, 
-      error, 
+      error: error ? {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      } : null,
+      data: data,
+      hasData: !!data,
       dataLength: data?.length || 0,
-      errorMessage: error?.message
+      dataContent: data ? JSON.stringify(data) : 'null'
     });
       
     if (error) {
@@ -195,7 +210,8 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       return {
         success: false,
         message: `Databasfel: ${error.message || 'Okänt fel'}`,
-        error: error
+        error: error,
+        debug: debugParams
       };
     }
     
@@ -203,51 +219,80 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     if (!data || data.length === 0) {
       console.error(`No rows updated for run ID ${runId}`);
       
-      // Verify if the run exists and belongs to this user
+      // Double check if the run exists and belongs to this user
+      console.log(`Verifying run existence and ownership...`);
+      const { data: runData, error: runError } = await supabase
+        .from('runs')
+        .select('*')
+        .eq('id', runId)
+        .maybeSingle();
+        
       const { count, error: countError } = await supabase
         .from('runs')
         .select('*', { count: 'exact', head: true })
-        .eq('id', runId)
-        .eq('user_id', user.id);
+        .eq('id', runId);
         
-      if (countError) {
-        console.error('Error checking run existence:', countError);
-      } else {
-        console.log(`Found ${count} matching rows for run ID ${runId} and user ID ${user.id}`);
-      }
+      console.log('Run existence check:', {
+        runExists: !!runData,
+        runBelongsToUser: runData?.user_id === user.id,
+        totalRunsWithId: count,
+        runData: runData,
+        error: runError || countError
+      });
       
       return {
         success: false,
-        message: count === 0 ? 
-          'Körningen hittades inte eller tillhör inte dig' : 
+        message: !runData ? 
+          'Körningen hittades inte' : 
+          runData.user_id !== user.id ?
+          'Du har inte behörighet att ändra denna körning' :
           'Namnbyte misslyckades: Inga rader uppdaterades',
-        data: data
+        data: data,
+        debug: {
+          ...debugParams,
+          verificationResult: {
+            runExists: !!runData,
+            runData: runData,
+            userMatches: runData?.user_id === user.id
+          }
+        }
       };
     }
     
     // Verify that the name was actually updated
     const updatedName = data[0]?.name;
+    console.log(`Name update verification: Expected "${trimmedName}", got "${updatedName}"`);
     if (updatedName !== trimmedName) {
-      console.error(`Name verification failed: Expected "${trimmedName}", got "${updatedName}"`);
+      console.error(`Name verification failed`);
       return {
         success: false,
         message: `Verifiering misslyckades: Förväntade "${trimmedName}", fick "${updatedName}"`,
-        data: data
+        data: data,
+        debug: debugParams
       };
     }
     
-    console.log(`Run name successfully updated to "${updatedName}"`);
+    console.log(`Run name successfully updated to "${updatedName}" (${data.length} rows affected)`);
+    console.log(`==== END UPDATE RUN NAME DEBUG LOG ====`);
+    
     return {
       success: true,
       message: 'Namnbyte genomfört',
-      data: data
+      data: data,
+      debug: debugParams
     };
   } catch (err: any) {
     console.error('Exception in updateRunName:', err);
     return {
       success: false,
       message: `Ett oväntat fel uppstod: ${err.message || 'Okänt fel'}`,
-      error: err
+      error: err,
+      debug: {
+        runId,
+        newName,
+        errorStack: err.stack,
+        errorMessage: err.message
+      }
     };
   }
 };
