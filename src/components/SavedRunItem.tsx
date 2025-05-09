@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,6 +8,7 @@ import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { sub } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { updateRunName } from "@/services/database/resultRepository";
 
 interface SavedRunItemProps {
   id: string;
@@ -110,33 +110,18 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     try {
       console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
       
-      // Use direct Supabase update for better debug information
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use the repository function which has better error handling and debugging
+      const updateResponse = await updateRunName(id, newName.trim());
       
-      if (!user) {
-        throw new Error("Du måste vara inloggad för att byta namn");
+      console.log("Update response:", updateResponse);
+      
+      if (!updateResponse.success) {
+        throw new Error(updateResponse.message || "Namnbyte misslyckades");
       }
       
-      // Direct update with proper response handling
-      const { data, error } = await supabase
-        .from('runs')
-        .update({ name: newName.trim() })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select();
-        
-      console.log("Update response:", { data, error, dataLength: data?.length || 0 });
-        
-      if (error) {
-        throw new Error(error.message || "Kunde inte uppdatera namnet");
-      }
-      
-      if (!data || data.length === 0) {
-        throw new Error("Namnbyte misslyckades: Inga rader uppdaterades");
-      }
-      
-      // Update local state
-      setDisplayName(newName.trim());
+      // Update local state with the new name from the response
+      const updatedName = updateResponse.data[0]?.name || newName.trim();
+      setDisplayName(updatedName);
       setIsEditing(false);
       
       toast({

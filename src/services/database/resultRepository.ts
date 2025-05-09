@@ -1,3 +1,4 @@
+
 /**
  * Database operations for results
  */
@@ -209,7 +210,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       .update({ name: trimmedName })
       .eq('id', runId)
       .eq('user_id', user.id) // Explicitly check user_id to ensure ownership
-      .select();
+      .select(); // CRITICAL: Add .select() to return the updated row
     
     // Log the complete response for troubleshooting
     console.log('Supabase update complete. Response:', { 
