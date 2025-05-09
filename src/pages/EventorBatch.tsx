@@ -29,8 +29,8 @@ const EventorBatch = () => {
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [jobId, setJobId] = useState<string | null>(null);
   
-  // New states for batch processing options
-  const [fetchCourseLength, setFetchCourseLength] = useState<boolean>(true);
+  // New states for batch processing options - updated default for fetchCourseLength to false
+  const [fetchCourseLength, setFetchCourseLength] = useState<boolean>(false);
   const [fetchStarters, setFetchStarters] = useState<boolean>(true);
   const [courseLengthDelay, setCourseLengthDelay] = useState<number>(15.00);
   const [startersDelay, setStartersDelay] = useState<number>(1.00);
@@ -490,30 +490,6 @@ const EventorBatch = () => {
             </div>
             
             <div className="space-y-4 mt-2">
-              <div className="flex gap-3 items-center">
-                <Label htmlFor="delay-input">
-                  Standardfördröjning mellan anrop (sekunder):
-                </Label>
-                <Input 
-                  id="delay-input"
-                  type="number" 
-                  min="0"
-                  step="0.1"
-                  value={delay} 
-                  onChange={(e) => {
-                    const newDelay = parseFloat(e.target.value) || 0;
-                    if (newDelay >= 0) {
-                      setDelay(newDelay);
-                    }
-                  }}
-                  className="w-20"
-                  disabled={isProcessing}
-                />
-                <div className="text-xs text-muted-foreground">
-                  (Högre värde förhindrar rate-limiting från Eventor)
-                </div>
-              </div>
-              
               <div className="space-y-2 border p-4 rounded-md">
                 <h3 className="text-lg font-medium">Bearbetningsalternativ</h3>
                 
@@ -546,6 +522,9 @@ const EventorBatch = () => {
                       disabled={isProcessing || !fetchCourseLength}
                     />
                     <span className="text-sm">sekunder</span>
+                    <div className="text-xs text-muted-foreground">
+                      (Högre värde förhindrar rate-limiting från Eventor)
+                    </div>
                   </div>
                 </div>
                 
@@ -578,6 +557,9 @@ const EventorBatch = () => {
                       disabled={isProcessing || !fetchStarters}
                     />
                     <span className="text-sm">sekunder</span>
+                    <div className="text-xs text-muted-foreground">
+                      (Högre värde förhindrar rate-limiting från Eventor)
+                    </div>
                   </div>
                 </div>
               </div>
