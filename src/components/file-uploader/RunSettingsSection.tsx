@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { isUserSuperuser } from "@/types/user";
+import { updateRunName } from "@/services/database/resultRepository";
 
 interface RunSettingsSectionProps {
   saveName: string;
@@ -194,54 +194,18 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     try {
       console.log(`RunSettingsSection: Attempting to rename run ${runId} to "${saveName}"`);
       
-      // Get current user ID for debugging
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log(`User ID attempting update: ${user?.id}`);
+      // Use the repository function which has enhanced error handling and logging
+      const updateResponse = await updateRunName(runId, saveName.trim());
       
-      // Direct Supabase update with proper response handling
-      const { data, error } = await supabase
-        .from('runs')
-        .update({ name: saveName.trim() })
-        .eq('id', runId)
-        .eq('user_id', user?.id || '') // Add explicit user check
-        .select();
-      
-      // Log the complete response
-      const responseDetails = {
-        data, 
-        error,
-        dataLength: data?.length || 0,
-        hasData: data && data.length > 0,
-        userIdAttemptingUpdate: user?.id
-      };
+      console.log("Update response:", updateResponse);
       
       setDebugInfo(prev => ({
         ...prev,
-        supabaseDirectResponse: responseDetails
+        updateResponse
       }));
       
-      if (error) {
-        throw new Error(error.message || "Kunde inte uppdatera namnet");
-      }
-      
-      if (!data || data.length === 0) {
-        // Perform additional check to verify run existence and permissions
-        const { data: runCheck } = await supabase
-          .from('runs')
-          .select('id, user_id, name')
-          .eq('id', runId)
-          .single();
-          
-        setDebugInfo(prev => ({
-          ...prev,
-          additionalCheck: {
-            runExists: !!runCheck,
-            runDetails: runCheck,
-            userMatches: runCheck?.user_id === user?.id
-          }
-        }));
-        
-        throw new Error("Namnbyte misslyckades: Inga rader uppdaterades");
+      if (!updateResponse.success) {
+        throw new Error(updateResponse.message || "Kunde inte uppdatera namnet");
       }
       
       // Update our tracking of the DB value
@@ -259,7 +223,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
         ...prev,
         success: true,
         successMessage: "Namn uppdaterat framgångsrikt",
-        updatedData: data
+        updatedData: updateResponse.data
       }));
     } catch (error: any) {
       console.error("Error renaming run:", error);
