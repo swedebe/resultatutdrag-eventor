@@ -173,15 +173,48 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       };
     }
     
-    // Debug information
+    // ==== ENHANCED DEBUGGING ====
+    // Print the full details about what will be sent to the database
     const debugParams = {
       runId,
       newName: trimmedName,
       userId: user.id,
       timestamp: new Date().toISOString()
     };
-    console.log('Query parameters:', JSON.stringify(debugParams, null, 2));
-    console.log(`SQL equivalent: UPDATE runs SET name = '${trimmedName}' WHERE id = '${runId}' AND user_id = '${user.id}' RETURNING *`);
+    
+    console.log('=== SUPER DETAILED QUERY DEBUG ===');
+    console.log('DATABASE TARGET: Supabase PostgreSQL');
+    console.log('TABLE: runs');
+    console.log('OPERATION: UPDATE');
+    console.log('UPDATE FIELDS:', { name: trimmedName });
+    console.log('WHERE CONDITIONS:', [
+      { field: 'id', operator: '=', value: runId, valueType: typeof runId },
+      { field: 'user_id', operator: '=', value: user.id, valueType: typeof user.id }
+    ]);
+    console.log('RETURNING: * (all fields)');
+    
+    // Generate a representation of what the SQL would look like
+    const sqlRepresentation = `
+-- SQL EQUIVALENT (not the actual query sent by Supabase):
+UPDATE runs
+SET name = '${trimmedName.replace(/'/g, "''")}'  -- Note: Single quotes escaped in SQL
+WHERE id = '${runId}' 
+AND user_id = '${user.id}'
+RETURNING *;
+    `;
+    console.log(sqlRepresentation);
+    
+    // Generate a representation of what the REST API call would look like
+    console.log(`
+-- REST API EQUIVALENT (Supabase uses PostgREST under the hood):
+PATCH /rest/v1/runs?id=eq.${encodeURIComponent(runId)}&user_id=eq.${encodeURIComponent(user.id)}
+Headers:
+  Content-Type: application/json
+  Authorization: Bearer [JWT token]
+Body:
+${JSON.stringify({ name: trimmedName }, null, 2)}
+    `);
+    console.log('=== END SUPER DETAILED QUERY DEBUG ===');
     
     // Before executing update, verify the run exists and belongs to this user
     console.log('--- PRE-VERIFICATION CHECK ---');
