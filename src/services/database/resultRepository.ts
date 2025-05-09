@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -144,6 +143,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
   error?: any; 
   message?: string;
   debug?: any;
+  sql_debug?: any; // Added dedicated SQL debug information
 }> => {
   try {
     console.log(`==== UPDATE RUN NAME DEBUG LOG ====`);
@@ -205,7 +205,7 @@ RETURNING *;
     console.log(sqlRepresentation);
     
     // Generate a representation of what the REST API call would look like
-    console.log(`
+    const restApiRepresentation = `
 -- REST API EQUIVALENT (Supabase uses PostgREST under the hood):
 PATCH /rest/v1/runs?id=eq.${encodeURIComponent(runId)}&user_id=eq.${encodeURIComponent(user.id)}
 Headers:
@@ -213,8 +213,28 @@ Headers:
   Authorization: Bearer [JWT token]
 Body:
 ${JSON.stringify({ name: trimmedName }, null, 2)}
-    `);
+    `;
+    console.log(restApiRepresentation);
     console.log('=== END SUPER DETAILED QUERY DEBUG ===');
+    
+    // Create dedicated SQL debug object that will be returned for display in debug panel
+    const sqlDebugObject = {
+      target: 'PostgreSQL via Supabase',
+      table: 'runs',
+      operation: 'UPDATE',
+      fields: { name: trimmedName },
+      conditions: [
+        { field: 'id', operator: '=', value: runId },
+        { field: 'user_id', operator: '=', value: user.id }
+      ],
+      sql_representation: sqlRepresentation.trim(),
+      rest_api_representation: restApiRepresentation.trim(),
+      parameters: {
+        runId,
+        newName: trimmedName,
+        userId: user.id
+      }
+    };
     
     // Before executing update, verify the run exists and belongs to this user
     console.log('--- PRE-VERIFICATION CHECK ---');
@@ -236,6 +256,14 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
       });
       console.log('--- END PRE-VERIFICATION CHECK ---');
     }
+    
+    // Update sqlDebugObject with pre-verification results
+    sqlDebugObject.pre_verification = {
+      runExists: !!runCheck,
+      userMatches: runCheck?.user_id === user.id,
+      currentName: runCheck?.name,
+      error: runCheckError
+    };
     
     // Create a prepared query object but don't execute it yet
     const query = supabase
@@ -282,13 +310,30 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
     console.log('Data length:', data?.length || 0);
     console.log('--- END COMPLETE SUPABASE RESPONSE ---');
       
+    // Update sqlDebugObject with response details
+    sqlDebugObject.response = {
+      status,
+      statusText,
+      count,
+      error: error ? {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      } : null,
+      data: data,
+      executionTime: `${(endTime - startTime).toFixed(2)}ms`,
+      timestamp: new Date().toISOString()
+    };
+      
     if (error) {
       console.error('Error updating run name:', error);
       return {
         success: false,
         message: `Databasfel: ${error.message || 'Okänt fel'}`,
         error: error,
-        debug: debugParams
+        debug: debugParams,
+        sql_debug: sqlDebugObject
       };
     }
     
@@ -318,6 +363,14 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
       });
       console.log(`--- END VERIFICATION AFTER FAILED UPDATE ---`);
       
+      // Update sqlDebugObject with post-verification results
+      sqlDebugObject.post_verification = {
+        runExists: !!runData,
+        userMatches: runData?.user_id === user.id,
+        totalRunsWithId: count,
+        error: runError || countError
+      };
+      
       return {
         success: false,
         message: !runData ? 
@@ -333,7 +386,8 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
             runData: runData,
             userMatches: runData?.user_id === user.id
           }
-        }
+        },
+        sql_debug: sqlDebugObject
       };
     }
     
@@ -342,13 +396,29 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
     console.log(`Name update verification: Expected "${trimmedName}", got "${updatedName}"`);
     if (updatedName !== trimmedName) {
       console.error(`Name verification failed`);
+      
+      // Update sqlDebugObject with verification results
+      sqlDebugObject.name_verification = {
+        expected: trimmedName,
+        actual: updatedName,
+        success: false
+      };
+      
       return {
         success: false,
         message: `Verifiering misslyckades: Förväntade "${trimmedName}", fick "${updatedName}"`,
         data: data,
-        debug: debugParams
+        debug: debugParams,
+        sql_debug: sqlDebugObject
       };
     }
+    
+    // Update sqlDebugObject with successful verification
+    sqlDebugObject.name_verification = {
+      expected: trimmedName,
+      actual: updatedName,
+      success: true
+    };
     
     console.log(`Run name successfully updated to "${updatedName}" (${data.length} rows affected)`);
     console.log(`==== END UPDATE RUN NAME DEBUG LOG ====`);
@@ -357,7 +427,8 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
       success: true,
       message: 'Namnbyte genomfört',
       data: data,
-      debug: debugParams
+      debug: debugParams,
+      sql_debug: sqlDebugObject
     };
   } catch (err: any) {
     console.error('Exception in updateRunName:', err);
@@ -370,6 +441,10 @@ ${JSON.stringify({ name: trimmedName }, null, 2)}
         newName,
         errorStack: err.stack,
         errorMessage: err.message
+      },
+      sql_debug: {
+        error: err.message,
+        stack: err.stack
       }
     };
   }

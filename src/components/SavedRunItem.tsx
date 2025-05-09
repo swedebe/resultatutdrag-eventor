@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { sv } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
-import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
+import { Trash2, Eye, Pencil, Check, X, Bug } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { sub } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { updateRunName } from "@/services/database/resultRepository";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface SavedRunItemProps {
   id: string;
@@ -29,6 +31,8 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
   const [isExpired, setIsExpired] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showDebugDialog, setShowDebugDialog] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
 
   useEffect(() => {
     // Update local state when props change (after a refetch)
@@ -115,6 +119,9 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
       
       console.log("Update response:", updateResponse);
       
+      // Store debug data for the debug panel
+      setDebugData(updateResponse.sql_debug || updateResponse.debug || updateResponse);
+      
       if (!updateResponse.success) {
         throw new Error(updateResponse.message || "Namnbyte misslyckades");
       }
@@ -190,6 +197,99 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     }
   };
 
+  // Function to render debug information in a readable format
+  const renderDebugInfo = () => {
+    if (!debugData) return <p>Ingen debuginformation tillgänglig</p>;
+    
+    return (
+      <div className="text-sm overflow-auto max-h-[70vh]">
+        <h3 className="font-bold text-lg mb-2">Debug SQL Query</h3>
+        
+        {debugData.sql_representation && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">SQL Representation:</h4>
+            <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{debugData.sql_representation}</pre>
+          </div>
+        )}
+        
+        {debugData.rest_api_representation && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">REST API Call:</h4>
+            <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{debugData.rest_api_representation}</pre>
+          </div>
+        )}
+        
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <h4 className="font-bold mb-1">Operation:</h4>
+            <p>{debugData.operation || "UPDATE"} on table {debugData.table || "runs"}</p>
+          </div>
+          <div>
+            <h4 className="font-bold mb-1">Fields Being Updated:</h4>
+            <pre className="bg-gray-100 p-2 rounded">{JSON.stringify(debugData.fields || {name: newName.trim()}, null, 2)}</pre>
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          <h4 className="font-bold mb-1">Parameters:</h4>
+          <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(debugData.parameters || {
+            runId: id,
+            newName: newName.trim(),
+            userId: "current-user"
+          }, null, 2)}</pre>
+        </div>
+        
+        {debugData.response && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">Response:</h4>
+            <div className="bg-gray-100 p-3 rounded overflow-x-auto">
+              <p><strong>Status:</strong> {debugData.response.status} {debugData.response.statusText}</p>
+              <p><strong>Count:</strong> {debugData.response.count}</p>
+              <p><strong>Execution Time:</strong> {debugData.response.executionTime}</p>
+              {debugData.response.error && (
+                <div className="mt-2">
+                  <p className="text-red-500"><strong>Error:</strong></p>
+                  <pre className="text-red-500">{JSON.stringify(debugData.response.error, null, 2)}</pre>
+                </div>
+              )}
+              {debugData.response.data && (
+                <div className="mt-2">
+                  <p><strong>Data:</strong></p>
+                  <pre>{JSON.stringify(debugData.response.data, null, 2)}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {debugData.pre_verification && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">Pre-verification Check:</h4>
+            <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(debugData.pre_verification, null, 2)}</pre>
+          </div>
+        )}
+        
+        {debugData.post_verification && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">Post-verification Check:</h4>
+            <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(debugData.post_verification, null, 2)}</pre>
+          </div>
+        )}
+        
+        {debugData.name_verification && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-1">Name Verification:</h4>
+            <pre className="bg-gray-100 p-3 rounded overflow-x-auto">{JSON.stringify(debugData.name_verification, null, 2)}</pre>
+          </div>
+        )}
+        
+        <div className="mt-4 text-xs text-gray-500">
+          <p>Debugging timestamp: {new Date().toISOString()}</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`flex items-center justify-between p-4 border rounded-lg ${isExpired ? 'bg-red-50' : 'bg-card'}`}>
       {isEditing ? (
@@ -240,12 +340,30 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
                 </Button>
               </>
             )}
+            {debugData && (
+              <Button variant="outline" size="icon" onClick={() => setShowDebugDialog(true)} title="Visa debug info">
+                <Bug className="h-4 w-4 text-blue-600" />
+              </Button>
+            )}
             <Button variant="outline" size="icon" onClick={handleDelete} disabled={isDeleting} title="Ta bort">
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </>
         )}
       </div>
+
+      {/* Debug Dialog */}
+      <Dialog open={showDebugDialog} onOpenChange={setShowDebugDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>SQL Debug Information</DialogTitle>
+            <DialogDescription>
+              Detaljerad information om SQL-frågan och dess resultat
+            </DialogDescription>
+          </DialogHeader>
+          {renderDebugInfo()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
