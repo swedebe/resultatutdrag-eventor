@@ -193,6 +193,10 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
     try {
       console.log(`RunSettingsSection: Attempting to rename run ${runId} to "${saveName}"`);
       
+      // Get current user ID for debugging
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log(`User ID attempting update: ${user?.id}`);
+      
       // Call the updateRunName function with proper error handling
       const result = await updateRunName(runId, saveName.trim());
       
@@ -201,10 +205,30 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       
       setDebugInfo(prev => ({
         ...prev,
-        supabaseResponse: { success, data, error, message },
+        supabaseResponse: result,
         dataLength: data?.length || 0,
-        hasData: data && data.length > 0
+        hasData: data && data.length > 0,
+        userIdAttemptingUpdate: user?.id
       }));
+      
+      // If update failed, check if the run exists with our criteria
+      if (!success && error?.type === 'updateFailed') {
+        // Perform additional check to verify run existence and permissions
+        const { data: runCheck } = await supabase
+          .from('runs')
+          .select('id, user_id, name')
+          .eq('id', runId)
+          .single();
+          
+        setDebugInfo(prev => ({
+          ...prev,
+          additionalCheck: {
+            runExists: !!runCheck,
+            runDetails: runCheck,
+            userMatches: runCheck?.user_id === user?.id
+          }
+        }));
+      }
       
       if (!success) {
         throw new Error(message || "Kunde inte byta namnet");
@@ -294,7 +318,7 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                 <h3 className="font-medium text-amber-800">Debug Panel (Superusers Only)</h3>
               </div>
               <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div>
                     <Label className="text-xs text-amber-800">Run ID</Label>
                     <Input 
@@ -311,7 +335,50 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                       className="bg-white text-sm h-8" 
                     />
                   </div>
+                  <div>
+                    <Label className="text-xs text-amber-800">Authentication Status</Label>
+                    <div className="flex items-center gap-2 h-8">
+                      {debugInfo?.currentUserId ? (
+                        <span className="text-green-600 font-medium">Authenticated</span>
+                      ) : (
+                        <span className="text-red-600 font-medium">Not authenticated</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-amber-800">Run User ID</Label>
+                    <Input 
+                      value={debugInfo?.runUserId || 'N/A'} 
+                      readOnly 
+                      className="bg-white text-sm h-8 font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-amber-800">Current User ID</Label>
+                    <Input 
+                      value={debugInfo?.currentUserId || 'N/A'} 
+                      readOnly 
+                      className="bg-white text-sm h-8 font-mono" 
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-xs text-amber-800">Permission Status</Label>
+                  <div className="p-2 rounded bg-white">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${debugInfo?.hasAccess ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className={`${debugInfo?.hasAccess ? 'text-green-700' : 'text-red-700'} font-medium`}>
+                        {debugInfo?.hasAccess ? 'Has permission' : 'No permission'} 
+                        (User IDs {debugInfo?.hasAccess ? 'match' : 'do not match'})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
                 <div>
                   <Label className="text-xs text-amber-800">Debug Information</Label>
                   <Textarea 
@@ -320,6 +387,31 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
                     className="bg-white font-mono text-xs h-48" 
                   />
                 </div>
+                
+                {debugInfo?.additionalCheck && (
+                  <div>
+                    <Label className="text-xs text-amber-800">Additional Run Check</Label>
+                    <div className="p-3 bg-white rounded border border-amber-200">
+                      <p className="text-xs mb-1">
+                        <span className="font-bold">Run exists: </span>
+                        <span className={debugInfo.additionalCheck.runExists ? 'text-green-600' : 'text-red-600'}>
+                          {String(debugInfo.additionalCheck.runExists)}
+                        </span>
+                      </p>
+                      <p className="text-xs mb-1">
+                        <span className="font-bold">User IDs match: </span>
+                        <span className={debugInfo.additionalCheck.userMatches ? 'text-green-600' : 'text-red-600'}>
+                          {String(debugInfo.additionalCheck.userMatches)}
+                        </span>
+                      </p>
+                      {debugInfo.additionalCheck.runDetails && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono">
+                          {JSON.stringify(debugInfo.additionalCheck.runDetails, null, 2)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
