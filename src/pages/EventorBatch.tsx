@@ -9,10 +9,11 @@ import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/Fi
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
 import PreviewSection from "@/components/file-uploader/PreviewSection";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAllAppTexts } from "@/hooks/useAppText";
 
 const EventorBatch = () => {
   const { toast } = useToast();
@@ -36,6 +37,7 @@ const EventorBatch = () => {
   const [startersDelay, setStartersDelay] = useState<number>(1.00);
   
   const navigate = useNavigate();
+  const { texts } = useAllAppTexts();
   
   useEffect(() => {
     setLogsUpdateFunction(updateLogs);
@@ -228,7 +230,7 @@ const EventorBatch = () => {
       
       toast({
         title: "Avbryter körning",
-        description: "Begäran om att avbryta har skickats",
+        description: "Beg��ran om att avbryta har skickats",
       });
       
       addCancellationLog();
@@ -447,23 +449,24 @@ const EventorBatch = () => {
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-4xl font-bold">Resultatanalys - Batch-bearbetning</h1>
+        <h1 className="text-4xl font-bold">{texts.eventorbatch_title || "Resultatanalys - Batch-bearbetning"}</h1>
         <Link to="/">
           <Button variant="outline" className="flex items-center gap-2" disabled={isProcessing}>
-            <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
+            <ArrowLeft className="h-4 w-4" /> {texts.back_to_home || "Tillbaka till startsidan"}
           </Button>
         </Link>
       </div>
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filuppladdning och bearbetningsalternativ</CardTitle>
+          <CardTitle>{texts.eventorbatch_upload_title || "Filuppladdning och bearbetningsalternativ"}</CardTitle>
+          <CardDescription>{texts.eventorbatch_upload_description || "Ladda upp en Excel-fil med resultat för att automatiskt berika dem med data från Eventor."}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="file-upload">
-                Ladda upp resultatfil (Excel)
+                {texts.eventorbatch_upload_label || "Ladda upp resultatfil (Excel)"}
               </Label>
               <input 
                 id="file-upload"
@@ -491,7 +494,7 @@ const EventorBatch = () => {
             
             <div className="space-y-4 mt-2">
               <div className="space-y-2 border p-4 rounded-md">
-                <h3 className="text-lg font-medium">Bearbetningsalternativ</h3>
+                <h3 className="text-lg font-medium">{texts.eventorbatch_options_title || "Bearbetningsalternativ"}</h3>
                 
                 <div className="flex items-center space-x-2">
                   <Checkbox 
@@ -502,10 +505,10 @@ const EventorBatch = () => {
                     }}
                     disabled={isProcessing}
                   />
-                  <Label htmlFor="fetch-course-length">Hämta banlängder (scraping)</Label>
+                  <Label htmlFor="fetch-course-length">{texts.eventorbatch_fetch_course_length || "Hämta banlängder (scraping)"}</Label>
                   
                   <div className="ml-4 flex items-center space-x-2">
-                    <Label htmlFor="course-length-delay">Fördröjning:</Label>
+                    <Label htmlFor="course-length-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
                     <Input 
                       id="course-length-delay"
                       type="number" 
@@ -523,7 +526,7 @@ const EventorBatch = () => {
                     />
                     <span className="text-sm">sekunder</span>
                     <div className="text-xs text-muted-foreground">
-                      (Högre värde förhindrar rate-limiting från Eventor)
+                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
                     </div>
                   </div>
                 </div>
@@ -537,10 +540,10 @@ const EventorBatch = () => {
                     }}
                     disabled={isProcessing}
                   />
-                  <Label htmlFor="fetch-starters">Hämta antal startande (API)</Label>
+                  <Label htmlFor="fetch-starters">{texts.eventorbatch_fetch_starters || "Hämta antal startande (API)"}</Label>
                   
                   <div className="ml-4 flex items-center space-x-2">
-                    <Label htmlFor="starters-delay">Fördröjning:</Label>
+                    <Label htmlFor="starters-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
                     <Input 
                       id="starters-delay"
                       type="number" 
@@ -558,7 +561,7 @@ const EventorBatch = () => {
                     />
                     <span className="text-sm">sekunder</span>
                     <div className="text-xs text-muted-foreground">
-                      (Högre värde förhindrar rate-limiting från Eventor)
+                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
                     </div>
                   </div>
                 </div>
@@ -571,7 +574,7 @@ const EventorBatch = () => {
                 disabled={isProcessing || !file}
                 className="w-40"
               >
-                {isProcessing ? "Bearbetar..." : "Bearbeta fil"}
+                {isProcessing ? texts.eventorbatch_processing || "Bearbetar..." : texts.eventorbatch_process_file || "Bearbeta fil"}
               </Button>
               
               {isProcessing ? (
@@ -579,7 +582,7 @@ const EventorBatch = () => {
                   variant="destructive" 
                   onClick={handleCancelProcessing}
                 >
-                  Avbryt
+                  {texts.eventorbatch_cancel || "Avbryt"}
                 </Button>
               ) : (
                 <Button 
@@ -587,7 +590,7 @@ const EventorBatch = () => {
                   onClick={handleClearResults}
                   disabled={!results.length}
                 >
-                  Rensa
+                  {texts.eventorbatch_clear || "Rensa"}
                 </Button>
               )}
             </div>
