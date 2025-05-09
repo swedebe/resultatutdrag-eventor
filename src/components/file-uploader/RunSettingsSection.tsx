@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil, Bug } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { updateRunName } from "@/services/database/resultRepository";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { isUserSuperuser } from "@/types/user";
@@ -140,6 +139,8 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
 
   const handleRename = async () => {
     setErrorMessage(null);
+    
+    // Debug information about the request we're about to make
     const requestPayload = {
       runId,
       newName: saveName.trim(),
@@ -197,22 +198,33 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       console.log(`User ID attempting update: ${user?.id}`);
       
-      // Call the updateRunName function with proper error handling
-      const result = await updateRunName(runId, saveName.trim());
+      // Direct Supabase update with proper response handling
+      const { data, error } = await supabase
+        .from('runs')
+        .update({ name: saveName.trim() })
+        .eq('id', runId)
+        .eq('user_id', user?.id || '') // Add explicit user check
+        .select();
       
-      // Extract success and response data from the result
-      const { success, data, error, message } = result;
-      
-      setDebugInfo(prev => ({
-        ...prev,
-        supabaseResponse: result,
+      // Log the complete response
+      const responseDetails = {
+        data, 
+        error,
         dataLength: data?.length || 0,
         hasData: data && data.length > 0,
         userIdAttemptingUpdate: user?.id
+      };
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        supabaseDirectResponse: responseDetails
       }));
       
-      // If update failed, check if the run exists with our criteria
-      if (!success && error?.type === 'updateFailed') {
+      if (error) {
+        throw new Error(error.message || "Kunde inte uppdatera namnet");
+      }
+      
+      if (!data || data.length === 0) {
         // Perform additional check to verify run existence and permissions
         const { data: runCheck } = await supabase
           .from('runs')
@@ -228,17 +240,9 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
             userMatches: runCheck?.user_id === user?.id
           }
         }));
+        
+        throw new Error("Namnbyte misslyckades: Inga rader uppdaterades");
       }
-      
-      if (!success) {
-        throw new Error(message || "Kunde inte byta namnet");
-      }
-      
-      // If successful, update the UI
-      toast({
-        title: "Namn uppdaterat",
-        description: "Körningens namn har uppdaterats",
-      });
       
       // Update our tracking of the DB value
       setCurrentDbName(saveName.trim());
@@ -246,10 +250,16 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       // Call the parent's onRenameRun function to refresh data
       onRenameRun();
       
+      toast({
+        title: "Namn uppdaterat",
+        description: "Körningens namn har uppdaterats",
+      });
+      
       setDebugInfo(prev => ({
         ...prev,
         success: true,
-        successMessage: "Namn uppdaterat framgångsrikt"
+        successMessage: "Namn uppdaterat framgångsrikt",
+        updatedData: data
       }));
     } catch (error: any) {
       console.error("Error renaming run:", error);

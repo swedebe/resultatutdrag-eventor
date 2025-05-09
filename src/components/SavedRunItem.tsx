@@ -8,7 +8,6 @@ import { useNavigate } from "react-router-dom";
 import { Trash2, Eye, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { sub } from "date-fns";
-import { updateRunName } from "@/services/database/resultRepository";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SavedRunItemProps {
@@ -111,25 +110,29 @@ const SavedRunItem: React.FC<SavedRunItemProps> = ({ id, name, date, eventCount,
     try {
       console.log(`SavedRunItem: Updating run name from "${displayName}" to "${newName.trim()}" for run ID: ${id}`);
       
-      // Verify current user has access to this run
+      // Use direct Supabase update for better debug information
       const { data: { user } } = await supabase.auth.getUser();
-      console.log("Current user:", user?.id);
       
-      const { data: runData } = await supabase
-        .from('runs')
-        .select('user_id')
-        .eq('id', id)
-        .single();
-        
-      if (runData && user?.id !== runData.user_id) {
-        console.error("User doesn't have permission to update this run");
-        throw new Error("Saknar behörighet att ändra namnet");
+      if (!user) {
+        throw new Error("Du måste vara inloggad för att byta namn");
       }
       
-      const success = await updateRunName(id, newName.trim());
+      // Direct update with proper response handling
+      const { data, error } = await supabase
+        .from('runs')
+        .update({ name: newName.trim() })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select();
+        
+      console.log("Update response:", { data, error, dataLength: data?.length || 0 });
+        
+      if (error) {
+        throw new Error(error.message || "Kunde inte uppdatera namnet");
+      }
       
-      if (!success) {
-        throw new Error("Kunde inte uppdatera namnet");
+      if (!data || data.length === 0) {
+        throw new Error("Namnbyte misslyckades: Inga rader uppdaterades");
       }
       
       // Update local state

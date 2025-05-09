@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -204,77 +203,74 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       };
     }
     
-    // Execute the update with detailed logging
-    const updateResult = await supabase
+    // Execute the update with explicit .select() to return the updated data
+    const { data: updateData, error: updateError } = await supabase
       .from('runs')
       .update({ name: trimmedName })
       .eq('id', runId)
+      .eq('user_id', user.id) // Explicitly check user_id to ensure ownership
       .select();
-    
-    // Get the count of rows affected (this is a separate query since Supabase doesn't directly return count)
-    const { count: rowsAffected } = await supabase
-      .from('runs')
-      .select('*', { count: 'exact', head: true })
-      .eq('id', runId)
-      .eq('name', trimmedName);
     
     // Log the complete response for troubleshooting
     console.log('Supabase update complete. Response:', { 
-      data: updateResult.data, 
-      error: updateResult.error, 
-      dataLength: updateResult.data?.length || 0,
-      errorMessage: updateResult.error?.message,
-      errorCode: updateResult.error?.code,
-      errorDetails: updateResult.error?.details,
-      rowsAffected
+      data: updateData, 
+      error: updateError, 
+      dataLength: updateData?.length || 0,
+      errorMessage: updateError?.message,
+      errorCode: updateError?.code,
+      errorDetails: updateError?.details
     });
       
-    if (updateResult.error) {
-      console.error('Error updating run name:', updateResult.error);
-      console.error('Error details:', updateResult.error.message, updateResult.error.code, updateResult.error.details);
+    if (updateError) {
+      console.error('Error updating run name:', updateError);
+      console.error('Error details:', updateError.message, updateError.code, updateError.details);
       return {
         success: false,
-        message: `Databasfel: ${updateResult.error.message || 'Okänt fel'}`,
-        error: updateResult.error,
-        data: updateResult.data
+        message: `Databasfel: ${updateError.message || 'Okänt fel'}`,
+        error: updateError,
+        data: updateData
       };
     }
     
     // Verify update success by checking if data was returned
-    if (!updateResult.data || updateResult.data.length === 0) {
+    if (!updateData || updateData.length === 0) {
       console.error(`Run name update failed: No rows were updated for run ID ${runId}`);
       console.error('Update conditions:', { runId, userId: user.id });
       
-      // Perform a query to see if the run exists with these conditions
-      const { count: matchingRows } = await supabase
+      // Verify query conditions with a direct count
+      const { count, error: countError } = await supabase
         .from('runs')
         .select('*', { count: 'exact', head: true })
         .eq('id', runId)
         .eq('user_id', user.id);
-      
-      console.log(`Found ${matchingRows} matching rows for run ID ${runId} with user ID ${user.id}`);
+        
+      if (countError) {
+        console.error('Error counting matching rows:', countError);
+      } else {
+        console.log(`Found ${count} matching rows for run ID ${runId} with user ID ${user.id}`);
+      }
       
       return {
         success: false,
         message: 'Namnbyte misslyckades: Inga rader uppdaterades',
-        data: updateResult.data,
+        data: updateData,
         error: { 
           type: 'updateFailed', 
           details: 'No rows updated',
-          matchingRows,
+          matchingRows: count,
           conditions: { runId, userId: user.id }
         }
       };
     }
     
     // Further verify the name was updated correctly
-    const updatedName = updateResult.data[0]?.name;
+    const updatedName = updateData[0]?.name;
     if (updatedName !== trimmedName) {
       console.error(`Name verification failed: Expected "${trimmedName}", got "${updatedName}"`);
       return {
         success: false,
         message: `Verifiering misslyckades: Förväntade "${trimmedName}", fick "${updatedName}"`,
-        data: updateResult.data,
+        data: updateData,
         error: { type: 'verification', details: 'Name mismatch after update' }
       };
     }
@@ -283,7 +279,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     return {
       success: true,
       message: 'Namnbyte genomfört',
-      data: updateResult.data
+      data: updateData
     };
   } catch (err: any) {
     console.error('Exception in updateRunName:', err);
