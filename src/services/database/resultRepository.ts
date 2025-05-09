@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -136,7 +135,7 @@ export const saveLogToDatabase = async (
 };
 
 /**
- * Function to update a run's name, with enhanced debugging
+ * Function to update a run's name, with enhanced debugging and validation
  */
 export const updateRunName = async (runId: string, newName: string): Promise<{ 
   success: boolean; 
@@ -160,10 +159,7 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     // Clear any leading/trailing whitespace
     const trimmedName = newName.trim();
     
-    // Debug output before update
-    console.log(`Attempting to update run with ID: ${runId} to name: "${trimmedName}"`);
-    
-    // First check if the user has permission to update this run
+    // Get the current user for validation
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.error('No authenticated user found');
@@ -174,71 +170,40 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
       };
     }
     
-    // Get the run and check user permissions
-    const { data: runData, error: runError } = await supabase
-      .from('runs')
-      .select('user_id, name')
-      .eq('id', runId)
-      .single();
-      
-    if (runError) {
-      console.error('Error checking run permissions:', runError);
-      return { 
-        success: false, 
-        message: 'Kunde inte verifiera behörighet',
-        error: runError 
-      };
-    }
-    
-    // Debug information about run ownership
-    console.log(`Run belongs to user ${runData.user_id}, current user is ${user.id}`);
-    console.log(`Current run name in DB: "${runData.name}", attempting to update to: "${trimmedName}"`);
-    
-    // Verify the user owns this run
-    if (runData.user_id !== user.id) {
-      console.error(`Permission denied: User ${user.id} attempting to update run owned by ${runData.user_id}`);
-      return { 
-        success: false, 
-        message: 'Du har inte behörighet att ändra denna körning',
-        error: { type: 'permission', details: 'User does not own this run' }
-      };
-    }
+    // Debug information
+    console.log(`User ID performing update: ${user.id}`);
+    console.log(`Attempting to update run with ID: ${runId} to name: "${trimmedName}"`);
     
     // Execute the update with explicit .select() to return the updated data
-    const { data: updateData, error: updateError } = await supabase
+    const { data, error } = await supabase
       .from('runs')
       .update({ name: trimmedName })
       .eq('id', runId)
-      .eq('user_id', user.id) // Explicitly check user_id to ensure ownership
-      .select(); // CRITICAL: Add .select() to return the updated row
+      .eq('user_id', user.id) // Ensure the user owns this run
+      .select();
     
     // Log the complete response for troubleshooting
-    console.log('Supabase update complete. Response:', { 
-      data: updateData, 
-      error: updateError, 
-      dataLength: updateData?.length || 0,
-      errorMessage: updateError?.message,
-      errorCode: updateError?.code,
-      errorDetails: updateError?.details
+    console.log('Supabase update response:', { 
+      data, 
+      error, 
+      dataLength: data?.length || 0,
+      errorMessage: error?.message
     });
       
-    if (updateError) {
-      console.error('Error updating run name:', updateError);
-      console.error('Error details:', updateError.message, updateError.code, updateError.details);
+    if (error) {
+      console.error('Error updating run name:', error);
       return {
         success: false,
-        message: `Databasfel: ${updateError.message || 'Okänt fel'}`,
-        error: updateError,
-        data: updateData
+        message: `Databasfel: ${error.message || 'Okänt fel'}`,
+        error: error
       };
     }
     
     // Verify update success by checking if data was returned
-    if (!updateData || updateData.length === 0) {
-      console.error(`Run name update failed: No rows were updated for run ID ${runId}`);
-      console.error('Update conditions:', { runId, userId: user.id });
+    if (!data || data.length === 0) {
+      console.error(`No rows updated for run ID ${runId}`);
       
-      // Verify query conditions with a direct count
+      // Verify if the run exists and belongs to this user
       const { count, error: countError } = await supabase
         .from('runs')
         .select('*', { count: 'exact', head: true })
@@ -246,33 +211,28 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
         .eq('user_id', user.id);
         
       if (countError) {
-        console.error('Error counting matching rows:', countError);
+        console.error('Error checking run existence:', countError);
       } else {
-        console.log(`Found ${count} matching rows for run ID ${runId} with user ID ${user.id}`);
+        console.log(`Found ${count} matching rows for run ID ${runId} and user ID ${user.id}`);
       }
       
       return {
         success: false,
-        message: 'Namnbyte misslyckades: Inga rader uppdaterades',
-        data: updateData,
-        error: { 
-          type: 'updateFailed', 
-          details: 'No rows updated',
-          matchingRows: count,
-          conditions: { runId, userId: user.id }
-        }
+        message: count === 0 ? 
+          'Körningen hittades inte eller tillhör inte dig' : 
+          'Namnbyte misslyckades: Inga rader uppdaterades',
+        data: data
       };
     }
     
-    // Further verify the name was updated correctly
-    const updatedName = updateData[0]?.name;
+    // Verify that the name was actually updated
+    const updatedName = data[0]?.name;
     if (updatedName !== trimmedName) {
       console.error(`Name verification failed: Expected "${trimmedName}", got "${updatedName}"`);
       return {
         success: false,
         message: `Verifiering misslyckades: Förväntade "${trimmedName}", fick "${updatedName}"`,
-        data: updateData,
-        error: { type: 'verification', details: 'Name mismatch after update' }
+        data: data
       };
     }
     
@@ -280,18 +240,14 @@ export const updateRunName = async (runId: string, newName: string): Promise<{
     return {
       success: true,
       message: 'Namnbyte genomfört',
-      data: updateData
+      data: data
     };
   } catch (err: any) {
     console.error('Exception in updateRunName:', err);
     return {
       success: false,
       message: `Ett oväntat fel uppstod: ${err.message || 'Okänt fel'}`,
-      error: {
-        type: 'exception',
-        message: err.message,
-        stack: err.stack
-      }
+      error: err
     };
   }
 };
