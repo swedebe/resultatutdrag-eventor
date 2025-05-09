@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import AuthWrapper from "./components/AuthWrapper";
 import RunDetail from "./pages/RunDetail";
 import Settings from "./pages/Settings";
+import EventorBatch from "./pages/EventorBatch"; // Import the new page
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,14 @@ const App = () => (
             element={
               <AuthWrapper>
                 <FileUploader />
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/batch-processing"
+            element={
+              <AuthWrapper>
+                <EventorBatch />
               </AuthWrapper>
             }
           />
