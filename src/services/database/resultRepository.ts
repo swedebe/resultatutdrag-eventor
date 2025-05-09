@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -136,16 +135,25 @@ export const saveLogToDatabase = async (
 };
 
 /**
- * Function to update a run's name
+ * Function to update a run's name, with enhanced debugging
  */
-export const updateRunName = async (runId: string, newName: string): Promise<boolean> => {
+export const updateRunName = async (runId: string, newName: string): Promise<{ 
+  success: boolean; 
+  data?: any; 
+  error?: any; 
+  message?: string;
+}> => {
   try {
     console.log(`Repository: Updating run ${runId} name to "${newName}"`);
     
     // Make sure we have a valid input
     if (!runId || !newName.trim()) {
       console.error('Invalid input: runId or name is empty');
-      return false;
+      return { 
+        success: false, 
+        message: 'Ogiltigt namn eller run ID',
+        error: { type: 'validation', details: 'runId or name is empty' }
+      };
     }
     
     // Clear any leading/trailing whitespace
@@ -153,6 +161,43 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     
     // Debug output before update
     console.log(`Attempting to update run with ID: ${runId} to name: "${trimmedName}"`);
+    
+    // First check if the user has permission to update this run
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('No authenticated user found');
+      return { 
+        success: false, 
+        message: 'Du måste vara inloggad för att byta namn',
+        error: { type: 'auth', details: 'No authenticated user' }
+      };
+    }
+    
+    // Get the run and check user permissions
+    const { data: runData, error: runError } = await supabase
+      .from('runs')
+      .select('user_id')
+      .eq('id', runId)
+      .single();
+      
+    if (runError) {
+      console.error('Error checking run permissions:', runError);
+      return { 
+        success: false, 
+        message: 'Kunde inte verifiera behörighet',
+        error: runError 
+      };
+    }
+    
+    // Verify the user owns this run
+    if (runData.user_id !== user.id) {
+      console.error(`Permission denied: User ${user.id} attempting to update run owned by ${runData.user_id}`);
+      return { 
+        success: false, 
+        message: 'Du har inte behörighet att ändra denna körning',
+        error: { type: 'permission', details: 'User does not own this run' }
+      };
+    }
     
     // Execute the update with detailed logging
     const { data, error, count } = await supabase
@@ -175,27 +220,54 @@ export const updateRunName = async (runId: string, newName: string): Promise<boo
     if (error) {
       console.error('Error updating run name:', error);
       console.error('Error details:', error.message, error.code, error.details);
-      return false;
+      return {
+        success: false,
+        message: `Databasfel: ${error.message || 'Okänt fel'}`,
+        error,
+        data
+      };
     }
     
     // Verify update success by checking if data was returned
     if (!data || data.length === 0) {
       console.error('Run name update failed: No rows were updated');
-      return false;
+      return {
+        success: false,
+        message: 'Namnbyte misslyckades: Inga rader uppdaterades',
+        data,
+        error: { type: 'updateFailed', details: 'No rows updated' }
+      };
     }
     
     // Further verify the name was updated correctly
     const updatedName = data[0]?.name;
     if (updatedName !== trimmedName) {
       console.error(`Name verification failed: Expected "${trimmedName}", got "${updatedName}"`);
-      return false;
+      return {
+        success: false,
+        message: `Verifiering misslyckades: Förväntade "${trimmedName}", fick "${updatedName}"`,
+        data,
+        error: { type: 'verification', details: 'Name mismatch after update' }
+      };
     }
     
     console.log(`Run name successfully updated to "${updatedName}"`);
-    return true;
-  } catch (err) {
+    return {
+      success: true,
+      message: 'Namnbyte genomfört',
+      data
+    };
+  } catch (err: any) {
     console.error('Exception in updateRunName:', err);
-    return false;
+    return {
+      success: false,
+      message: `Ett oväntat fel uppstod: ${err.message || 'Okänt fel'}`,
+      error: {
+        type: 'exception',
+        message: err.message,
+        stack: err.stack
+      }
+    };
   }
 };
 

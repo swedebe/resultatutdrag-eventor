@@ -4,10 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil } from "lucide-react";
+import { Pencil, Bug } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { updateRunName } from "@/services/database/resultRepository";
 import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
+import { isUserSuperuser } from "@/types/user";
 
 interface RunSettingsSectionProps {
   saveName: string;
@@ -28,6 +30,28 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
   const [localIsRenaming, setLocalIsRenaming] = useState(false);
   const [nameBeforeEdit, setNameBeforeEdit] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [isSuperuser, setIsSuperuser] = useState(false);
+
+  // Check if the current user is a superuser
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (!error && userData) {
+          setIsSuperuser(isUserSuperuser(userData.role));
+        }
+      }
+    };
+    
+    checkUserRole();
+  }, []);
 
   // Store the original name to detect actual changes
   useEffect(() => {
@@ -53,11 +77,24 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
           
         if (error) {
           console.error("Error checking run access:", error);
+          setDebugInfo(prev => ({
+            ...prev,
+            accessCheckError: error
+          }));
         } else {
           console.log("Run belongs to user:", data?.user_id);
           console.log("Current run name:", data?.name);
           const hasAccess = user?.id === data?.user_id;
           console.log("User has access to rename:", hasAccess);
+          
+          setDebugInfo(prev => ({
+            ...prev,
+            currentUserId: user?.id,
+            runId,
+            runUserId: data?.user_id,
+            currentRunName: data?.name,
+            hasAccess
+          }));
         }
       }
     };
@@ -67,22 +104,46 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
 
   const handleRename = async () => {
     setErrorMessage(null);
+    const requestPayload = {
+      runId,
+      newName: saveName.trim(),
+    };
+    
+    setDebugInfo(prev => ({
+      ...prev,
+      requestPayload,
+      nameBeforeEdit,
+      attemptedNewName: saveName.trim(),
+      timestamp: new Date().toISOString()
+    }));
     
     if (!runId || !saveName.trim()) {
+      const error = "Körningen måste ha ett namn";
       toast({
         title: "Ogiltigt namn",
-        description: "Körningen måste ha ett namn",
+        description: error,
         variant: "destructive",
       });
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        validationError: error,
+      }));
       return;
     }
     
     // Skip update if name hasn't changed
     if (saveName.trim() === nameBeforeEdit.trim()) {
+      const message = "Du använde samma namn som tidigare";
       toast({
         title: "Inget namnbyte behövs",
-        description: "Du använde samma namn som tidigare",
+        description: message,
       });
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        skippedReason: message,
+      }));
       return;
     }
     
@@ -91,10 +152,20 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       console.log(`RunSettingsSection: Attempting to rename run ${runId} to "${saveName}"`);
       
       // Call the updateRunName function with proper error handling
-      const success = await updateRunName(runId, saveName.trim());
+      const result = await updateRunName(runId, saveName.trim());
+      
+      // Extract success and response data from the result
+      const { success, data, error, message } = result;
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        supabaseResponse: { success, data, error, message },
+        dataLength: data?.length || 0,
+        hasData: data && data.length > 0
+      }));
       
       if (!success) {
-        throw new Error("Kunde inte byta namnet");
+        throw new Error(message || "Kunde inte byta namnet");
       }
       
       // If successful, update the UI
@@ -108,9 +179,26 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
       
       // Call the parent's onRenameRun function to refresh data
       onRenameRun();
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        success: true,
+        successMessage: "Namn uppdaterat framgångsrikt"
+      }));
     } catch (error: any) {
       console.error("Error renaming run:", error);
       setErrorMessage(error.message || "Ett fel uppstod vid namnbyte av körningen");
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        caughtException: {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        },
+        success: false
+      }));
+      
       toast({
         title: "Fel vid namnbyte",
         description: error.message || "Ett fel uppstod vid namnbyte av körningen",
@@ -155,6 +243,44 @@ const RunSettingsSection: React.FC<RunSettingsSectionProps> = ({
               )}
             </div>
           </div>
+          
+          {/* Debug Panel for Superusers */}
+          {isSuperuser && (
+            <div className="mt-6 border border-amber-300 bg-amber-50 p-4 rounded-md">
+              <div className="flex items-center gap-2 mb-3">
+                <Bug className="text-amber-600" size={20} />
+                <h3 className="font-medium text-amber-800">Debug Panel (Superusers Only)</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-amber-800">Run ID</Label>
+                    <Input 
+                      value={runId || 'N/A'} 
+                      readOnly 
+                      className="bg-white text-sm h-8 font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-amber-800">Original Name</Label>
+                    <Input 
+                      value={nameBeforeEdit || 'N/A'} 
+                      readOnly 
+                      className="bg-white text-sm h-8" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-amber-800">Debug Information</Label>
+                  <Textarea 
+                    value={JSON.stringify(debugInfo, null, 2)} 
+                    readOnly 
+                    className="bg-white font-mono text-xs h-48" 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
