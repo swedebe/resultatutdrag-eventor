@@ -1,5 +1,4 @@
 
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -10,13 +9,22 @@ import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveL
 export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
 
+// Define the batch options type
+interface BatchProcessingOptions {
+  fetchCourseLength: boolean;
+  fetchStarters: boolean;
+  courseLengthDelay: number;
+  startersDelay: number;
+}
+
 export const processExcelFile = async (
   file: File, 
   setProgress: (value: number) => void, 
   setCurrentStatus: (status: string) => void,
   delaySeconds: number = 15,
   onPartialResults?: (results: ResultRow[]) => Promise<boolean>,
-  runId?: string | null
+  runId?: string | null,
+  batchOptions?: BatchProcessingOptions // Make the batch options optional
 ): Promise<ResultRow[]> => {
   setProgress(0);
   setCurrentStatus("Läser in fil...");
@@ -43,8 +51,8 @@ export const processExcelFile = async (
       setProgress(10 + Math.floor(80 * (i / jsonData.length)));
       setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${jsonData.length})...`);
       
-      // Fetch additional data from Eventor
-      const enhancedResultRow = await fetchEventorData(resultRow, runId);
+      // Pass batch options to fetchEventorData if they exist
+      const enhancedResultRow = await fetchEventorData(resultRow, runId, batchOptions);
       
       // Save processed result to database if runId is provided
       if (runId) {

@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction } from "@/components/LogComponent";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,7 +127,7 @@ const EventorBatch = () => {
     setRunId(newRunId);
     
     try {
-      // Pass the batch processing options to the Excel processing function
+      // Create a batch options object to pass to the processExcelFile function
       const batchOptions = {
         fetchCourseLength,
         fetchStarters,
@@ -158,7 +158,7 @@ const EventorBatch = () => {
           return true;
         },
         newRunId,
-        batchOptions
+        batchOptions  // Pass batch options as the 7th argument
       );
       
       // Final cancellation check
