@@ -113,14 +113,14 @@ const EventorApiKeySection = () => {
     setIsTesting(true);
     setTestResult(null);
     
-    const renderProxyUrl = 'https://eventor-proxy.onrender.com/eventor-api';
+    const renderProxyUrl = 'https://eventor-proxy.onrender.com/validate-eventor-api-key';
     console.log(`Starting API key test with Render proxy URL: ${renderProxyUrl}`);
     
     try {
       console.log("Preparing fetch request to Render proxy service");
       console.log(`Request payload: ${JSON.stringify({ apiKey: apiKey.substring(0, 5) + '...' })}`);
       
-      // Call the Render proxy service with the new endpoint structure
+      // Call the dedicated validation endpoint on the Render proxy service
       const fetchPromise = fetch(renderProxyUrl, {
         method: 'POST',
         headers: {
@@ -128,7 +128,7 @@ const EventorApiKeySection = () => {
         },
         body: JSON.stringify({ 
           apiKey,
-          endpoint: '/organisation/apiKey'
+          baseUrl: 'https://eventor.orientering.se/api'
         }),
       });
       

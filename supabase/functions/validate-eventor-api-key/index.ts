@@ -10,10 +10,8 @@ import axios from 'https://deno.land/x/axiod/mod.ts'
 
 interface RequestBody {
   apiKey: string;
-  endpoint?: string; // Optional endpoint path to support different Eventor API calls
+  baseUrl?: string;
 }
-
-const EVENTOR_API_BASE_URL = 'https://eventor.orientering.se/api';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,18 +24,18 @@ serve(async (req) => {
     
     // Parse the request body
     let apiKey: string | undefined;
-    let endpoint: string = '/organisation/apiKey'; // Default endpoint for API key validation
+    let baseUrl: string = 'https://eventor.orientering.se/api';
     
     try {
       const body = await req.json() as RequestBody;
       apiKey = body.apiKey;
       
-      // Use the provided endpoint if available
-      if (body.endpoint) {
-        endpoint = body.endpoint;
+      // Use the provided baseUrl if available
+      if (body.baseUrl) {
+        baseUrl = body.baseUrl;
       }
       
-      console.log(`Request body successfully parsed. Endpoint: ${endpoint}`);
+      console.log(`Request body successfully parsed. Using base URL: ${baseUrl}`);
     } catch (error) {
       console.error("Error parsing request body:", error);
       return new Response(
@@ -66,8 +64,8 @@ serve(async (req) => {
       );
     }
 
-    // Construct the full URL by combining the base URL with the endpoint
-    const apiUrl = `${EVENTOR_API_BASE_URL}${endpoint}`;
+    // Construct the URL for validating the API key
+    const apiUrl = `${baseUrl}/organisation/apiKey`;
     
     // Log the request details
     const requestHeaders = {
