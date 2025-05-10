@@ -1,4 +1,3 @@
-
 /**
  * Excel import and export operations
  */
@@ -101,40 +100,39 @@ export const fetchClassParticipantCounts = async (
   let totalEvents = eventIds.length;
   let processedEvents = 0;
   
-  // Constants
-  const RENDER_PROXY_URL = 'https://eventor-proxy.onrender.com/eventor-api';
+  // Constants - Note the trailing slash is removed to properly construct URLs
+  const RENDER_PROXY_BASE_URL = 'https://eventor-proxy.onrender.com';
   
   for (const eventId of eventIds) {
     try {
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
       
+      // Construct the full endpoint path
+      const eventorApiEndpoint = `/classes/event?eventId=${eventId}`;
+      
       // Log the API call attempt
-      const endpoint = `/classes/event?eventId=${eventId}`;
-      addLog(eventId, `Eventor API: ${endpoint}`, `Anropar Eventor API via Render proxy...`);
+      addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Anropar Eventor API via Render proxy...`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
-          `Eventor API: ${endpoint}`,
+          `Eventor API: ${eventorApiEndpoint}`,
           `Anropar Eventor API via Render proxy...`
         );
       }
       
-      // Construct the full request URL for logging
-      const fullRequestUrl = `${RENDER_PROXY_URL}${endpoint}`;
+      // Construct the full request URL - this is now the direct endpoint on the Render proxy
+      const fullRequestUrl = `${RENDER_PROXY_BASE_URL}${eventorApiEndpoint}`;
       console.log(`Fetching class data from: ${fullRequestUrl}`);
       
-      // Direct request to the Render proxy
-      const response = await fetch(RENDER_PROXY_URL, {
-        method: 'POST',
+      // Send a GET request directly to the Render proxy with the full endpoint
+      const response = await fetch(fullRequestUrl, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey,
-          endpoint
-        })
+          'X-Eventor-Api-Key': apiKey
+        }
       });
       
       if (!response.ok) {
@@ -146,13 +144,13 @@ export const fetchClassParticipantCounts = async (
       
       // Check if we have valid class data in the response
       if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
-        addLog(eventId, `Eventor API: ${endpoint}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
+        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(),
-            `Eventor API: ${endpoint}`,
+            `Eventor API: ${eventorApiEndpoint}`,
             `Hittade ${responseData.ClassList.Class.length} klasser`
           );
         }
@@ -166,13 +164,13 @@ export const fetchClassParticipantCounts = async (
           const key = `${eventId}_${className}`;
           participantCountMap.set(key, numberOfEntries);
           
-          addLog(eventId, `Eventor API: ${endpoint}`, `Klass ${className}: ${numberOfEntries} deltagare`);
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Klass ${className}: ${numberOfEntries} deltagare`);
           
           if (runId) {
             await saveLogToDatabase(
               runId,
               eventId.toString(),
-              `Eventor API: ${endpoint}`,
+              `Eventor API: ${eventorApiEndpoint}`,
               `Klass ${className}: ${numberOfEntries} deltagare`
             );
           }
@@ -180,13 +178,13 @@ export const fetchClassParticipantCounts = async (
       } else {
         console.warn(`Invalid response data structure. Expected ClassList.Class array but received:`, responseData);
         
-        addLog(eventId, `Eventor API: ${endpoint}`, `Ogiltig svardata: Inga klasser hittades`);
+        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Ogiltig svardata: Inga klasser hittades`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(),
-            `Eventor API: ${endpoint}`,
+            `Eventor API: ${eventorApiEndpoint}`,
             `Ogiltig svardata: Inga klasser hittades`
           );
         }
@@ -240,4 +238,3 @@ export const updateResultsWithParticipantCounts = (
     };
   });
 };
-

@@ -10,7 +10,6 @@ interface RequestBody {
 }
 
 const EVENTOR_API_BASE_URL = 'https://eventor.orientering.se/api';
-const RENDER_PROXY_URL = 'https://eventor-proxy.onrender.com/eventor-api';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -21,28 +20,52 @@ serve(async (req) => {
   try {
     console.log("Edge Function: eventor-api - request received");
     
-    // Parse the request body
     let apiKey: string | undefined;
     let endpoint: string | undefined;
     
-    try {
-      const body = await req.json() as RequestBody;
-      apiKey = body.apiKey;
-      endpoint = body.endpoint;
+    // Handle both GET and POST requests
+    if (req.method === 'POST') {
+      // Parse the request body for POST requests
+      try {
+        const body = await req.json() as RequestBody;
+        apiKey = body.apiKey;
+        endpoint = body.endpoint;
+        
+        console.log(`POST request - endpoint: ${endpoint}`);
+      } catch (error) {
+        console.error("Error parsing request body:", error);
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in request body', details: error.message }),
+          { 
+            status: 400, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+    } else if (req.method === 'GET') {
+      // For GET requests, extract parameters from the URL
+      const url = new URL(req.url);
       
-      console.log(`Request body successfully parsed. Endpoint: ${endpoint}`);
-    } catch (error) {
-      console.error("Error parsing request body:", error);
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body', details: error.message }),
-        { 
-          status: 400, 
-          headers: { 
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          } 
+      // The API key must be in the headers for GET requests
+      apiKey = req.headers.get('x-eventor-api-key') || undefined;
+      
+      // The endpoint is everything after /eventor-api in the path
+      const path = url.pathname;
+      const apiPrefix = '/eventor-api';
+      
+      if (path.startsWith(apiPrefix)) {
+        endpoint = path.substring(apiPrefix.length);
+        
+        // Include query parameters if they exist
+        if (url.search) {
+          endpoint += url.search;
         }
-      );
+      }
+      
+      console.log(`GET request - extracted endpoint: ${endpoint}`);
     }
 
     if (!apiKey) {
@@ -78,36 +101,26 @@ serve(async (req) => {
       endpoint = '/' + endpoint;
     }
 
-    // Log the final forwarding details
-    console.log(`Forwarding request to Render proxy: ${RENDER_PROXY_URL}`);
-    console.log(`Request body to be forwarded:`, { apiKey: "***REDACTED***", endpoint });
-    console.log(`Target Eventor API endpoint: ${EVENTOR_API_BASE_URL}${endpoint}`);
+    // Construct the full Eventor API URL
+    const fullUrl = `${EVENTOR_API_BASE_URL}${endpoint}`;
+    console.log(`Forwarding request to Eventor API: ${fullUrl}`);
     
-    // Forward the request to the Render proxy
     try {
-      console.log("Initiating request to Render proxy");
-      
-      const response = await fetch(RENDER_PROXY_URL, {
-        method: 'POST',
+      // Make the request to the Eventor API
+      const response = await axios({
+        method: req.method,
+        url: fullUrl,
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey,
-          endpoint
-        })
+          'ApiKey': apiKey
+        }
       });
       
-      console.log(`Response status from Render proxy: ${response.status} ${response.statusText}`);
+      console.log(`Response status from Eventor API: ${response.status}`);
       
-      // Get the response data
-      const responseData = await response.json();
-      
-      console.log(`Response received from Render proxy, forwarding to client`);
-      
-      // Forward the proxy response to the client
+      // Forward the response to the client
       return new Response(
-        JSON.stringify(responseData),
+        JSON.stringify(response.data),
         { 
           status: response.status, 
           headers: { 
@@ -116,16 +129,17 @@ serve(async (req) => {
           } 
         }
       );
-    } catch (proxyError) {
-      console.error("Error forwarding request to Render proxy:", proxyError);
+    } catch (apiError: any) {
+      console.error("Error forwarding request to Eventor API:", apiError);
       
       return new Response(
         JSON.stringify({ 
-          error: 'Error forwarding request to Render proxy',
-          details: proxyError.message || 'Unknown error occurred'
+          error: 'Error forwarding request to Eventor API',
+          details: apiError.message || 'Unknown error occurred',
+          status: apiError.response?.status
         }),
         { 
-          status: 500, 
+          status: apiError.response?.status || 500, 
           headers: { 
             ...corsHeaders,
             'Content-Type': 'application/json'
