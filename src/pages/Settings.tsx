@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { UserRole, UserProfile } from "@/types/user";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Key } from "lucide-react";
 import SuperuserSettings from "@/components/settings/SuperuserSettings";
 import UserProfileSettings from "@/components/settings/UserProfileSettings";
 import { useAppText } from "@/hooks/useAppText";
 import ExpiredRunsSection from "@/components/settings/ExpiredRunsSection";
+import EventorApiKeySection from "@/components/settings/EventorApiKeySection";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -178,6 +180,8 @@ const Settings = () => {
 
       <div className="space-y-6">
         {userProfile && <UserProfileSettings userProfile={userProfile} />}
+        
+        <EventorApiKeySection />
         
         <ExpiredRunsSection />
         

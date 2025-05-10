@@ -48,6 +48,9 @@ export const fetchEventorData = async (
     
     // Fetch number of starters if option is enabled (default to true if not specified)
     if (!batchOptions || batchOptions.fetchStarters) {
+      // Get API key from localStorage
+      const apiKey = localStorage.getItem("eventorApiKey") || "";
+      
       // Set URL for API call to get starters
       currentEventorUrl = `https://eventor.orientering.se/api/events/${resultRow.eventId}/entries`;
       
@@ -63,6 +66,16 @@ export const fetchEventorData = async (
       // Wait the specified delay before requesting starters
       if (startersDelay > 0) {
         await sleep(startersDelay);
+      }
+      
+      // Add API key to the request if available
+      // This is a placeholder for the actual API call implementation
+      if (apiKey) {
+        addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop`);
+        
+        if (runId) {
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop`);
+        }
       }
       
       // Implement starters count fetching logic here
