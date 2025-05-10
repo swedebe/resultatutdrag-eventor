@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,9 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
+        // Ensure required texts exist
+        await AppTextService.ensureRequiredAppTextsExist();
+        
         const { data, error } = await supabase.from('app_texts').select('*');
         
         if (error) {

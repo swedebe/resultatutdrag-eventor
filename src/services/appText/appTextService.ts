@@ -137,5 +137,33 @@ export const AppTextService = {
       console.error(`Failed to create or update app text ${key}:`, error);
       throw error;
     }
+  },
+
+  /**
+   * Ensure all required application texts exist in the database
+   * This method can be called during application initialization
+   */
+  async ensureRequiredAppTextsExist(): Promise<void> {
+    const requiredTexts = [
+      // EventorBatch page texts
+      { key: 'eventorbatch_title', value: 'Resultatanalys - Batch-bearbetning', category: 'eventorbatch' },
+      { key: 'eventorbatch_upload_title', value: 'Filuppladdning och bearbetningsalternativ', category: 'eventorbatch' },
+      { key: 'eventorbatch_upload_description', value: 'Ladda upp en Excel-fil med resultat för att automatiskt berika dem med data från Eventor.', category: 'eventorbatch' },
+      { key: 'eventorbatch_upload_label', value: 'Ladda upp resultatfil (Excel)', category: 'eventorbatch' },
+      { key: 'eventorbatch_options_title', value: 'Bearbetningsalternativ', category: 'eventorbatch' },
+      { key: 'eventorbatch_fetch_course_length', value: 'Hämta banlängder (scraping)', category: 'eventorbatch' },
+      { key: 'eventorbatch_fetch_starters', value: 'Hämta antal startande (API)', category: 'eventorbatch' },
+      { key: 'eventorbatch_delay_label', value: 'Fördröjning:', category: 'eventorbatch' },
+      { key: 'eventorbatch_delay_hint', value: '(Högre värde förhindrar rate-limiting från Eventor)', category: 'eventorbatch' },
+      { key: 'eventorbatch_processing', value: 'Bearbetar...', category: 'eventorbatch' },
+      { key: 'eventorbatch_process_file', value: 'Bearbeta fil', category: 'eventorbatch' },
+      { key: 'eventorbatch_cancel', value: 'Avbryt', category: 'eventorbatch' },
+      { key: 'eventorbatch_clear', value: 'Rensa', category: 'eventorbatch' },
+      { key: 'back_to_home', value: 'Tillbaka till startsidan', category: 'general' }
+    ];
+
+    for (const text of requiredTexts) {
+      await this.createOrUpdateAppTextByKey(text.key, text.value, text.category);
+    }
   }
 };
