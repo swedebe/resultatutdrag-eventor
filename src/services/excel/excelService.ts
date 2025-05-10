@@ -1,3 +1,4 @@
+
 /**
  * Excel import and export operations
  */
@@ -100,54 +101,48 @@ export const fetchClassParticipantCounts = async (
   let totalEvents = eventIds.length;
   let processedEvents = 0;
   
+  // Constants
+  const RENDER_PROXY_URL = 'https://eventor-proxy.onrender.com/eventor-api';
+  
   for (const eventId of eventIds) {
     try {
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
       
       // Log the API call attempt
-      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Anropar Supabase edge function för att hämta klassdata...`);
+      const endpoint = `/classes/event?eventId=${eventId}`;
+      addLog(eventId, `Eventor API: ${endpoint}`, `Anropar Eventor API via Render proxy...`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
-          `Eventor API: classes/event?eventId=${eventId}`,
-          `Anropar Supabase edge function för att hämta klassdata...`
+          `Eventor API: ${endpoint}`,
+          `Anropar Eventor API via Render proxy...`
         );
       }
       
-      // Construct the request endpoint
-      const endpoint = `/classes/event?eventId=${eventId}`;
+      // Construct the full request URL for logging
+      const fullRequestUrl = `${RENDER_PROXY_URL}${endpoint}`;
+      console.log(`Fetching class data from: ${fullRequestUrl}`);
       
-      // Log the full request details for debugging
-      console.log(`Calling Supabase edge function 'eventor-api' with endpoint: ${endpoint}`);
-      
-      // Use the Supabase edge function to forward the request to the Render proxy
-      const { data: responseData, error } = await supabase.functions.invoke('eventor-api', {
-        body: {
+      // Direct request to the Render proxy
+      const response = await fetch(RENDER_PROXY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           apiKey,
           endpoint
-        }
+        })
       });
       
-      if (error) {
-        console.error(`Error from Supabase edge function:`, error);
-        
-        addLog(eventId, `Eventor API: ${endpoint}`, `Supabase edge function anrop misslyckades: ${error.message || error}`);
-        
-        if (runId) {
-          await saveLogToDatabase(
-            runId,
-            eventId.toString(), 
-            `Eventor API: ${endpoint}`,
-            `Supabase edge function anrop misslyckades: ${error.message || error}`
-          );
-        }
-        
-        continue;
+      if (!response.ok) {
+        throw new Error(`Render proxy responded with status: ${response.status}`);
       }
       
-      console.log(`Response from Supabase edge function:`, responseData);
+      const responseData = await response.json();
+      console.log(`Response from Render proxy:`, responseData);
       
       // Check if we have valid class data in the response
       if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
@@ -245,3 +240,4 @@ export const updateResultsWithParticipantCounts = (
     };
   });
 };
+
