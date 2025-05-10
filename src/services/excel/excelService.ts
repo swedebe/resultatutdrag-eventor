@@ -1,4 +1,3 @@
-
 /**
  * Excel import and export operations
  */
@@ -6,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { ResultRow } from '@/types/results';
 import { addLog } from '@/components/LogComponent';
 import { saveLogToDatabase } from '@/services/database/resultRepository';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Parse Excel file into JSON data
@@ -105,71 +105,59 @@ export const fetchClassParticipantCounts = async (
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
       
       // Log the API call attempt
-      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Anropar Render proxy för att hämta klassdata...`);
+      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Anropar Supabase edge function för att hämta klassdata...`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
           `Eventor API: classes/event?eventId=${eventId}`,
-          `Anropar Render proxy för att hämta klassdata...`
+          `Anropar Supabase edge function för att hämta klassdata...`
         );
       }
       
-      // Construct the full request URL to the Render proxy
-      const proxyUrl = 'https://eventor-proxy.onrender.com/eventor-api';
-      const requestBody = {
-        apiKey,
-        endpoint: `/classes/event?eventId=${eventId}`
-      };
+      // Construct the request endpoint
+      const endpoint = `/classes/event?eventId=${eventId}`;
       
       // Log the full request details for debugging
-      console.log(`Fetching class data from Render proxy: ${proxyUrl}`);
-      console.log(`Request body:`, requestBody);
-      console.log(`Full Eventor API endpoint being requested: https://eventor.orientering.se/api/classes/event?eventId=${eventId}`);
+      console.log(`Calling Supabase edge function 'eventor-api' with endpoint: ${endpoint}`);
       
-      // Use the Render proxy service for the Eventor API call
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
+      // Use the Supabase edge function to forward the request to the Render proxy
+      const { data: responseData, error } = await supabase.functions.invoke('eventor-api', {
+        body: {
+          apiKey,
+          endpoint
+        }
       });
       
-      console.log(`Response status from Render proxy: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error response from Render proxy:`, errorText);
+      if (error) {
+        console.error(`Error from Supabase edge function:`, error);
         
-        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `API-anrop misslyckades: ${response.status} ${response.statusText}`);
+        addLog(eventId, `Eventor API: ${endpoint}`, `Supabase edge function anrop misslyckades: ${error.message || error}`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(), 
-            `Eventor API: classes/event?eventId=${eventId}`,
-            `API-anrop misslyckades: ${response.status} ${response.statusText}`
+            `Eventor API: ${endpoint}`,
+            `Supabase edge function anrop misslyckades: ${error.message || error}`
           );
         }
         
         continue;
       }
       
-      // Parse the response as JSON - the Render proxy should now convert XML to JSON for us
-      const responseData = await response.json();
-      console.log(`Response data from Render proxy:`, responseData);
+      console.log(`Response from Supabase edge function:`, responseData);
       
       // Check if we have valid class data in the response
       if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
-        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
+        addLog(eventId, `Eventor API: ${endpoint}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(),
-            `Eventor API: classes/event?eventId=${eventId}`,
+            `Eventor API: ${endpoint}`,
             `Hittade ${responseData.ClassList.Class.length} klasser`
           );
         }
@@ -183,13 +171,13 @@ export const fetchClassParticipantCounts = async (
           const key = `${eventId}_${className}`;
           participantCountMap.set(key, numberOfEntries);
           
-          addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Klass ${className}: ${numberOfEntries} deltagare`);
+          addLog(eventId, `Eventor API: ${endpoint}`, `Klass ${className}: ${numberOfEntries} deltagare`);
           
           if (runId) {
             await saveLogToDatabase(
               runId,
               eventId.toString(),
-              `Eventor API: classes/event?eventId=${eventId}`,
+              `Eventor API: ${endpoint}`,
               `Klass ${className}: ${numberOfEntries} deltagare`
             );
           }
@@ -197,13 +185,13 @@ export const fetchClassParticipantCounts = async (
       } else {
         console.warn(`Invalid response data structure. Expected ClassList.Class array but received:`, responseData);
         
-        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Ogiltig svardata: Inga klasser hittades`);
+        addLog(eventId, `Eventor API: ${endpoint}`, `Ogiltig svardata: Inga klasser hittades`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(),
-            `Eventor API: classes/event?eventId=${eventId}`,
+            `Eventor API: ${endpoint}`,
             `Ogiltig svardata: Inga klasser hittades`
           );
         }
