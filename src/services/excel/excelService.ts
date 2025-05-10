@@ -116,19 +116,33 @@ export const fetchClassParticipantCounts = async (
         );
       }
       
+      // Construct the full request URL to the Render proxy
+      const proxyUrl = 'https://eventor-proxy.onrender.com/eventor-api';
+      const requestBody = {
+        apiKey,
+        endpoint: `/classes/event?eventId=${eventId}`
+      };
+      
+      // Log the full request details for debugging
+      console.log(`Fetching class data from Render proxy: ${proxyUrl}`);
+      console.log(`Request body:`, requestBody);
+      console.log(`Full Eventor API endpoint being requested: https://eventor.orientering.se/api/classes/event?eventId=${eventId}`);
+      
       // Use the Render proxy service for the Eventor API call
-      const response = await fetch('https://eventor-proxy.onrender.com/eventor-api', {
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          apiKey,
-          endpoint: `/classes/event?eventId=${eventId}`
-        })
+        body: JSON.stringify(requestBody)
       });
       
+      console.log(`Response status from Render proxy: ${response.status} ${response.statusText}`);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error response from Render proxy:`, errorText);
+        
         addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `API-anrop misslyckades: ${response.status} ${response.statusText}`);
         
         if (runId) {
@@ -145,6 +159,7 @@ export const fetchClassParticipantCounts = async (
       
       // Parse the response as JSON - the Render proxy should now convert XML to JSON for us
       const responseData = await response.json();
+      console.log(`Response data from Render proxy:`, responseData);
       
       // Check if we have valid class data in the response
       if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
@@ -180,6 +195,8 @@ export const fetchClassParticipantCounts = async (
           }
         }
       } else {
+        console.warn(`Invalid response data structure. Expected ClassList.Class array but received:`, responseData);
+        
         addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Ogiltig svardata: Inga klasser hittades`);
         
         if (runId) {
