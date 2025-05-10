@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -49,17 +48,20 @@ export const fetchEventorData = async (
     
     // Fetch number of starters if option is enabled (default to true if not specified)
     if (!batchOptions || batchOptions.fetchStarters) {
-      // Fetch user's API key from Supabase
+      // Get the user's session to obtain access token
       let apiKey = "";
+      let accessToken = "";
       
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (user) {
+        if (session) {
+          accessToken = session.access_token;
+          
           const { data: userData } = await supabase
             .from('users')
             .select('eventor_api_key')
-            .eq('id', user.id)
+            .eq('id', session.user.id)
             .single();
             
           if (userData && userData.eventor_api_key) {
@@ -87,22 +89,53 @@ export const fetchEventorData = async (
         await sleep(startersDelay);
       }
       
-      // Add API key to the request if available
-      if (apiKey) {
-        addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop`);
-        
-        if (runId) {
-          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop`);
+      // If we have an API key and access token, try to fetch the starters using the Edge Function
+      if (apiKey && accessToken) {
+        try {
+          addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop via Edge Function`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop via Edge Function`);
+          }
+          
+          // Call the Supabase Edge Function with the access token
+          const { data, error } = await supabase.functions.invoke('validate-eventor-api-key', {
+            body: { apiKey },
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          });
+          
+          if (error) {
+            throw error;
+          }
+          
+          // Process the response if successful
+          if (data && data.status === 200 && data.body) {
+            // Here you would parse the XML response to get the actual starters count
+            // For now, we'll just log the success
+            addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
+            }
+            
+            // For now, we'll keep using the placeholder
+          } else {
+            addLog(resultRow.eventId, currentEventorUrl, `API-anrop misslyckades. Status: ${data?.status || 'okänd'}`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop misslyckades. Status: ${data?.status || 'okänd'}`);
+            }
+          }
+        } catch (apiError: any) {
+          console.error("Error calling Eventor API via Edge Function:", apiError);
+          addLog(resultRow.eventId, currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
+          }
         }
-        
-        // Here you would implement the actual API call with the correct header format
-        // For example:
-        // const response = await fetch(currentEventorUrl, {
-        //   headers: {
-        //     "ApiKey": apiKey,
-        //     "Accept": "application/xml"
-        //   }
-        // });
       }
       
       // Implement starters count fetching logic here

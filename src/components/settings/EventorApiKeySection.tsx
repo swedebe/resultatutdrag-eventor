@@ -114,12 +114,33 @@ const EventorApiKeySection = () => {
     setTestResult(null);
     
     try {
-      // Call the Supabase Edge Function
+      // Get the current user's session to obtain the access token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Failed to get session: ${sessionError.message}`);
+      }
+      
+      if (!sessionData.session) {
+        throw new Error("No active session found. Please log in again.");
+      }
+      
+      const accessToken = sessionData.session.access_token;
+      
+      console.log("Calling validate-eventor-api-key edge function");
+      
+      // Call the Supabase Edge Function with the access token
       const { data, error } = await supabase.functions.invoke('validate-eventor-api-key', {
         body: { apiKey },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
       });
       
+      console.log("Edge function response:", data);
+      
       if (error) {
+        console.error("Error from edge function:", error);
         throw error;
       }
       
@@ -143,7 +164,7 @@ const EventorApiKeySection = () => {
         
         toast({
           title: "API-nyckel ogiltig",
-          description: "API-nyckeln är ogiltig eller anslutningen misslyckades.",
+          description: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${data.status}`,
           variant: "destructive",
         });
       }
