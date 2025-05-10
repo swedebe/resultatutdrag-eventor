@@ -136,6 +136,29 @@ const EventorBatch = () => {
         courseLengthDelay,
         startersDelay
       };
+
+      // If we're fetching starters, first check if the user has an API key
+      if (fetchStarters) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userData } = await supabase
+          .from('users')
+          .select('eventor_api_key')
+          .eq('id', user.id)
+          .single();
+        
+        if (!userData?.eventor_api_key) {
+          toast({
+            title: "Saknad API-nyckel",
+            description: "Du behöver ange en Eventor API-nyckel i din profil för att kunna hämta antal startande",
+            variant: "destructive",
+          });
+          
+          addLog("system", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+          if (newRunId) {
+            await saveLogToDatabase(newRunId, "system", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+          }
+        }
+      }
       
       const enrichedResults = await processExcelFile(
         file, 
@@ -160,7 +183,7 @@ const EventorBatch = () => {
           return true;
         },
         newRunId,
-        batchOptions  // Pass batch options as the 7th argument
+        batchOptions
       );
       
       // Final cancellation check

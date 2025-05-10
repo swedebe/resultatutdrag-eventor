@@ -21,5 +21,6 @@ export type ResultRow = {
   personId?: string | number;
   birthYear?: string | number;
   started?: string | boolean;
+  antalStartande?: string;
   [key: string]: any;
 };

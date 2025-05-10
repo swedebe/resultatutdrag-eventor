@@ -2,7 +2,13 @@
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
-import { parseExcelFile, mapExcelRowToResultRow, exportResultsToExcel } from './excel/excelService';
+import { 
+  parseExcelFile, 
+  mapExcelRowToResultRow, 
+  exportResultsToExcel, 
+  fetchClassParticipantCounts, 
+  updateResultsWithParticipantCounts 
+} from './excel/excelService';
 import { fetchEventorData } from './eventor/eventorService';
 import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveLogToDatabase } from './database/resultRepository';
 
@@ -36,33 +42,125 @@ export const processExcelFile = async (
   setCurrentStatus("Fil inläst, bearbetar data...");
   
   // Process each row
-  const enrichedResults: ResultRow[] = [];
+  let enrichedResults: ResultRow[] = [];
+  
+  // First pass: map all rows and collect unique event IDs
+  const uniqueEventIds = new Set<string>();
+  const mappedRows: ResultRow[] = [];
   
   for (let i = 0; i < jsonData.length; i++) {
-    const row = jsonData[i];
+    try {
+      const row = jsonData[i];
+      const resultRow = mapExcelRowToResultRow(row);
+      mappedRows.push(resultRow);
+      uniqueEventIds.add(resultRow.eventId.toString());
+    } catch (error) {
+      console.error(`Error mapping row ${i}:`, error);
+      addLog("error", "", `Fel vid mappning av rad ${i}: ${error}`);
+      if (runId) {
+        await saveLogToDatabase(runId, "error", "", `Fel vid mappning av rad ${i}: ${error}`);
+      }
+    }
+  }
+  
+  // Check if we need to fetch starter counts
+  if (batchOptions?.fetchStarters) {
+    setProgress(15);
+    setCurrentStatus("Hämtar information om antal startande från Eventor API...");
+    addLog("system", "", "Påbörjar hämtning av antal startande per klass");
+    
+    if (runId) {
+      await saveLogToDatabase(runId, "system", "", "Påbörjar hämtning av antal startande per klass");
+    }
     
     try {
-      // Map Excel row to ResultRow
-      const resultRow = mapExcelRowToResultRow(row);
+      // Fetch the user's Eventor API key
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('eventor_api_key')
+        .eq('id', user.id)
+        .single();
       
+      if (userData?.eventor_api_key) {
+        const eventIdArray = Array.from(uniqueEventIds);
+        const participantCountMap = await fetchClassParticipantCounts(
+          eventIdArray,
+          userData.eventor_api_key,
+          setCurrentStatus,
+          batchOptions.startersDelay
+        );
+        
+        // Update all results with participant counts
+        if (participantCountMap.size > 0) {
+          enrichedResults = updateResultsWithParticipantCounts(mappedRows, participantCountMap);
+          setProgress(30);
+          addLog("system", "", `Hämtade antal startande för ${participantCountMap.size} klasser`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, "system", "", `Hämtade antal startande för ${participantCountMap.size} klasser`);
+          }
+          
+          // Call the partial results callback to update UI
+          if (onPartialResults) {
+            await onPartialResults([...enrichedResults]);
+          }
+        } else {
+          addLog("warning", "", "Kunde inte hitta några deltagarsiffror");
+          if (runId) {
+            await saveLogToDatabase(runId, "warning", "", "Kunde inte hitta några deltagarsiffror");
+          }
+          enrichedResults = [...mappedRows];
+        }
+      } else {
+        addLog("warning", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+        if (runId) {
+          await saveLogToDatabase(runId, "warning", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+        }
+        enrichedResults = [...mappedRows];
+      }
+    } catch (error: any) {
+      console.error("Error fetching participant counts:", error);
+      addLog("error", "", `Fel vid hämtning av antal startande: ${error.message || error}`);
+      
+      if (runId) {
+        await saveLogToDatabase(runId, "error", "", `Fel vid hämtning av antal startande: ${error.message || error}`);
+      }
+      
+      // Continue with the original mapped rows
+      enrichedResults = [...mappedRows];
+    }
+  } else {
+    // Skip participant count fetching
+    enrichedResults = [...mappedRows];
+  }
+  
+  // Continue with normal processing (e.g., fetching course lengths)
+  for (let i = 0; i < enrichedResults.length; i++) {
+    const resultRow = enrichedResults[i];
+    
+    try {
       // Log the original started value for debugging
       console.log(`Row ${i+1}: Original 'started' value:`, resultRow.started, typeof resultRow.started);
       
-      setProgress(10 + Math.floor(80 * (i / jsonData.length)));
-      setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${jsonData.length})...`);
+      setProgress(30 + Math.floor(70 * (i / enrichedResults.length)));
+      setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${enrichedResults.length})...`);
       
-      // Pass batch options to fetchEventorData if they exist
-      const enhancedResultRow = await fetchEventorData(resultRow, runId, batchOptions);
+      // Only fetch additional Eventor data if course length is needed
+      if (batchOptions?.fetchCourseLength) {
+        const enhancedResultRow = await fetchEventorData(resultRow, runId, batchOptions);
+        enrichedResults[i] = enhancedResultRow;
+      }
       
       // Save processed result to database if runId is provided
       if (runId) {
         console.log(`About to save result for event ${resultRow.eventId}, started value:`, 
-          enhancedResultRow.started, typeof enhancedResultRow.started);
+          resultRow.started, typeof resultRow.started);
             
-        const savedSuccessfully = await saveResultToDatabase(enhancedResultRow, runId);
+        const savedSuccessfully = await saveResultToDatabase(enrichedResults[i], runId);
         
         const saveMessage = savedSuccessfully 
-          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen (started=${enhancedResultRow.started ? '1' : '0'})`
+          ? `Sparat resultat för tävling ${resultRow.eventId} i databasen (started=${enrichedResults[i].started ? '1' : '0'})`
           : `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
           
         addLog(resultRow.eventId, currentEventorUrl, saveMessage);
@@ -74,16 +172,14 @@ export const processExcelFile = async (
         if (!savedSuccessfully) {
           console.error(`Failed to save result for event ${resultRow.eventId}`, {
             'Original started': resultRow.started,
-            'Enhanced started': enhancedResultRow.started,
-            'Type': typeof enhancedResultRow.started
+            'Enhanced started': enrichedResults[i].started,
+            'Type': typeof enrichedResults[i].started
           });
         }
       }
       
-      enrichedResults.push(enhancedResultRow);
-      
       // Call the partial results callback if provided
-      if (onPartialResults) {
+      if (onPartialResults && i % 5 === 0) {
         // Await the callback and check if processing should continue
         const shouldContinue = await onPartialResults([...enrichedResults]);
         if (shouldContinue === false) {
@@ -97,9 +193,9 @@ export const processExcelFile = async (
         }
       }
       
-      // Use delay between calls to avoid rate limit
-      if (i < jsonData.length - 1 && delaySeconds > 0) {
-        const waitMessage = `Väntar ${delaySeconds} sekunder innan nästa anrop (för att undvika rate limiting)...`;
+      // Use delay between calls to avoid rate limit (only if fetching course lengths)
+      if (batchOptions?.fetchCourseLength && i < enrichedResults.length - 1 && batchOptions.courseLengthDelay > 0) {
+        const waitMessage = `Väntar ${batchOptions.courseLengthDelay} sekunder innan nästa anrop (för att undvika rate limiting)...`;
         setCurrentStatus(waitMessage);
         addLog(resultRow.eventId, currentEventorUrl, waitMessage);
         
@@ -107,7 +203,7 @@ export const processExcelFile = async (
           await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, waitMessage);
         }
         
-        await sleep(delaySeconds);
+        await sleep(batchOptions.courseLengthDelay);
       }
     } catch (error: any) {
       console.error(`Error processing row:`, error);
@@ -130,3 +226,6 @@ export const processExcelFile = async (
 
 // This variable is used in the eventorService.ts but needs to be here for TypeScript
 const currentEventorUrl = "";
+
+// Add the missing supabase import
+import { supabase } from "@/integrations/supabase/client";
