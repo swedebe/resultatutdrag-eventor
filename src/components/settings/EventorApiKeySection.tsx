@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -115,6 +114,7 @@ const EventorApiKeySection = () => {
     
     const renderProxyUrl = 'https://eventor-proxy.onrender.com/validate-eventor-api-key';
     console.log(`Starting API key test with Render proxy URL: ${renderProxyUrl}`);
+    console.log("Sending API key validation request to:", renderProxyUrl);
     
     try {
       console.log("Preparing fetch request to Render proxy service");
@@ -132,7 +132,7 @@ const EventorApiKeySection = () => {
         }),
       });
       
-      console.log("Fetch request sent, awaiting response...");
+      console.log("Fetch request sent to URL:", renderProxyUrl);
       
       // Add a timeout to the fetch promise to detect if it's hanging
       const timeoutPromise = new Promise((_, reject) => {
