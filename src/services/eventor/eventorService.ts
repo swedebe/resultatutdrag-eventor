@@ -88,13 +88,21 @@ export const fetchEventorData = async (
       }
       
       // Add API key to the request if available
-      // This is a placeholder for the actual API call implementation
       if (apiKey) {
         addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop`);
         
         if (runId) {
           await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop`);
         }
+        
+        // Here you would implement the actual API call with the correct header format
+        // For example:
+        // const response = await fetch(currentEventorUrl, {
+        //   headers: {
+        //     "ApiKey": apiKey,
+        //     "Accept": "application/xml"
+        //   }
+        // });
       }
       
       // Implement starters count fetching logic here
