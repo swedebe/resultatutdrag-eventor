@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction } from "@/components/LogComponent";
+import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/file-uploader/FileUploadSection";
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAllAppTexts } from "@/hooks/useAppText";
+import { saveLogToDatabase } from "@/services/database/resultRepository";
 
 const EventorBatch = () => {
   const { toast } = useToast();
