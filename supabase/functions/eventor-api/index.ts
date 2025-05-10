@@ -6,7 +6,9 @@ import axios from 'https://deno.land/x/axiod/mod.ts'
 
 interface RequestBody {
   apiKey: string;
-  endpoint: string;
+  endpoint?: string;
+  eventId?: string | number;
+  includeSplitTimes?: boolean;
 }
 
 const EVENTOR_API_BASE_URL = 'https://eventor.orientering.se/api';
@@ -20,6 +22,94 @@ serve(async (req) => {
   try {
     console.log("Edge Function: eventor-api - request received");
     
+    // Check if this is a request to the /results/event endpoint
+    const url = new URL(req.url);
+    const path = url.pathname;
+    
+    if (path.endsWith('/results/event') && req.method === 'POST') {
+      console.log("Handling /results/event endpoint");
+      
+      // Extract request body
+      const body = await req.json() as RequestBody;
+      const { apiKey, eventId, includeSplitTimes = false } = body;
+      
+      if (!apiKey) {
+        return new Response(
+          JSON.stringify({ error: 'API key is required' }),
+          { 
+            status: 400, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+      
+      if (!eventId) {
+        return new Response(
+          JSON.stringify({ error: 'Event ID is required' }),
+          { 
+            status: 400, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+      
+      console.log(`Processing event entries request for event ID: ${eventId}`);
+      
+      // Construct the Eventor API URL for entries
+      const entriesUrl = `${EVENTOR_API_BASE_URL}/events/${eventId}/entries`;
+      console.log(`Forwarding request to Eventor API: ${entriesUrl}`);
+      
+      try {
+        // Make the request to the Eventor API
+        const response = await axios({
+          method: 'GET',
+          url: entriesUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'ApiKey': apiKey
+          }
+        });
+        
+        console.log(`Response status from Eventor API: ${response.status}`);
+        
+        // Forward the response to the client
+        return new Response(
+          JSON.stringify(response.data),
+          { 
+            status: response.status, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      } catch (apiError: any) {
+        console.error("Error forwarding request to Eventor API:", apiError);
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Error forwarding request to Eventor API',
+            details: apiError.message || 'Unknown error occurred',
+            status: apiError.response?.status
+          }),
+          { 
+            status: apiError.response?.status || 500, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+    }
+    
+    // Original logic for the dynamic endpoints
     let apiKey: string | undefined;
     let endpoint: string | undefined;
     
@@ -47,13 +137,11 @@ serve(async (req) => {
       }
     } else if (req.method === 'GET') {
       // For GET requests, extract parameters from the URL
-      const url = new URL(req.url);
       
       // The API key must be in the headers for GET requests
       apiKey = req.headers.get('x-eventor-api-key') || undefined;
       
       // The endpoint is everything after /eventor-api in the path
-      const path = url.pathname;
       const apiPrefix = '/eventor-api';
       
       if (path.startsWith(apiPrefix)) {

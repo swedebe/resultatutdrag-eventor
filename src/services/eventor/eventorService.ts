@@ -70,8 +70,9 @@ export const fetchEventorData = async (
         console.error("Failed to fetch API key from Supabase:", error);
       }
       
-      // Set URL for API call to get starters
-      currentEventorUrl = `https://eventor.orientering.se/api/events/${resultRow.eventId}/entries`;
+      // Set URL for API call to get starters using the Render proxy
+      const renderProxyUrl = 'https://eventor-proxy.onrender.com/results/event';
+      currentEventorUrl = renderProxyUrl;
       
       // Use the specified delay for starters or default to 1 second
       const startersDelay = batchOptions?.startersDelay ?? 1.0;
@@ -87,47 +88,43 @@ export const fetchEventorData = async (
         await sleep(startersDelay);
       }
       
-      // If we have an API key, try to fetch the starters using the Supabase edge function
+      // If we have an API key, try to fetch the starters using the Render proxy
       if (apiKey) {
         try {
           // Update the log message to use the new approach
-          addLog(resultRow.eventId, currentEventorUrl, `Använder Supabase edge function för Eventor API-anrop`);
+          addLog(resultRow.eventId, currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder Supabase edge function för Eventor API-anrop`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
           }
           
-          // Construct the endpoint
-          const endpoint = `/events/${resultRow.eventId}/entries`;
-          
           // Log the full request details for debugging
-          console.log(`Calling Supabase edge function 'eventor-api' with endpoint: ${endpoint}`);
+          console.log(`Making POST request to Render proxy: ${renderProxyUrl}`);
+          console.log(`Request payload: ${JSON.stringify({
+            apiKey: apiKey.substring(0, 5) + '...',
+            eventId: resultRow.eventId,
+            includeSplitTimes: false
+          })}`);
           
-          // Call the Supabase edge function
-          const { data: responseData, error } = await supabase.functions.invoke('eventor-api', {
-            body: {
+          // Call the Render proxy directly with a POST request
+          const response = await fetch(renderProxyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
               apiKey,
-              endpoint
-            }
+              eventId: resultRow.eventId,
+              includeSplitTimes: false
+            }),
           });
           
-          if (error) {
-            console.error(`Error from Supabase edge function:`, error);
-            
-            addLog(resultRow.eventId, currentEventorUrl, 
-              `Supabase edge function anrop misslyckades: ${error.message || error}`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId,
-                resultRow.eventId.toString(),
-                currentEventorUrl,
-                `Supabase edge function anrop misslyckades: ${error.message || error}`
-              );
-            }
-          } else {
-            // Process the response
-            console.log(`Response from Supabase edge function:`, responseData);
+          console.log(`Response status from Render proxy: ${response.status}`);
+          
+          // Process the response
+          if (response.ok) {
+            const responseData = await response.json();
+            console.log(`Response received from Render proxy:`, responseData);
             
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             
@@ -151,9 +148,24 @@ export const fetchEventorData = async (
                 );
               }
             }
+          } else {
+            const errorText = await response.text();
+            console.error(`Error response from Render proxy: ${response.status} - ${errorText}`);
+            
+            addLog(resultRow.eventId, currentEventorUrl, 
+              `Render proxy anrop misslyckades: HTTP ${response.status} - ${errorText}`);
+            
+            if (runId) {
+              await saveLogToDatabase(
+                runId,
+                resultRow.eventId.toString(),
+                currentEventorUrl,
+                `Render proxy anrop misslyckades: HTTP ${response.status} - ${errorText}`
+              );
+            }
           }
         } catch (apiError: any) {
-          console.error("Error calling Eventor API via Supabase edge function:", apiError);
+          console.error("Error calling Eventor API via Render proxy:", apiError);
           addLog(resultRow.eventId, currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
           
           if (runId) {
