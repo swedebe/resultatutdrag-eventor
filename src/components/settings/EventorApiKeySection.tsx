@@ -113,11 +113,15 @@ const EventorApiKeySection = () => {
     setIsTesting(true);
     setTestResult(null);
     
+    const renderProxyUrl = 'https://eventor-proxy.onrender.com/validate-eventor-api-key';
+    console.log(`Starting API key test with Render proxy URL: ${renderProxyUrl}`);
+    
     try {
-      console.log("Calling Render-based proxy service for Eventor API validation");
+      console.log("Preparing fetch request to Render proxy service");
+      console.log(`Request payload: ${JSON.stringify({ apiKey: apiKey.substring(0, 5) + '...' })}`);
       
-      // Call the new Render-based API proxy
-      const response = await fetch('https://eventor-proxy.onrender.com/validate-eventor-api-key', {
+      // Call the Render proxy service
+      const fetchPromise = fetch(renderProxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,8 +129,19 @@ const EventorApiKeySection = () => {
         body: JSON.stringify({ apiKey }),
       });
       
+      console.log("Fetch request sent, awaiting response...");
+      
+      // Add a timeout to the fetch promise to detect if it's hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Request timed out after 10 seconds")), 10000);
+      });
+      
+      // Race the fetch against the timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      console.log(`Response received with status: ${response.status}`);
+      
       const data = await response.json();
-      console.log("Proxy service response:", data);
+      console.log("Response data parsed successfully:", data);
       
       if (data.status === 200) {
         setTestResult({
@@ -154,6 +169,12 @@ const EventorApiKeySection = () => {
       }
     } catch (error: any) {
       console.error("Error testing API key:", error);
+      
+      // Detailed error logging
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error("Network error - This might indicate a CORS issue or that the Render service is unreachable");
+      }
+      
       setTestResult({
         success: false,
         message: `Fel vid testning av API-nyckel: ${error instanceof Error ? error.message : 'Okänt fel'}`,
