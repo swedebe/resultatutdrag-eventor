@@ -10,6 +10,8 @@ interface RequestBody {
   apiKey: string;
 }
 
+const EVENTOR_API_URL = 'https://eventor.orientering.se/api/organisation/apiKey';
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -53,24 +55,42 @@ serve(async (req) => {
       );
     }
 
-    console.log("Making request to Eventor API");
+    // Log the request details
+    const requestHeaders = {
+      'ApiKey': apiKey,
+      'Accept': 'application/xml'
+    };
+    
+    console.log(`Making request to Eventor API at URL: ${EVENTOR_API_URL}`);
+    console.log(`Request headers: ${JSON.stringify(requestHeaders, null, 2)}`);
     
     // Make the request to Eventor API
-    const response = await fetch('https://eventor.orientering.se/api/organisation/apiKey', {
+    const response = await fetch(EVENTOR_API_URL, {
       method: 'GET',
-      headers: {
-        'ApiKey': apiKey,
-        'Accept': 'application/xml'
-      }
+      headers: requestHeaders
     });
 
     // Get the response text
     const responseText = await response.text();
+    const responseHeaders = Object.fromEntries(response.headers.entries());
     
     console.log(`Eventor API response status: ${response.status}`);
+    console.log(`Eventor API response headers: ${JSON.stringify(responseHeaders, null, 2)}`);
     
     if (response.status !== 200) {
       console.error(`Error from Eventor API - Status: ${response.status}, Response: ${responseText}`);
+      // Log the first 500 characters of the response for debugging but avoid flooding logs
+      const truncatedResponse = responseText.length > 500 
+        ? responseText.substring(0, 500) + "... (truncated)"
+        : responseText;
+      console.error(`Truncated response: ${truncatedResponse}`);
+    } else {
+      console.log("Eventor API request successful");
+      // Log a small sample of the response for debugging successful cases
+      const sampleResponse = responseText.length > 200 
+        ? responseText.substring(0, 200) + "... (truncated)"
+        : responseText;
+      console.log(`Sample response: ${sampleResponse}`);
     }
 
     // Return the response with the same status code and body
@@ -79,7 +99,11 @@ serve(async (req) => {
         status: response.status,
         statusText: response.statusText,
         body: responseText,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: responseHeaders,
+        requestDetails: {
+          url: EVENTOR_API_URL,
+          headers: requestHeaders
+        }
       }),
       { 
         headers: { 
@@ -89,10 +113,21 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    // Handle any errors
+    // Handle any errors and log detailed error information
     console.error("Edge function error:", error);
+    console.error("Error stack:", error.stack);
+    
+    if (error instanceof Error) {
+      console.error(`Error type: ${error.constructor.name}`);
+      console.error(`Error message: ${error.message}`);
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error occurred', stack: error.stack }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error occurred',
+        stack: error.stack,
+        type: error instanceof Error ? error.constructor.name : typeof error
+      }),
       { 
         status: 500, 
         headers: { 
