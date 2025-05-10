@@ -1,3 +1,4 @@
+
 /**
  * Excel import and export operations
  */
@@ -107,8 +108,8 @@ export const fetchClassParticipantCounts = async (
     try {
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
       
-      // Construct the full endpoint path
-      const eventorApiEndpoint = `/classes/event?eventId=${eventId}`;
+      // Construct the full endpoint path - UPDATED to use the /results/event endpoint
+      const eventorApiEndpoint = `/results/event?eventId=${eventId}&includeSplitTimes=false`;
       
       // Log the API call attempt
       addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Anropar Eventor API via Render proxy...`);
@@ -122,7 +123,7 @@ export const fetchClassParticipantCounts = async (
         );
       }
       
-      // Construct the full request URL - this is now the direct endpoint on the Render proxy
+      // Construct the full request URL
       const fullRequestUrl = `${RENDER_PROXY_BASE_URL}${eventorApiEndpoint}`;
       console.log(`Fetching class data from: ${fullRequestUrl}`);
       
@@ -142,23 +143,30 @@ export const fetchClassParticipantCounts = async (
       const responseData = await response.json();
       console.log(`Response from Render proxy:`, responseData);
       
-      // Check if we have valid class data in the response
-      if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
-        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
+      // Process the results data from the /results/event endpoint
+      if (responseData && responseData.Event && responseData.Event.EventClassList && 
+          Array.isArray(responseData.Event.EventClassList.EventClass)) {
+        
+        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${responseData.Event.EventClassList.EventClass.length} klasser`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             eventId.toString(),
             `Eventor API: ${eventorApiEndpoint}`,
-            `Hittade ${responseData.ClassList.Class.length} klasser`
+            `Hittade ${responseData.Event.EventClassList.EventClass.length} klasser`
           );
         }
         
         // Process each class in the response
-        for (const classInfo of responseData.ClassList.Class) {
-          const className = classInfo.Name;
-          const numberOfEntries = parseInt(classInfo.NumberOfEntries || '0', 10);
+        for (const eventClass of responseData.Event.EventClassList.EventClass) {
+          const className = eventClass.Name;
+          
+          // Count the number of results in this class
+          let numberOfEntries = 0;
+          if (eventClass.ResultList && Array.isArray(eventClass.ResultList.Result)) {
+            numberOfEntries = eventClass.ResultList.Result.length;
+          }
           
           // Create a unique key combining eventId and className
           const key = `${eventId}_${className}`;
@@ -176,7 +184,7 @@ export const fetchClassParticipantCounts = async (
           }
         }
       } else {
-        console.warn(`Invalid response data structure. Expected ClassList.Class array but received:`, responseData);
+        console.warn(`Invalid response data structure. Expected Event.EventClassList.EventClass array but received:`, responseData);
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Ogiltig svardata: Inga klasser hittades`);
         
@@ -201,13 +209,13 @@ export const fetchClassParticipantCounts = async (
     } catch (error: any) {
       console.error(`Error fetching class data for event ${eventId}:`, error);
       
-      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Fel vid hämtning av klassdata: ${error.message || error}`);
+      addLog(eventId, `Eventor API: results/event?eventId=${eventId}`, `Fel vid hämtning av klassdata: ${error.message || error}`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
-          `Eventor API: classes/event?eventId=${eventId}`,
+          `Eventor API: results/event?eventId=${eventId}`,
           `Fel vid hämtning av klassdata: ${error.message || error}`
         );
       }
