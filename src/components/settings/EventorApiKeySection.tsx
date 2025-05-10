@@ -140,14 +140,18 @@ const EventorApiKeySection = () => {
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
       console.log(`Response received with status: ${response.status}`);
       
-      const data = await response.json();
-      console.log("Response data parsed successfully:", data);
+      // Get response as text since we're expecting XML now
+      const xmlText = await response.text();
+      console.log("Response received as text:", xmlText.substring(0, 100) + "...");
       
-      if (data.status === 200) {
+      // Check if the response contains expected XML content
+      const isValidXml = xmlText.includes('<?xml') || xmlText.includes('<') && xmlText.includes('>');
+      
+      if (response.ok && isValidXml) {
         setTestResult({
           success: true,
           message: "API-nyckeln är giltig.",
-          responseBody: data.body
+          responseBody: xmlText
         });
         
         toast({
@@ -157,13 +161,13 @@ const EventorApiKeySection = () => {
       } else {
         setTestResult({
           success: false,
-          message: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${data.status}`,
-          responseBody: data.body
+          message: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${response.status}`,
+          responseBody: xmlText
         });
         
         toast({
           title: "API-nyckel ogiltig",
-          description: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${data.status}`,
+          description: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${response.status}`,
           variant: "destructive",
         });
       }
