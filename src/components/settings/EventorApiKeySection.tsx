@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -147,17 +148,31 @@ const EventorApiKeySection = () => {
       const responseData = await response.json();
       console.log("Response received as JSON:", responseData);
       
-      // Check if the response contains expected data for a valid API key
-      if (response.ok && responseData && (responseData.OrganisationIdForApiKey || responseData.OrganisationList)) {
+      // Updated validation logic to check for "Organisation" object as well
+      if (
+        response.ok && 
+        responseData && 
+        (
+          responseData.OrganisationIdForApiKey || 
+          responseData.OrganisationList || 
+          responseData.Organisation
+        )
+      ) {
+        // Extract organization name if available for a more informative message
+        let orgName = "Unknown organization";
+        if (responseData.Organisation && responseData.Organisation.Name) {
+          orgName = responseData.Organisation.Name;
+        }
+        
         setTestResult({
           success: true,
-          message: "API-nyckeln är giltig.",
+          message: `API-nyckeln är giltig. Organisation: ${orgName}`,
           responseData
         });
         
         toast({
           title: "API-nyckel testad",
-          description: "API-nyckeln är giltig.",
+          description: `API-nyckeln är giltig. Organization: ${orgName}`,
         });
       } else {
         setTestResult({
