@@ -114,21 +114,20 @@ const EventorApiKeySection = () => {
     setTestResult(null);
     
     try {
-      const response = await fetch("https://eventor.orientering.se/api/organisation/apiKey", {
-        method: "GET",
-        headers: {
-          "ApiKey": apiKey,
-          "Accept": "application/xml"
-        }
+      // Call the Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('validate-eventor-api-key', {
+        body: { apiKey },
       });
       
-      const responseText = await response.text();
+      if (error) {
+        throw error;
+      }
       
-      if (response.ok) {
+      if (data.status === 200) {
         setTestResult({
           success: true,
           message: "API-nyckeln är giltig.",
-          responseBody: responseText
+          responseBody: data.body
         });
         
         toast({
@@ -138,8 +137,8 @@ const EventorApiKeySection = () => {
       } else {
         setTestResult({
           success: false,
-          message: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${response.status}`,
-          responseBody: responseText
+          message: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${data.status}`,
+          responseBody: data.body
         });
         
         toast({
