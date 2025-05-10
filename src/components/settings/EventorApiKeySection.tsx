@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Key, Save, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-const LOCAL_STORAGE_KEY = "eventorApiKey";
+import { supabase } from "@/integrations/supabase/client";
 
 const EventorApiKeySection = () => {
   const { toast } = useToast();
@@ -22,31 +21,77 @@ const EventorApiKeySection = () => {
   } | null>(null);
 
   useEffect(() => {
-    // Load the API key from localStorage on component mount
-    const savedApiKey = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
+    // Fetch the API key from Supabase on component mount
+    const fetchApiKey = async () => {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError) {
+          console.error("Error fetching auth user:", authError);
+          return;
+        }
+        
+        if (!user) {
+          console.log("No authenticated user found");
+          return;
+        }
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('eventor_api_key')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          return;
+        }
+        
+        if (data && data.eventor_api_key) {
+          setApiKey(data.eventor_api_key);
+        }
+      } catch (error) {
+        console.error("Failed to fetch API key:", error);
+      }
+    };
+
+    fetchApiKey();
   }, []);
 
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     setIsSaving(true);
     try {
-      // Save the API key to localStorage
-      localStorage.setItem(LOCAL_STORAGE_KEY, apiKey);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        throw authError;
+      }
+      
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ eventor_api_key: apiKey })
+        .eq('id', user.id);
+        
+      if (error) {
+        throw error;
+      }
       
       toast({
         title: "API-nyckel sparad",
-        description: "Din Eventor API-nyckel har sparats i webbläsarminnet.",
+        description: "Din Eventor API-nyckel har sparats i din användarprofil.",
       });
       
       // Clear any previous test results when saving a new key
       setTestResult(null);
-    } catch (error) {
-      console.error("Failed to save API key to localStorage:", error);
+    } catch (error: any) {
+      console.error("Failed to save API key to Supabase:", error);
       toast({
         title: "Fel vid sparande",
-        description: "Kunde inte spara API-nyckeln. Kontrollera din webbläsarinställningar.",
+        description: "Kunde inte spara API-nyckeln: " + (error.message || "Okänt fel"),
         variant: "destructive",
       });
     } finally {
@@ -72,8 +117,8 @@ const EventorApiKeySection = () => {
       const response = await fetch("https://eventor.orientering.se/api/organisation/apiKey", {
         method: "GET",
         headers: {
-          "Authorization": `ApiKey ${apiKey}`,
-          "Content-Type": "application/json"
+          "ApiKey": apiKey,
+          "Accept": "application/xml"
         }
       });
       
@@ -103,7 +148,7 @@ const EventorApiKeySection = () => {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error testing API key:", error);
       setTestResult({
         success: false,
@@ -138,13 +183,13 @@ const EventorApiKeySection = () => {
             <Label htmlFor="eventor-api-key">Eventor API-nyckel</Label>
             <Input
               id="eventor-api-key"
-              type="password"
+              type="text"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Ange din Eventor API-nyckel"
             />
             <p className="text-xs text-muted-foreground">
-              Denna nyckel sparas i din webbläsare och skickas aldrig till vår server.
+              Denna nyckel sparas i din användarprofil och är endast synlig för dig.
             </p>
           </div>
           

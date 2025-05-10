@@ -4,6 +4,7 @@ import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
 import { BatchProcessingOptions } from '../FileProcessingService';
 import { sleep } from '../utils/processingUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 // Export this for TypeScript since it's used in other files
 export let currentEventorUrl = "";
@@ -48,8 +49,26 @@ export const fetchEventorData = async (
     
     // Fetch number of starters if option is enabled (default to true if not specified)
     if (!batchOptions || batchOptions.fetchStarters) {
-      // Get API key from localStorage
-      const apiKey = localStorage.getItem("eventorApiKey") || "";
+      // Fetch user's API key from Supabase
+      let apiKey = "";
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('eventor_api_key')
+            .eq('id', user.id)
+            .single();
+            
+          if (userData && userData.eventor_api_key) {
+            apiKey = userData.eventor_api_key;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch API key from Supabase:", error);
+      }
       
       // Set URL for API call to get starters
       currentEventorUrl = `https://eventor.orientering.se/api/events/${resultRow.eventId}/entries`;

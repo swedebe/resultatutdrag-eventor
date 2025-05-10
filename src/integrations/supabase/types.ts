@@ -222,6 +222,7 @@ export type Database = {
           club_name: string
           created_at: string
           email: string
+          eventor_api_key: string | null
           id: string
           name: string | null
           role: string | null
@@ -230,6 +231,7 @@ export type Database = {
           club_name: string
           created_at?: string
           email: string
+          eventor_api_key?: string | null
           id?: string
           name?: string | null
           role?: string | null
@@ -238,6 +240,7 @@ export type Database = {
           club_name?: string
           created_at?: string
           email?: string
+          eventor_api_key?: string | null
           id?: string
           name?: string | null
           role?: string | null
