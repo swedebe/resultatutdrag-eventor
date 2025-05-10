@@ -56,9 +56,10 @@ serve(async (req) => {
     }
 
     // Log the request details
+    // Updated to match MeOS application - removed Accept header, added User-Agent: MeOS
     const requestHeaders = {
       'ApiKey': apiKey,
-      'Accept': 'application/xml'
+      'User-Agent': 'MeOS'
     };
     
     console.log(`Making request to Eventor API at URL: ${EVENTOR_API_URL}`);
