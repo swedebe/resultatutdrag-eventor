@@ -12,6 +12,15 @@ interface RequestBody {
 
 const EVENTOR_API_URL = 'https://eventor.orientering.se/api/organisation/apiKey';
 
+// Parse URL function to get hostname and path
+function parseUrl(url: string) {
+  const urlObj = new URL(url);
+  return {
+    hostname: urlObj.hostname,
+    path: `${urlObj.pathname}${urlObj.search}`
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -65,18 +74,68 @@ serve(async (req) => {
     console.log(`Making request to Eventor API at URL: ${EVENTOR_API_URL}`);
     console.log(`Request headers: ${JSON.stringify(requestHeaders, null, 2)}`);
     
-    // Make the request to Eventor API
-    const response = await fetch(EVENTOR_API_URL, {
-      method: 'GET',
-      headers: requestHeaders
-    });
-
-    // Get the response text
-    const responseText = await response.text();
-    const responseHeaders = Object.fromEntries(response.headers.entries());
+    // Extract hostname and path from URL
+    const urlParts = parseUrl(EVENTOR_API_URL);
     
+    console.log(`Using HTTPS module with hostname: ${urlParts.hostname}, path: ${urlParts.path}`);
+    
+    // Create a promise to handle the HTTPS request
+    const httpsResponse = await new Promise((resolve, reject) => {
+      const https = (Deno as any).createHttpClient();
+      
+      const options = {
+        hostname: urlParts.hostname,
+        path: urlParts.path,
+        method: 'GET',
+        headers: requestHeaders
+      };
+      
+      console.log(`HTTPS request options: ${JSON.stringify(options, null, 2)}`);
+      
+      try {
+        const req = https.request(options, (res: any) => {
+          console.log(`HTTPS response status: ${res.statusCode}`);
+          console.log(`HTTPS response headers: ${JSON.stringify(res.headers, null, 2)}`);
+          
+          let data = '';
+          
+          res.on('data', (chunk: any) => {
+            data += chunk;
+          });
+          
+          res.on('end', () => {
+            console.log(`HTTPS response complete, data length: ${data.length}`);
+            resolve({
+              status: res.statusCode,
+              statusText: res.statusMessage,
+              headers: res.headers,
+              body: data
+            });
+          });
+        });
+        
+        req.on('error', (err: Error) => {
+          console.error(`HTTPS request error: ${err.message}`);
+          reject(err);
+        });
+        
+        req.end();
+      } catch (err) {
+        console.error(`Error creating HTTPS request: ${err instanceof Error ? err.message : String(err)}`);
+        reject(err);
+      }
+    }).catch(err => {
+      console.error(`Promise rejection in HTTPS request: ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    });
+    
+    const response = httpsResponse as any;
+    
+    // Get the response data
     console.log(`Eventor API response status: ${response.status}`);
-    console.log(`Eventor API response headers: ${JSON.stringify(responseHeaders, null, 2)}`);
+    console.log(`Eventor API response headers: ${JSON.stringify(response.headers, null, 2)}`);
+    
+    const responseText = response.body;
     
     if (response.status !== 200) {
       console.error(`Error from Eventor API - Status: ${response.status}, Response: ${responseText}`);
@@ -100,7 +159,7 @@ serve(async (req) => {
         status: response.status,
         statusText: response.statusText,
         body: responseText,
-        headers: responseHeaders,
+        headers: response.headers,
         requestDetails: {
           url: EVENTOR_API_URL,
           headers: requestHeaders
