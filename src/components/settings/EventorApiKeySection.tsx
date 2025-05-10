@@ -114,35 +114,19 @@ const EventorApiKeySection = () => {
     setTestResult(null);
     
     try {
-      // Get the current user's session to obtain the access token
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log("Calling Render-based proxy service for Eventor API validation");
       
-      if (sessionError) {
-        throw new Error(`Failed to get session: ${sessionError.message}`);
-      }
-      
-      if (!sessionData.session) {
-        throw new Error("No active session found. Please log in again.");
-      }
-      
-      const accessToken = sessionData.session.access_token;
-      
-      console.log("Calling validate-eventor-api-key edge function");
-      
-      // Call the Supabase Edge Function with the access token
-      const { data, error } = await supabase.functions.invoke('validate-eventor-api-key', {
-        body: { apiKey },
+      // Call the new Render-based API proxy
+      const response = await fetch('https://eventor-proxy.onrender.com/validate-eventor-api-key', {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiKey }),
       });
       
-      console.log("Edge function response:", data);
-      
-      if (error) {
-        console.error("Error from edge function:", error);
-        throw error;
-      }
+      const data = await response.json();
+      console.log("Proxy service response:", data);
       
       if (data.status === 200) {
         setTestResult({

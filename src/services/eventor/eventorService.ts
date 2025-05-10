@@ -50,14 +50,11 @@ export const fetchEventorData = async (
     if (!batchOptions || batchOptions.fetchStarters) {
       // Get the user's session to obtain access token
       let apiKey = "";
-      let accessToken = "";
       
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
-          accessToken = session.access_token;
-          
           const { data: userData } = await supabase
             .from('users')
             .select('eventor_api_key')
@@ -89,26 +86,25 @@ export const fetchEventorData = async (
         await sleep(startersDelay);
       }
       
-      // If we have an API key and access token, try to fetch the starters using the Edge Function
-      if (apiKey && accessToken) {
+      // If we have an API key, try to fetch the starters using the Render API proxy
+      if (apiKey) {
         try {
-          addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop via Edge Function`);
+          addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop via Render proxy`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop via Edge Function`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop via Render proxy`);
           }
           
-          // Call the Supabase Edge Function with the access token
-          const { data, error } = await supabase.functions.invoke('validate-eventor-api-key', {
-            body: { apiKey },
+          // Call the Render proxy service instead of Supabase Edge Function
+          const response = await fetch('https://eventor-proxy.onrender.com/validate-eventor-api-key', {
+            method: 'POST',
             headers: {
-              Authorization: `Bearer ${accessToken}`
-            }
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ apiKey }),
           });
           
-          if (error) {
-            throw error;
-          }
+          const data = await response.json();
           
           // Process the response if successful
           if (data && data.status === 200 && data.body) {
@@ -129,7 +125,7 @@ export const fetchEventorData = async (
             }
           }
         } catch (apiError: any) {
-          console.error("Error calling Eventor API via Edge Function:", apiError);
+          console.error("Error calling Eventor API via Render proxy:", apiError);
           addLog(resultRow.eventId, currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
           
           if (runId) {
