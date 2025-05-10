@@ -4,6 +4,8 @@
  */
 import * as XLSX from 'xlsx';
 import { ResultRow } from '@/types/results';
+import { addLog } from '@/components/LogComponent';
+import { saveLogToDatabase } from '@/services/database/resultRepository';
 
 /**
  * Parse Excel file into JSON data
@@ -84,13 +86,15 @@ export const exportResultsToExcel = (results: ResultRow[]): void => {
  * @param apiKey Eventor API key
  * @param setStatus Function to update status for user feedback
  * @param delaySeconds Delay between API calls in seconds
+ * @param runId Optional run ID for logging
  * @returns Map of eventId+className to participant count
  */
 export const fetchClassParticipantCounts = async (
   eventIds: string[],
   apiKey: string,
   setStatus: (status: string) => void,
-  delaySeconds: number = 1
+  delaySeconds: number = 1,
+  runId?: string | null
 ): Promise<Map<string, number>> => {
   const participantCountMap = new Map<string, number>();
   let totalEvents = eventIds.length;
@@ -99,35 +103,93 @@ export const fetchClassParticipantCounts = async (
   for (const eventId of eventIds) {
     try {
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
-      const response = await fetch(`https://eventor-proxy.onrender.com/eventor/api/classes/event?eventId=${eventId}`, {
-        method: 'GET',
+      
+      // Log the API call attempt
+      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Anropar Render proxy för att hämta klassdata...`);
+      
+      if (runId) {
+        await saveLogToDatabase(
+          runId,
+          eventId.toString(),
+          `Eventor API: classes/event?eventId=${eventId}`,
+          `Anropar Render proxy för att hämta klassdata...`
+        );
+      }
+      
+      // Use the Render proxy service for the Eventor API call
+      const response = await fetch('https://eventor-proxy.onrender.com/eventor-api', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'ApiKey': apiKey
-        }
+        },
+        body: JSON.stringify({
+          apiKey,
+          endpoint: `/classes/event?eventId=${eventId}`
+        })
       });
       
       if (!response.ok) {
-        console.error(`Failed to fetch classes for event ${eventId}:`, response.statusText);
+        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `API-anrop misslyckades: ${response.status} ${response.statusText}`);
+        
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            eventId.toString(), 
+            `Eventor API: classes/event?eventId=${eventId}`,
+            `API-anrop misslyckades: ${response.status} ${response.statusText}`
+          );
+        }
+        
         continue;
       }
       
-      // Parse the XML response
-      const xmlText = await response.text();
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+      // Parse the response as JSON - the Render proxy should now convert XML to JSON for us
+      const responseData = await response.json();
       
-      // Extract class data
-      const classElements = xmlDoc.getElementsByTagName('ClassList')[0]?.getElementsByTagName('Class') || [];
-      
-      for (let i = 0; i < classElements.length; i++) {
-        const classElement = classElements[i];
-        const className = classElement.getElementsByTagName('Name')[0]?.textContent || '';
-        const numberOfEntries = parseInt(classElement.getElementsByTagName('NumberOfEntries')[0]?.textContent || '0', 10);
+      // Check if we have valid class data in the response
+      if (responseData && responseData.ClassList && Array.isArray(responseData.ClassList.Class)) {
+        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Hittade ${responseData.ClassList.Class.length} klasser`);
         
-        // Create a unique key combining eventId and className
-        const key = `${eventId}_${className}`;
-        participantCountMap.set(key, numberOfEntries);
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            eventId.toString(),
+            `Eventor API: classes/event?eventId=${eventId}`,
+            `Hittade ${responseData.ClassList.Class.length} klasser`
+          );
+        }
+        
+        // Process each class in the response
+        for (const classInfo of responseData.ClassList.Class) {
+          const className = classInfo.Name;
+          const numberOfEntries = parseInt(classInfo.NumberOfEntries || '0', 10);
+          
+          // Create a unique key combining eventId and className
+          const key = `${eventId}_${className}`;
+          participantCountMap.set(key, numberOfEntries);
+          
+          addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Klass ${className}: ${numberOfEntries} deltagare`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: classes/event?eventId=${eventId}`,
+              `Klass ${className}: ${numberOfEntries} deltagare`
+            );
+          }
+        }
+      } else {
+        addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Ogiltig svardata: Inga klasser hittades`);
+        
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            eventId.toString(),
+            `Eventor API: classes/event?eventId=${eventId}`,
+            `Ogiltig svardata: Inga klasser hittades`
+          );
+        }
       }
       
       processedEvents++;
@@ -138,8 +200,19 @@ export const fetchClassParticipantCounts = async (
         await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error fetching class data for event ${eventId}:`, error);
+      
+      addLog(eventId, `Eventor API: classes/event?eventId=${eventId}`, `Fel vid hämtning av klassdata: ${error.message || error}`);
+      
+      if (runId) {
+        await saveLogToDatabase(
+          runId,
+          eventId.toString(),
+          `Eventor API: classes/event?eventId=${eventId}`,
+          `Fel vid hämtning av klassdata: ${error.message || error}`
+        );
+      }
     }
   }
   

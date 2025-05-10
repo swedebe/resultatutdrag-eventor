@@ -17,7 +17,7 @@ const EventorApiKeySection = () => {
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
-    responseBody?: string;
+    responseData?: any;
   } | null>(null);
 
   useEffect(() => {
@@ -113,20 +113,23 @@ const EventorApiKeySection = () => {
     setIsTesting(true);
     setTestResult(null);
     
-    const renderProxyUrl = 'https://eventor-proxy.onrender.com/validate-eventor-api-key';
+    const renderProxyUrl = 'https://eventor-proxy.onrender.com/eventor-api';
     console.log(`Starting API key test with Render proxy URL: ${renderProxyUrl}`);
     
     try {
       console.log("Preparing fetch request to Render proxy service");
       console.log(`Request payload: ${JSON.stringify({ apiKey: apiKey.substring(0, 5) + '...' })}`);
       
-      // Call the Render proxy service
+      // Call the Render proxy service with the new endpoint structure
       const fetchPromise = fetch(renderProxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ 
+          apiKey,
+          endpoint: '/organisation/apiKey'
+        }),
       });
       
       console.log("Fetch request sent, awaiting response...");
@@ -140,18 +143,16 @@ const EventorApiKeySection = () => {
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
       console.log(`Response received with status: ${response.status}`);
       
-      // Get response as text since we're expecting XML now
-      const xmlText = await response.text();
-      console.log("Response received as text:", xmlText.substring(0, 100) + "...");
+      // Parse the response as JSON (the proxy should convert XML to JSON)
+      const responseData = await response.json();
+      console.log("Response received as JSON:", responseData);
       
-      // Check if the response contains expected XML content
-      const isValidXml = xmlText.includes('<?xml') || xmlText.includes('<') && xmlText.includes('>');
-      
-      if (response.ok && isValidXml) {
+      // Check if the response contains expected data for a valid API key
+      if (response.ok && responseData && (responseData.OrganisationIdForApiKey || responseData.OrganisationList)) {
         setTestResult({
           success: true,
           message: "API-nyckeln är giltig.",
-          responseBody: xmlText
+          responseData
         });
         
         toast({
@@ -162,7 +163,7 @@ const EventorApiKeySection = () => {
         setTestResult({
           success: false,
           message: `API-nyckeln är ogiltig eller anslutningen misslyckades. Status: ${response.status}`,
-          responseBody: xmlText
+          responseData
         });
         
         toast({
@@ -246,11 +247,11 @@ const EventorApiKeySection = () => {
               <AlertDescription>
                 <div className="space-y-2">
                   <p className="font-medium">{testResult.message}</p>
-                  {testResult.responseBody && (
+                  {testResult.responseData && (
                     <div className="mt-2">
-                      <p className="text-xs font-semibold">Response Body:</p>
+                      <p className="text-xs font-semibold">Response Data:</p>
                       <pre className="mt-1 max-h-60 overflow-auto rounded bg-slate-950 p-2 text-xs text-slate-50">
-                        {testResult.responseBody}
+                        {JSON.stringify(testResult.responseData, null, 2)}
                       </pre>
                     </div>
                   )}

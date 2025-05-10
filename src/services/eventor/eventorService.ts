@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -89,26 +90,30 @@ export const fetchEventorData = async (
       // If we have an API key, try to fetch the starters using the Render API proxy
       if (apiKey) {
         try {
-          addLog(resultRow.eventId, currentEventorUrl, `Använder API-nyckel för anrop via Render proxy`);
+          // Update the log message to use the new proxy method
+          addLog(resultRow.eventId, currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder API-nyckel för anrop via Render proxy`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
           }
           
-          // Call the Render proxy service instead of Supabase Edge Function
-          const response = await fetch('https://eventor-proxy.onrender.com/validate-eventor-api-key', {
+          // Call the Render proxy service with the updated approach
+          const response = await fetch('https://eventor-proxy.onrender.com/eventor-api', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ apiKey }),
+            body: JSON.stringify({
+              apiKey,
+              endpoint: `/events/${resultRow.eventId}/entries`
+            })
           });
           
-          const data = await response.json();
-          
-          // Process the response if successful
-          if (data && data.status === 200 && data.body) {
-            // Here you would parse the XML response to get the actual starters count
+          // Process the response
+          if (response.ok) {
+            const responseData = await response.json();
+            
+            // Here we would parse the JSON to get the actual starters count
             // For now, we'll just log the success
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             
@@ -116,12 +121,34 @@ export const fetchEventorData = async (
               await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             }
             
-            // For now, we'll keep using the placeholder
+            // Process the participant count from API response
+            // This is a placeholder - actual implementation would parse the entries data
+            if (responseData && responseData.EntryList && Array.isArray(responseData.EntryList.Entry)) {
+              enhancedResultRow.totalParticipants = responseData.EntryList.Entry.length;
+              enhancedResultRow.antalStartande = responseData.EntryList.Entry.length.toString();
+              
+              addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`);
+              
+              if (runId) {
+                await saveLogToDatabase(
+                  runId,
+                  resultRow.eventId.toString(),
+                  currentEventorUrl,
+                  `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`
+                );
+              }
+            }
           } else {
-            addLog(resultRow.eventId, currentEventorUrl, `API-anrop misslyckades. Status: ${data?.status || 'okänd'}`);
+            const errorText = await response.text();
+            addLog(resultRow.eventId, currentEventorUrl, `API-anrop misslyckades. Status: ${response.status}. ${errorText}`);
             
             if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop misslyckades. Status: ${data?.status || 'okänd'}`);
+              await saveLogToDatabase(
+                runId,
+                resultRow.eventId.toString(),
+                currentEventorUrl,
+                `API-anrop misslyckades. Status: ${response.status}. ${errorText}`
+              );
             }
           }
         } catch (apiError: any) {
@@ -134,14 +161,22 @@ export const fetchEventorData = async (
         }
       }
       
-      // Implement starters count fetching logic here
-      // This is a placeholder - the actual implementation would depend on your API call logic
-      enhancedResultRow.totalParticipants = enhancedResultRow.totalParticipants || Math.floor(Math.random() * 100) + 10; // Placeholder: Random participants between 10-109
-      
-      addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`);
-      
-      if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`);
+      // Fallback to placeholder value if API call didn't set the value
+      if (!enhancedResultRow.totalParticipants) {
+        // Placeholder for development/testing
+        enhancedResultRow.totalParticipants = enhancedResultRow.totalParticipants || Math.floor(Math.random() * 100) + 10;
+        enhancedResultRow.antalStartande = enhancedResultRow.antalStartande || enhancedResultRow.totalParticipants.toString();
+        
+        addLog(resultRow.eventId, currentEventorUrl, `Antal startande (fallback): ${enhancedResultRow.totalParticipants}`);
+        
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            resultRow.eventId.toString(),
+            currentEventorUrl,
+            `Antal startande (fallback): ${enhancedResultRow.totalParticipants}`
+          );
+        }
       }
     }
     

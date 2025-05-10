@@ -1,16 +1,12 @@
 
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
+// Handle Eventor API calls with dynamic endpoints
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-// Import Axios from Deno-compatible CDN
 import axios from 'https://deno.land/x/axiod/mod.ts'
 
 interface RequestBody {
   apiKey: string;
-  endpoint?: string; // Optional endpoint path to support different Eventor API calls
+  endpoint: string;
 }
 
 const EVENTOR_API_BASE_URL = 'https://eventor.orientering.se/api';
@@ -22,20 +18,16 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Edge Function: validate-eventor-api-key - request received");
+    console.log("Edge Function: eventor-api - request received");
     
     // Parse the request body
     let apiKey: string | undefined;
-    let endpoint: string = '/organisation/apiKey'; // Default endpoint for API key validation
+    let endpoint: string | undefined;
     
     try {
       const body = await req.json() as RequestBody;
       apiKey = body.apiKey;
-      
-      // Use the provided endpoint if available
-      if (body.endpoint) {
-        endpoint = body.endpoint;
-      }
+      endpoint = body.endpoint;
       
       console.log(`Request body successfully parsed. Endpoint: ${endpoint}`);
     } catch (error) {
@@ -65,6 +57,25 @@ serve(async (req) => {
         }
       );
     }
+    
+    if (!endpoint) {
+      console.error("Missing endpoint in request");
+      return new Response(
+        JSON.stringify({ error: 'API endpoint is required' }),
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+    }
+
+    // Ensure endpoint starts with a slash
+    if (!endpoint.startsWith('/')) {
+      endpoint = '/' + endpoint;
+    }
 
     // Construct the full URL by combining the base URL with the endpoint
     const apiUrl = `${EVENTOR_API_BASE_URL}${endpoint}`;
@@ -78,8 +89,6 @@ serve(async (req) => {
     console.log(`Making request to Eventor API at URL: ${apiUrl}`);
     console.log(`Request headers: ${JSON.stringify(requestHeaders, null, 2)}`);
     
-    console.log("Using Axios for HTTP request");
-    
     // Make the request with Axios
     try {
       console.log("Initiating Axios request");
@@ -90,7 +99,6 @@ serve(async (req) => {
       });
       
       console.log(`Axios response status: ${axiosResponse.status}`);
-      console.log(`Axios response headers: ${JSON.stringify(axiosResponse.headers, null, 2)}`);
       
       // Get the response data
       const responseText = typeof axiosResponse.data === 'string' 
@@ -179,11 +187,6 @@ serve(async (req) => {
         console.error(`Truncated response: ${truncatedResponse}`);
       } else {
         console.log("Eventor API request successful");
-        // Log a small sample of the response for debugging successful cases
-        const sampleData = JSON.stringify(parsedData).length > 200 
-          ? JSON.stringify(parsedData).substring(0, 200) + "... (truncated)"
-          : JSON.stringify(parsedData);
-        console.log(`Sample data: ${sampleData}`);
       }
 
       // Return the response with the parsed data
@@ -204,14 +207,28 @@ serve(async (req) => {
       if (axiosError.response) {
         console.error("Response error data:", axiosError.response.data);
         console.error("Response error status:", axiosError.response.status);
-        console.error("Response error headers:", axiosError.response.headers);
       } else if (axiosError.request) {
         console.error("No response received. Request:", axiosError.request);
       } else {
         console.error("Error setting up request:", axiosError.message);
       }
       
-      throw axiosError; // Let the catch-all error handler below handle this
+      return new Response(
+        JSON.stringify({ 
+          error: axiosError.message || 'Error calling Eventor API',
+          details: axiosError.response ? {
+            status: axiosError.response.status,
+            data: axiosError.response.data
+          } : 'No response details available'
+        }),
+        { 
+          status: 500, 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
     }
   } catch (error) {
     // Handle any errors and log detailed error information
