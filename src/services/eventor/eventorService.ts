@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -104,7 +105,7 @@ export const fetchEventorData = async (
             includeSplitTimes: false
           };
           
-          // DETAILED LOGGING: Log the full request details before sending
+          // DETAILED LOGGING: Log the full request details
           console.log(`======================== EVENTOR API REQUEST ========================`);
           console.log(`Request URL: ${renderProxyUrl}`);
           console.log(`Request Method: POST`);
@@ -124,7 +125,7 @@ export const fetchEventorData = async (
             body: JSON.stringify(requestPayload),
           });
           
-          // DETAILED LOGGING: Log the response details
+          // DETAILED LOGGING: Log the response status
           console.log(`\n======================== EVENTOR API RESPONSE ========================`);
           console.log(`Response Status: ${response.status}`);
           console.log(`Response Status Text: ${response.statusText}`);
@@ -133,20 +134,9 @@ export const fetchEventorData = async (
           // Process the response
           if (response.ok) {
             const responseData = await response.json();
-            console.log(`Response received directly from Render proxy: `, responseData);
+            console.log(`Response from Render proxy:`, responseData);
             
-            // NEW: Add raw response data to logs for debugging
-            const rawResponseString = JSON.stringify(responseData).substring(0, 500) + '...'; // Truncate to avoid extremely long log entries
-            addLog(resultRow.eventId, currentEventorUrl, `Raw response from Render for event ${resultRow.eventId}: ${rawResponseString}`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId,
-                resultRow.eventId.toString(),
-                currentEventorUrl,
-                `Raw response from Render for event ${resultRow.eventId}: ${rawResponseString}`
-              );
-            }
+            // REMOVED: Raw response string logging to URL log
             
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             

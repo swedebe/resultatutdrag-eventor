@@ -163,19 +163,6 @@ export const fetchClassParticipantCounts = async (
       const responseData = await response.json();
       console.log(`Response from Render proxy:`, responseData);
       
-      // NEW: Log the raw response for debugging
-      const rawResponseString = JSON.stringify(responseData).substring(0, 500) + '...'; // Truncate to avoid extremely long log entries
-      addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Raw response from Render for event ${eventId}: ${rawResponseString}`);
-      
-      if (runId) {
-        await saveLogToDatabase(
-          runId,
-          eventId.toString(),
-          `Eventor API: ${eventorApiEndpoint}`,
-          `Raw response from Render for event ${eventId}: ${rawResponseString}`
-        );
-      }
-      
       // UPDATED: Check for ClassResult elements in the response structure
       let classesFound = false;
       let classesWithStartsCount = 0;
