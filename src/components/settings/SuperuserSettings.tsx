@@ -12,8 +12,8 @@ import { AppTextService } from "@/services/appText/appTextService";
 import AddUserForm from "./AddUserForm";
 import UserManagement from "./UserManagement";
 
-// Updated to remove 'fileupload' from the category order
-const CATEGORY_ORDER = ['homepage', 'eventorbatch', 'settings', 'general', 'auth'];
+// Updated to include 'eventorbatch' in the category order
+const CATEGORY_ORDER = ['homepage', 'fileupload', 'eventorbatch', 'settings', 'general', 'auth'];
 
 const SuperuserSettings: React.FC = () => {
   const { toast } = useToast();
@@ -73,20 +73,12 @@ const SuperuserSettings: React.FC = () => {
         
         if (data && data.length > 0) {
           console.log("App texts fetched directly:", data);
-          // Filter out the FileUploader related keys
-          const filteredData = data.filter(text => 
-            !['delay_hint', 'delay_label', 'upload_label', 'upload_title'].includes(text.key)
-          );
-          setAppTexts(filteredData);
+          setAppTexts(data);
         } else {
           console.log("No data from direct query, trying AppTextService");
           const serviceData = await AppTextService.getAllAppTexts();
           console.log("App texts fetched via service:", serviceData);
-          // Filter out the FileUploader related keys
-          const filteredData = serviceData.filter(text => 
-            !['delay_hint', 'delay_label', 'upload_label', 'upload_title'].includes(text.key)
-          );
-          setAppTexts(filteredData);
+          setAppTexts(serviceData);
         }
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
@@ -165,11 +157,7 @@ const SuperuserSettings: React.FC = () => {
                       });
                       const { data } = await supabase.from('app_texts').select('*');
                       if (data) {
-                        // Filter out the FileUploader related keys
-                        const filteredData = data.filter(text => 
-                          !['delay_hint', 'delay_label', 'upload_label', 'upload_title'].includes(text.key)
-                        );
-                        setAppTexts(filteredData);
+                        setAppTexts(data);
                       }
                     } catch (error: any) {
                       console.error("Error creating app texts:", error);
