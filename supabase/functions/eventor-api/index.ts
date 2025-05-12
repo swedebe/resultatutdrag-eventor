@@ -1,4 +1,3 @@
-
 // Handle Eventor API calls with dynamic endpoints
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -88,12 +87,12 @@ serve(async (req) => {
       
       console.log(`Processing event entries request for event ID: ${eventId}`);
       
-      // Construct the Eventor API URL for entries
+      // IMPORTANT: First try to fetch the entries data (more useful for participant counts)
       const entriesUrl = `${EVENTOR_API_BASE_URL}/events/${eventId}/entries`;
-      console.log(`Forwarding request to Eventor API: ${entriesUrl}`);
+      console.log(`Forwarding request to Eventor API entries endpoint: ${entriesUrl}`);
       
       try {
-        // Make the request to the Eventor API
+        // Make the request to the Eventor API entries endpoint
         const response = await axios({
           method: 'GET',
           url: entriesUrl,
@@ -103,9 +102,9 @@ serve(async (req) => {
           }
         });
         
-        console.log(`Response status from Eventor API: ${response.status}`);
+        console.log(`Response status from Eventor API entries: ${response.status}`);
         
-        // Forward the response to the client
+        // If successful, return the entries response
         return new Response(
           JSON.stringify(response.data),
           { 
@@ -116,23 +115,61 @@ serve(async (req) => {
             } 
           }
         );
-      } catch (apiError: any) {
-        console.error("Error forwarding request to Eventor API:", apiError);
+      } catch (entriesError: any) {
+        // If entries endpoint fails, try the results endpoint
+        console.log("Failed to fetch entries, trying results endpoint instead:", entriesError.message);
         
-        return new Response(
-          JSON.stringify({ 
-            error: 'Error forwarding request to Eventor API',
-            details: apiError.message || 'Unknown error occurred',
-            status: apiError.response?.status
-          }),
-          { 
-            status: apiError.response?.status || 500, 
-            headers: { 
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            } 
-          }
-        );
+        // Fallback to the results endpoint
+        const resultsUrl = `${EVENTOR_API_BASE_URL}/results/event`;
+        console.log(`Forwarding request to Eventor API results endpoint: ${resultsUrl}`);
+        
+        try {
+          // Make the request to the Eventor API results endpoint
+          const resultsResponse = await axios({
+            method: 'GET',
+            url: resultsUrl,
+            params: {
+              eventId,
+              includeSplitTimes
+            },
+            headers: {
+              'Content-Type': 'application/json',
+              'ApiKey': apiKey
+            }
+          });
+          
+          console.log(`Response status from Eventor API results: ${resultsResponse.status}`);
+          
+          // Return the results response
+          return new Response(
+            JSON.stringify(resultsResponse.data),
+            { 
+              status: resultsResponse.status, 
+              headers: { 
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              } 
+            }
+          );
+        } catch (resultsError: any) {
+          // If both endpoints fail, throw a consolidated error
+          console.error("Both entries and results endpoints failed:", resultsError);
+          
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to fetch data from Eventor API',
+              entriesError: entriesError.message,
+              resultsError: resultsError.message
+            }),
+            { 
+              status: 500, 
+              headers: { 
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              } 
+            }
+          );
+        }
       }
     } else if (path.endsWith('/results/event') && req.method === 'GET') {
       // Handle the legacy GET request for backward compatibility

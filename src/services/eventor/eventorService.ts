@@ -142,20 +142,98 @@ export const fetchEventorData = async (
               await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             }
             
-            // Process the participant count from API response
+            // UPDATED: Check for both possible data structures
+            // First check for entries data
             if (responseData && responseData.EntryList && Array.isArray(responseData.EntryList.Entry)) {
               enhancedResultRow.totalParticipants = responseData.EntryList.Entry.length;
               enhancedResultRow.antalStartande = responseData.EntryList.Entry.length.toString();
               
-              addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`);
+              addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat (från EntryList): ${enhancedResultRow.totalParticipants}`);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId,
                   resultRow.eventId.toString(),
                   currentEventorUrl,
-                  `Antal startande hämtat: ${enhancedResultRow.totalParticipants}`
+                  `Antal startande hämtat (från EntryList): ${enhancedResultRow.totalParticipants}`
                 );
+              }
+            } 
+            // Then check for results data
+            else if (responseData && responseData.Event && responseData.Event.EventClassList && 
+                     Array.isArray(responseData.Event.EventClassList.EventClass)) {
+              
+              // Try to find the specific class this result belongs to
+              const eventClasses = responseData.Event.EventClassList.EventClass;
+              const resultClass = enhancedResultRow.class;
+              let classFound = false;
+              
+              for (const eventClass of eventClasses) {
+                if (eventClass.Name === resultClass) {
+                  classFound = true;
+                  if (eventClass.ResultList && Array.isArray(eventClass.ResultList.Result)) {
+                    enhancedResultRow.totalParticipants = eventClass.ResultList.Result.length;
+                    enhancedResultRow.antalStartande = eventClass.ResultList.Result.length.toString();
+                    
+                    addLog(resultRow.eventId, currentEventorUrl, 
+                      `Antal startande hämtat (från ResultList för klass ${resultClass}): ${enhancedResultRow.totalParticipants}`);
+                    
+                    if (runId) {
+                      await saveLogToDatabase(
+                        runId,
+                        resultRow.eventId.toString(),
+                        currentEventorUrl,
+                        `Antal startande hämtat (från ResultList för klass ${resultClass}): ${enhancedResultRow.totalParticipants}`
+                      );
+                    }
+                    break;
+                  }
+                }
+              }
+              
+              if (!classFound) {
+                // If we couldn't find the specific class, log this issue
+                addLog(resultRow.eventId, currentEventorUrl, 
+                  `Klassen "${resultClass}" hittades inte i svaret som innehöll ${eventClasses.length} klasser`);
+                
+                if (runId) {
+                  await saveLogToDatabase(
+                    runId,
+                    resultRow.eventId.toString(),
+                    currentEventorUrl,
+                    `Klassen "${resultClass}" hittades inte i svaret som innehöll ${eventClasses.length} klasser`
+                  );
+                }
+              }
+            }
+            else {
+              // If we can't find the expected data structure, log detailed information
+              console.warn("Unable to find participant count in response:", responseData);
+              
+              // Check if we can find any useful information in the response
+              if (responseData.Event && responseData.Event.Name) {
+                addLog(resultRow.eventId, currentEventorUrl, 
+                  `Hittade event "${responseData.Event.Name}" men ingen deltagarlista i förväntad struktur`);
+                
+                if (runId) {
+                  await saveLogToDatabase(
+                    runId,
+                    resultRow.eventId.toString(),
+                    currentEventorUrl,
+                    `Hittade event "${responseData.Event.Name}" men ingen deltagarlista i förväntad struktur`
+                  );
+                }
+              } else {
+                addLog(resultRow.eventId, currentEventorUrl, `Ogiltig svardata: Kunde inte hitta deltagarlistan`);
+                
+                if (runId) {
+                  await saveLogToDatabase(
+                    runId,
+                    resultRow.eventId.toString(),
+                    currentEventorUrl,
+                    `Ogiltig svardata: Kunde inte hitta deltagarlistan`
+                  );
+                }
               }
             }
           } else {

@@ -1,4 +1,3 @@
-
 /**
  * Excel import and export operations
  */
@@ -164,8 +163,53 @@ export const fetchClassParticipantCounts = async (
       const responseData = await response.json();
       console.log(`Response from Render proxy:`, responseData);
       
-      // Process the results data from the /results/event endpoint
-      if (responseData && responseData.Event && responseData.Event.EventClassList && 
+      // UPDATED: Check the actual response structure and properly extract class information
+      // First, check if we have the proper entries data structure
+      if (responseData && responseData.EntryList && Array.isArray(responseData.EntryList.Entry)) {
+        // We're getting entries data, use it to count participants per class
+        const entries = responseData.EntryList.Entry;
+        const classCounts = new Map<string, number>();
+        
+        // Group entries by class
+        for (const entry of entries) {
+          const className = entry.EventClass?.Name || 'Unknown';
+          if (!classCounts.has(className)) {
+            classCounts.set(className, 0);
+          }
+          classCounts.set(className, classCounts.get(className)! + 1);
+        }
+        
+        // Log the counts and add to the participantCountMap
+        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${classCounts.size} klasser med totalt ${entries.length} deltagare`);
+        
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            eventId.toString(),
+            `Eventor API: ${eventorApiEndpoint}`,
+            `Hittade ${classCounts.size} klasser med totalt ${entries.length} deltagare`
+          );
+        }
+        
+        // Store each class count in the result map
+        for (const [className, count] of classCounts.entries()) {
+          const key = `${eventId}_${className}`;
+          participantCountMap.set(key, count);
+          
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Klass ${className}: ${count} deltagare`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: ${eventorApiEndpoint}`,
+              `Klass ${className}: ${count} deltagare`
+            );
+          }
+        }
+      } 
+      // Alternative structure: Check for Event with ResultList (results endpoint)
+      else if (responseData && responseData.Event && responseData.Event.EventClassList && 
           Array.isArray(responseData.Event.EventClassList.EventClass)) {
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${responseData.Event.EventClassList.EventClass.length} klasser`);
@@ -205,17 +249,42 @@ export const fetchClassParticipantCounts = async (
           }
         }
       } else {
-        console.warn(`Invalid response data structure. Expected Event.EventClassList.EventClass array but received:`, responseData);
+        // Try to extract any useful information from the response for debugging
+        console.warn(`Unknown response data structure received:`, responseData);
         
-        addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Ogiltig svardata: Inga klasser hittades`);
+        // Check if we can find classes or participants in any other format
+        let classFound = false;
         
-        if (runId) {
-          await saveLogToDatabase(
-            runId,
-            eventId.toString(),
-            `Eventor API: ${eventorApiEndpoint}`,
-            `Ogiltig svardata: Inga klasser hittades`
-          );
+        // Add detailed logging of the response structure to help debug
+        console.log("Response data keys:", Object.keys(responseData));
+        if (responseData.Event) {
+          console.log("Event keys:", Object.keys(responseData.Event));
+        }
+        
+        // Try a more general approach to look for any class data
+        if (responseData.Event && responseData.Event.Name) {
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, 
+            `Hittade event "${responseData.Event.Name}" men ingen klassdata hittades i förväntad struktur`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: ${eventorApiEndpoint}`,
+              `Hittade event "${responseData.Event.Name}" men ingen klassdata hittades i förväntad struktur`
+            );
+          }
+        } else {
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Ogiltig svardata: Inga klasser hittades`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: ${eventorApiEndpoint}`,
+              `Ogiltig svardata: Inga klasser hittades`
+            );
+          }
         }
       }
       
