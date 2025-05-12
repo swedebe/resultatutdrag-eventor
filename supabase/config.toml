@@ -6,7 +6,3 @@ verify_jwt = true
 
 [functions.delete-user]
 verify_jwt = true
-
-[functions.validate-eventor-api-key]
-verify_jwt = true
-
