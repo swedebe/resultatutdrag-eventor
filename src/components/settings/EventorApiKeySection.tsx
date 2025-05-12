@@ -113,6 +113,7 @@ const EventorApiKeySection = () => {
     setIsTesting(true);
     setTestResult(null);
     
+    // Use direct Render proxy URL for validation
     const renderProxyUrl = 'https://eventor-proxy.onrender.com/validate-eventor-api-key';
     console.log(`Starting API key test with Render proxy URL: ${renderProxyUrl}`);
     console.log("Sending API key validation request to:", renderProxyUrl);
@@ -121,7 +122,7 @@ const EventorApiKeySection = () => {
       console.log("Preparing fetch request to Render proxy service");
       console.log(`Request payload: ${JSON.stringify({ apiKey: apiKey.substring(0, 5) + '...' })}`);
       
-      // Call the dedicated validation endpoint on the Render proxy service
+      // Call the dedicated validation endpoint on the Render proxy service directly
       const fetchPromise = fetch(renderProxyUrl, {
         method: 'POST',
         headers: {

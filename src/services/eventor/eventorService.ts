@@ -70,7 +70,7 @@ export const fetchEventorData = async (
         console.error("Failed to fetch API key from Supabase:", error);
       }
       
-      // Set URL for API call to get starters using the Render proxy
+      // UPDATED: Set URL to direct Render proxy instead of Supabase Edge Function
       const renderProxyUrl = 'https://eventor-proxy.onrender.com/results/event';
       currentEventorUrl = renderProxyUrl;
       
@@ -88,14 +88,14 @@ export const fetchEventorData = async (
         await sleep(startersDelay);
       }
       
-      // If we have an API key, try to fetch the starters using the Render proxy
+      // If we have an API key, try to fetch the starters directly from Render proxy
       if (apiKey) {
         try {
-          // Update the log message to use the new approach
-          addLog(resultRow.eventId, currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
+          // Update the log message to use the direct approach
+          addLog(resultRow.eventId, currentEventorUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
           }
           
           // Create the POST request payload
@@ -116,7 +116,7 @@ export const fetchEventorData = async (
             includeSplitTimes: false
           })}`);
           
-          // Call the Render proxy with a POST request
+          // Call the Render proxy directly with a POST request
           const response = await fetch(renderProxyUrl, {
             method: 'POST',
             headers: {
@@ -134,7 +134,7 @@ export const fetchEventorData = async (
           // Process the response
           if (response.ok) {
             const responseData = await response.json();
-            console.log(`Response received from Render proxy: `, responseData);
+            console.log(`Response received directly from Render proxy: `, responseData);
             
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             

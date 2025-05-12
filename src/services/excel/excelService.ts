@@ -1,3 +1,4 @@
+
 /**
  * Excel import and export operations
  */
@@ -100,7 +101,7 @@ export const fetchClassParticipantCounts = async (
   let totalEvents = eventIds.length;
   let processedEvents = 0;
   
-  // Constants - Note the trailing slash is removed to properly construct URLs
+  // UPDATED: Connect directly to the Render proxy
   const RENDER_PROXY_BASE_URL = 'https://eventor-proxy.onrender.com';
   
   for (const eventId of eventIds) {
@@ -111,14 +112,14 @@ export const fetchClassParticipantCounts = async (
       const eventorApiEndpoint = `/results/event`;
       
       // Log the API call attempt
-      addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Anropar Eventor API via Render proxy...`);
+      addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Anropar Eventor API direkt via Render proxy...`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
           `Eventor API: ${eventorApiEndpoint}`,
-          `Anropar Eventor API via Render proxy...`
+          `Anropar Eventor API direkt via Render proxy...`
         );
       }
       
