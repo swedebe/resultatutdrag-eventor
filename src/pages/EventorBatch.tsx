@@ -7,14 +7,16 @@ import { Progress } from "@/components/ui/progress";
 import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
-import FileUploadSection from "@/components/file-uploader/FileUploadSection";
-import PreviewSection from "@/components/file-uploader/PreviewSection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAllAppTexts } from "@/hooks/useAppText";
 import { saveLogToDatabase } from "@/services/database/resultRepository";
+import PreviewSection from "@/components/eventor-batch/PreviewSection";
+import FileUploadSection from "@/components/eventor-batch/FileUploadSection";
+import RunSettingsSection from "@/components/eventor-batch/RunSettingsSection";
+import ActionButtonsSection from "@/components/eventor-batch/ActionButtonsSection";
 
 const EventorBatch = () => {
   const { toast } = useToast();
@@ -254,7 +256,7 @@ const EventorBatch = () => {
       
       toast({
         title: "Avbryter körning",
-        description: "Beg��ran om att avbryta har skickats",
+        description: "Begäran om att avbryta har skickats",
       });
       
       addCancellationLog();
@@ -481,153 +483,19 @@ const EventorBatch = () => {
         </Link>
       </div>
       
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{texts.eventorbatch_upload_title || "Filuppladdning och bearbetningsalternativ"}</CardTitle>
-          <CardDescription>{texts.eventorbatch_upload_description || "Ladda upp en Excel-fil med resultat för att automatiskt berika dem med data från Eventor."}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="file-upload">
-                {texts.eventorbatch_upload_label || "Ladda upp resultatfil (Excel)"}
-              </Label>
-              <input 
-                id="file-upload"
-                type="file" 
-                accept=".xlsx, .xls" 
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    setFile(e.target.files[0]);
-                    toast({
-                      title: "Fil vald",
-                      description: `Vald fil: ${e.target.files[0].name}`,
-                    });
-                  } else {
-                    setFile(null);
-                  }
-                }}
-                className="block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-md file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-primary file:text-white
-                  hover:file:bg-primary/90"
-              />
-            </div>
-            
-            <div className="space-y-4 mt-2">
-              <div className="space-y-2 border p-4 rounded-md">
-                <h3 className="text-lg font-medium">{texts.eventorbatch_options_title || "Bearbetningsalternativ"}</h3>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="fetch-course-length" 
-                    checked={fetchCourseLength}
-                    onCheckedChange={(checked) => {
-                      setFetchCourseLength(checked === true);
-                    }}
-                    disabled={isProcessing}
-                  />
-                  <Label htmlFor="fetch-course-length">{texts.eventorbatch_fetch_course_length || "Hämta banlängder (scraping)"}</Label>
-                  
-                  <div className="ml-4 flex items-center space-x-2">
-                    <Label htmlFor="course-length-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
-                    <Input 
-                      id="course-length-delay"
-                      type="number" 
-                      min="0"
-                      step="0.01"
-                      value={courseLengthDelay} 
-                      onChange={(e) => {
-                        const newDelay = parseFloat(e.target.value) || 0;
-                        if (newDelay >= 0) {
-                          setCourseLengthDelay(newDelay);
-                        }
-                      }}
-                      className="w-20"
-                      disabled={isProcessing || !fetchCourseLength}
-                    />
-                    <span className="text-sm">sekunder</span>
-                    <div className="text-xs text-muted-foreground">
-                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="fetch-starters" 
-                    checked={fetchStarters}
-                    onCheckedChange={(checked) => {
-                      setFetchStarters(checked === true);
-                    }}
-                    disabled={isProcessing}
-                  />
-                  <Label htmlFor="fetch-starters">{texts.eventorbatch_fetch_starters || "Hämta antal startande (API)"}</Label>
-                  
-                  <div className="ml-4 flex items-center space-x-2">
-                    <Label htmlFor="starters-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
-                    <Input 
-                      id="starters-delay"
-                      type="number" 
-                      min="0"
-                      step="0.01"
-                      value={startersDelay} 
-                      onChange={(e) => {
-                        const newDelay = parseFloat(e.target.value) || 0;
-                        if (newDelay >= 0) {
-                          setStartersDelay(newDelay);
-                        }
-                      }}
-                      className="w-20"
-                      disabled={isProcessing || !fetchStarters}
-                    />
-                    <span className="text-sm">sekunder</span>
-                    <div className="text-xs text-muted-foreground">
-                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-2">
-              <Button 
-                onClick={handleProcessFile} 
-                disabled={isProcessing || !file}
-                className="w-40"
-              >
-                {isProcessing ? texts.eventorbatch_processing || "Bearbetar..." : texts.eventorbatch_process_file || "Bearbeta fil"}
-              </Button>
-              
-              {isProcessing ? (
-                <Button 
-                  variant="destructive" 
-                  onClick={handleCancelProcessing}
-                >
-                  {texts.eventorbatch_cancel || "Avbryt"}
-                </Button>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  onClick={handleClearResults}
-                  disabled={!results.length}
-                >
-                  {texts.eventorbatch_clear || "Rensa"}
-                </Button>
-              )}
-            </div>
-            
-            {isProcessing && (
-              <div className="mt-4 space-y-2">
-                <Progress value={progress} className="w-full" />
-                <p className="text-sm text-muted-foreground">{currentStatus}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <FileUploadSection
+        isProcessing={isProcessing}
+        progress={progress}
+        currentStatus={currentStatus}
+        file={file}
+        onFileChange={setFile}
+        onProcessFile={handleProcessFile}
+        onClear={handleClearResults}
+        hasResults={results.length > 0}
+        delay={delay}
+        onDelayChange={setDelay}
+        onCancelProcessing={handleCancelProcessing}
+      />
       
       <LogComponent logs={logs} onClearLogs={clearLogs} />
       
