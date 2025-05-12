@@ -136,6 +136,7 @@ serve(async (req) => {
       }
     } else if (path.endsWith('/results/event') && req.method === 'GET') {
       // Handle the legacy GET request for backward compatibility
+      console.log("WARNING: Received GET request to /results/event but POST is required");
       console.log("Handling legacy /results/event GET endpoint");
       
       // Extract query parameters from the URL
@@ -154,7 +155,8 @@ serve(async (req) => {
         JSON.stringify({ 
           error: 'API key is required. Please use POST method with apiKey in the request body',
           method: 'GET',
-          path: path
+          path: path,
+          receivedParams: { eventId, includeSplitTimes }
         }),
         { 
           status: 400, 

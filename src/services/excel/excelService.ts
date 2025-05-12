@@ -108,8 +108,8 @@ export const fetchClassParticipantCounts = async (
     try {
       setStatus(`Hämtar klassdata för tävling ${eventId} (${processedEvents + 1}/${totalEvents})...`);
       
-      // Construct the full endpoint path - UPDATED to use the /results/event endpoint
-      const eventorApiEndpoint = `/results/event?eventId=${eventId}&includeSplitTimes=false`;
+      // Use the results/event endpoint with POST
+      const eventorApiEndpoint = `/results/event`;
       
       // Log the API call attempt
       addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Anropar Eventor API via Render proxy...`);
@@ -125,16 +125,37 @@ export const fetchClassParticipantCounts = async (
       
       // Construct the full request URL
       const fullRequestUrl = `${RENDER_PROXY_BASE_URL}${eventorApiEndpoint}`;
-      console.log(`Fetching class data from: ${fullRequestUrl}`);
+      console.log(`Fetching class data using POST request to: ${fullRequestUrl}`);
       
-      // Send a GET request directly to the Render proxy with the full endpoint
+      // DETAILED LOGGING: Log the full request details
+      console.log(`======================== EVENTOR CLASS API REQUEST ========================`);
+      console.log(`Request URL: ${fullRequestUrl}`);
+      console.log(`Request Method: POST`);
+      console.log(`Request Headers: Content-Type: application/json`);
+      console.log(`Request Body: ${JSON.stringify({
+        apiKey: "REDACTED_FOR_LOGGING",
+        eventId,
+        includeSplitTimes: false
+      })}`);
+      
+      // Send a POST request to the Render proxy
       const response = await fetch(fullRequestUrl, {
-        method: 'GET',
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-Eventor-Api-Key': apiKey
-        }
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          apiKey,
+          eventId,
+          includeSplitTimes: false
+        })
       });
+      
+      // DETAILED LOGGING: Log the response status
+      console.log(`\n======================== EVENTOR CLASS API RESPONSE ========================`);
+      console.log(`Response Status: ${response.status}`);
+      console.log(`Response Status Text: ${response.statusText}`);
+      console.log(`Response Headers: ${JSON.stringify([...response.headers.entries()])}`);
       
       if (!response.ok) {
         throw new Error(`Render proxy responded with status: ${response.status}`);
@@ -209,13 +230,13 @@ export const fetchClassParticipantCounts = async (
     } catch (error: any) {
       console.error(`Error fetching class data for event ${eventId}:`, error);
       
-      addLog(eventId, `Eventor API: results/event?eventId=${eventId}`, `Fel vid hämtning av klassdata: ${error.message || error}`);
+      addLog(eventId, `Eventor API: results/event`, `Fel vid hämtning av klassdata: ${error.message || error}`);
       
       if (runId) {
         await saveLogToDatabase(
           runId,
           eventId.toString(),
-          `Eventor API: results/event?eventId=${eventId}`,
+          `Eventor API: results/event`,
           `Fel vid hämtning av klassdata: ${error.message || error}`
         );
       }

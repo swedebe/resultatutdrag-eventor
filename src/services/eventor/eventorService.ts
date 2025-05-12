@@ -105,10 +105,13 @@ export const fetchEventorData = async (
             includeSplitTimes: false
           };
           
-          // Log the full request details for debugging
-          console.log(`Making POST request to Render proxy: ${renderProxyUrl}`);
-          console.log(`Request payload: ${JSON.stringify({
-            apiKey: apiKey.substring(0, 5) + '...',
+          // DETAILED LOGGING: Log the full request details before sending
+          console.log(`======================== EVENTOR API REQUEST ========================`);
+          console.log(`Request URL: ${renderProxyUrl}`);
+          console.log(`Request Method: POST`);
+          console.log(`Request Headers: Content-Type: application/json`);
+          console.log(`Request Body: ${JSON.stringify({
+            apiKey: "REDACTED_FOR_LOGGING",
             eventId: resultRow.eventId,
             includeSplitTimes: false
           })}`);
@@ -122,12 +125,16 @@ export const fetchEventorData = async (
             body: JSON.stringify(requestPayload),
           });
           
-          console.log(`Response status from Render proxy: ${response.status}`);
+          // DETAILED LOGGING: Log the response details
+          console.log(`\n======================== EVENTOR API RESPONSE ========================`);
+          console.log(`Response Status: ${response.status}`);
+          console.log(`Response Status Text: ${response.statusText}`);
+          console.log(`Response Headers: ${JSON.stringify([...response.headers.entries()])}`);
           
           // Process the response
           if (response.ok) {
             const responseData = await response.json();
-            console.log(`Response received from Render proxy:`, responseData);
+            console.log(`Response received from Render proxy: `, responseData);
             
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             
