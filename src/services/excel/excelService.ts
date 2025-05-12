@@ -1,4 +1,3 @@
-
 /**
  * Excel import and export operations
  */
@@ -221,8 +220,12 @@ export const fetchClassParticipantCounts = async (
         
         // Process each ClassResult to extract numberOfStarts attribute
         for (const classResult of classResults) {
-          const className = classResult.ClassShortName || classResult.ClassName || 'Unknown';
-          const numberOfStarts = classResult.numberOfStarts ? parseInt(classResult.numberOfStarts, 10) : null;
+          // UPDATED: Extract class name and numberOfStarts according to the XML structure
+          const className = classResult.EventClass?.Name || classResult.Class?.Name || classResult.ClassShortName || classResult.ClassName || 'Unknown';
+          
+          // UPDATED: Look for numberOfStarts in the $ attribute object as specified
+          const numberOfStarts = classResult.$ && classResult.$.numberOfStarts ? 
+            parseInt(classResult.$.numberOfStarts, 10) : null;
           
           if (numberOfStarts !== null) {
             // Valid numberOfStarts found
@@ -297,10 +300,12 @@ export const fetchClassParticipantCounts = async (
         
         // For each class, try to extract participant count from alternative sources
         for (const eventClass of eventClasses) {
+          // UPDATED: Extract the class name correctly
           const className = eventClass.Name || 'Unknown';
           
-          // Look for numberOfStarts first, if not available, count results
-          let numberOfStarts = eventClass.numberOfStarts ? parseInt(eventClass.numberOfStarts, 10) : null;
+          // UPDATED: Look for numberOfStarts in the $ attribute object
+          const numberOfStarts = eventClass.$ && eventClass.$.numberOfStarts ? 
+            parseInt(eventClass.$.numberOfStarts, 10) : null;
           
           if (numberOfStarts !== null) {
             // Valid numberOfStarts found

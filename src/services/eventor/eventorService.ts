@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -194,15 +193,20 @@ export const fetchEventorData = async (
               const resultClass = enhancedResultRow.class;
               
               for (const classResult of classResults) {
-                const className = classResult.ClassShortName || classResult.ClassName || 'Unknown';
+                // UPDATED: Extract class name correctly from EventClass.Name first, then fall back to other properties
+                const className = classResult.EventClass?.Name || classResult.Class?.Name || classResult.ClassShortName || classResult.ClassName || 'Unknown';
                 
                 if (className === resultClass) {
                   classFound = true;
-                  const numberOfStarts = classResult.numberOfStarts ? parseInt(classResult.numberOfStarts, 10) : null;
+                  
+                  // UPDATED: Look for numberOfStarts in the $ attribute object
+                  const numberOfStarts = classResult.$ && classResult.$.numberOfStarts ? 
+                    parseInt(classResult.$.numberOfStarts, 10) : null;
                   
                   if (numberOfStarts !== null) {
                     enhancedResultRow.totalParticipants = numberOfStarts;
                     enhancedResultRow.antalStartande = numberOfStarts.toString();
+                    classesWithStartsCount++;
                     
                     addLog(resultRow.eventId, currentEventorUrl, 
                       `Antal startande hämtat (numberOfStarts för klass ${resultClass}): ${numberOfStarts}`);
@@ -278,8 +282,9 @@ export const fetchEventorData = async (
                 if (eventClass.Name === resultClass) {
                   classFound = true;
                   
-                  // Look for numberOfStarts
-                  const numberOfStarts = eventClass.numberOfStarts ? parseInt(eventClass.numberOfStarts, 10) : null;
+                  // UPDATED: Look for numberOfStarts in the $ attribute object
+                  const numberOfStarts = eventClass.$ && eventClass.$.numberOfStarts ? 
+                    parseInt(eventClass.$.numberOfStarts, 10) : null;
                   
                   if (numberOfStarts !== null) {
                     enhancedResultRow.totalParticipants = numberOfStarts;
