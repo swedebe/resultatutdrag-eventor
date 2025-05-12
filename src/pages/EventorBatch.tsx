@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
@@ -8,8 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
 import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
-import FileUploadSection from "@/components/eventor-batch/FileUploadSection";
-import PreviewSection from "@/components/eventor-batch/PreviewSection";
+import FileUploadSection from "@/components/file-uploader/FileUploadSection";
+import PreviewSection from "@/components/file-uploader/PreviewSection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
