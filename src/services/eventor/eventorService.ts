@@ -136,10 +136,28 @@ export const fetchEventorData = async (
             const responseData = await response.json();
             console.log(`Response received directly from Render proxy: `, responseData);
             
+            // NEW: Add raw response data to logs for debugging
+            const rawResponseString = JSON.stringify(responseData).substring(0, 500) + '...'; // Truncate to avoid extremely long log entries
+            addLog(resultRow.eventId, currentEventorUrl, `Raw response from Render for event ${resultRow.eventId}: ${rawResponseString}`);
+            
+            if (runId) {
+              await saveLogToDatabase(
+                runId,
+                resultRow.eventId.toString(),
+                currentEventorUrl,
+                `Raw response from Render for event ${resultRow.eventId}: ${rawResponseString}`
+              );
+            }
+            
             addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
             
             if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
+              await saveLogToDatabase(
+                runId,
+                resultRow.eventId.toString(),
+                currentEventorUrl,
+                `API-anrop lyckades. Bearbetar svar...`
+              );
             }
             
             // UPDATED: First check for ClassResult elements in ResultList structure
