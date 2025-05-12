@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -11,6 +10,7 @@ import {
 } from './excel/excelService';
 import { fetchEventorData } from './eventor/eventorService';
 import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveLogToDatabase } from './database/resultRepository';
+import { supabase } from '@/integrations/supabase/client';
 
 export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
@@ -224,8 +224,5 @@ export const processExcelFile = async (
   return enrichedResults;
 };
 
-// This variable is used in the eventorService.ts but needs to be here for TypeScript
-const currentEventorUrl = "";
-
-// Add the missing supabase import
-import { supabase } from "@/integrations/supabase/client";
+// Export this for TypeScript since it's used in the eventorService.ts
+export const currentEventorUrl = "";
