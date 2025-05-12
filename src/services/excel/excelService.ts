@@ -1,3 +1,4 @@
+
 /**
  * Excel import and export operations
  */
@@ -175,23 +176,12 @@ export const fetchClassParticipantCounts = async (
         totalClassesCount = classResults.length;
         classesFound = totalClassesCount > 0;
         
-        // Store the first ClassResult for detailed logging
+        // Store the first ClassResult for console debugging only
         if (classesFound) {
           firstClassResult = classResults[0];
           
-          // Log the complete first ClassResult object for debugging
-          const firstClassResultString = JSON.stringify(firstClassResult);
-          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, 
-            `Raw ClassResult example for event ${eventId}: ${firstClassResultString}`);
-          
-          if (runId) {
-            await saveLogToDatabase(
-              runId,
-              eventId.toString(),
-              `Eventor API: ${eventorApiEndpoint}`,
-              `Raw ClassResult example for event ${eventId}: ${firstClassResultString}`
-            );
-          }
+          // Log the complete first ClassResult object for debugging in console only
+          console.log(`Raw ClassResult example for event ${eventId}:`, firstClassResult);
         }
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${totalClassesCount} klasser (ClassResult)`);
@@ -255,23 +245,12 @@ export const fetchClassParticipantCounts = async (
         totalClassesCount = eventClasses.length;
         classesFound = totalClassesCount > 0;
         
-        // Store the first EventClass for detailed logging
+        // Store the first EventClass for console debugging only
         if (classesFound) {
           firstClassResult = eventClasses[0];
           
-          // Log the complete first EventClass object for debugging
-          const firstEventClassString = JSON.stringify(firstClassResult);
-          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, 
-            `Raw EventClass example for event ${eventId}: ${firstEventClassString}`);
-          
-          if (runId) {
-            await saveLogToDatabase(
-              runId,
-              eventId.toString(),
-              `Eventor API: ${eventorApiEndpoint}`,
-              `Raw EventClass example for event ${eventId}: ${firstEventClassString}`
-            );
-          }
+          // Log the complete first EventClass object for debugging in console only
+          console.log(`Raw EventClass example for event ${eventId}:`, firstClassResult);
         }
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${totalClassesCount} klasser (EventClass)`);
