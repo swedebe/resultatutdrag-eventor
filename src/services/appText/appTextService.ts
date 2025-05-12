@@ -162,33 +162,8 @@ export const AppTextService = {
       { key: 'back_to_home', value: 'Tillbaka till startsidan', category: 'general' }
     ];
 
-    // Delete the keys that are related to FileUploader
-    await this.deleteAppTextsByKeys(['delay_hint', 'delay_label', 'upload_label', 'upload_title']);
-
     for (const text of requiredTexts) {
       await this.createOrUpdateAppTextByKey(text.key, text.value, text.category);
-    }
-  },
-
-  /**
-   * Delete app texts by keys
-   */
-  async deleteAppTextsByKeys(keys: string[]): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('app_texts')
-        .delete()
-        .in('key', keys);
-      
-      if (error) {
-        console.error(`Error deleting app texts with keys ${keys}:`, error);
-        throw error;
-      }
-      
-      console.log(`Deleted app texts with keys: ${keys.join(', ')}`);
-    } catch (error) {
-      console.error(`Failed to delete app texts with keys ${keys}:`, error);
-      throw error;
     }
   }
 };
