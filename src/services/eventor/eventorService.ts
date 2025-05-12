@@ -164,11 +164,31 @@ export const fetchEventorData = async (
             let classFound = false;
             let classesWithStartsCount = 0;
             let totalClassesCount = 0;
+            let firstClassResult: any = null;
             
             // Look for ClassResult elements
             if (responseData && responseData.ResultList && Array.isArray(responseData.ResultList.ClassResult)) {
               const classResults = responseData.ResultList.ClassResult;
               totalClassesCount = classResults.length;
+              
+              // Store first ClassResult for detailed logging
+              if (totalClassesCount > 0) {
+                firstClassResult = classResults[0];
+                
+                // Log the complete first ClassResult object for debugging
+                const firstClassResultString = JSON.stringify(firstClassResult);
+                addLog(resultRow.eventId, currentEventorUrl, 
+                  `Raw ClassResult example for event ${resultRow.eventId}: ${firstClassResultString}`);
+                
+                if (runId) {
+                  await saveLogToDatabase(
+                    runId,
+                    resultRow.eventId.toString(),
+                    currentEventorUrl,
+                    `Raw ClassResult example for event ${resultRow.eventId}: ${firstClassResultString}`
+                  );
+                }
+              }
               
               // Try to find the specific class this result belongs to
               const resultClass = enhancedResultRow.class;
@@ -234,6 +254,25 @@ export const fetchEventorData = async (
               const eventClasses = responseData.Event.EventClassList.EventClass;
               const resultClass = enhancedResultRow.class;
               totalClassesCount = eventClasses.length;
+              
+              // Store first EventClass for detailed logging
+              if (totalClassesCount > 0) {
+                firstClassResult = eventClasses[0];
+                
+                // Log the complete first EventClass object for debugging
+                const firstEventClassString = JSON.stringify(firstClassResult);
+                addLog(resultRow.eventId, currentEventorUrl, 
+                  `Raw EventClass example for event ${resultRow.eventId}: ${firstEventClassString}`);
+                
+                if (runId) {
+                  await saveLogToDatabase(
+                    runId,
+                    resultRow.eventId.toString(),
+                    currentEventorUrl,
+                    `Raw EventClass example for event ${resultRow.eventId}: ${firstEventClassString}`
+                  );
+                }
+              }
               
               for (const eventClass of eventClasses) {
                 if (eventClass.Name === resultClass) {

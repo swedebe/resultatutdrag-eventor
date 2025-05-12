@@ -181,12 +181,32 @@ export const fetchClassParticipantCounts = async (
       let classesFound = false;
       let classesWithStartsCount = 0;
       let totalClassesCount = 0;
+      let firstClassResult: any = null;
       
       // First, try to locate ClassResult elements in the ResultList structure
       if (responseData && responseData.ResultList && Array.isArray(responseData.ResultList.ClassResult)) {
         const classResults = responseData.ResultList.ClassResult;
         totalClassesCount = classResults.length;
         classesFound = totalClassesCount > 0;
+        
+        // Store the first ClassResult for detailed logging
+        if (classesFound) {
+          firstClassResult = classResults[0];
+          
+          // Log the complete first ClassResult object for debugging
+          const firstClassResultString = JSON.stringify(firstClassResult);
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, 
+            `Raw ClassResult example for event ${eventId}: ${firstClassResultString}`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: ${eventorApiEndpoint}`,
+              `Raw ClassResult example for event ${eventId}: ${firstClassResultString}`
+            );
+          }
+        }
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${totalClassesCount} klasser (ClassResult)`);
         
@@ -244,6 +264,25 @@ export const fetchClassParticipantCounts = async (
         const eventClasses = responseData.Event.EventClassList.EventClass;
         totalClassesCount = eventClasses.length;
         classesFound = totalClassesCount > 0;
+        
+        // Store the first EventClass for detailed logging
+        if (classesFound) {
+          firstClassResult = eventClasses[0];
+          
+          // Log the complete first EventClass object for debugging
+          const firstEventClassString = JSON.stringify(firstClassResult);
+          addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, 
+            `Raw EventClass example for event ${eventId}: ${firstEventClassString}`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId,
+              eventId.toString(),
+              `Eventor API: ${eventorApiEndpoint}`,
+              `Raw EventClass example for event ${eventId}: ${firstEventClassString}`
+            );
+          }
+        }
         
         addLog(eventId, `Eventor API: ${eventorApiEndpoint}`, `Hittade ${totalClassesCount} klasser (EventClass)`);
         
