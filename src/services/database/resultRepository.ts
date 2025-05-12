@@ -1,4 +1,3 @@
-
 /**
  * Database operations for results
  */
@@ -9,7 +8,10 @@ import { dbRowToResultRow, resultRowToDbFormat } from '../utils/processingUtils'
 /**
  * Save a result to the database
  */
-export const saveResultToDatabase = async (resultRow: ResultRow, runId: string): Promise<boolean> => {
+export const saveResultToDatabase = async (resultRow: ResultRow, runId: string): Promise<{
+  success: boolean;
+  recordId?: string;
+}> => {
   try {
     // First, get user info from the run
     const { data: runData, error: runError } = await supabase
@@ -35,7 +37,7 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
     processedResult.started = Number(processedResult.started) === 1 ? 1 : 0;
     
     // Make a clean insert with explicit type conversions for all numeric fields
-    const { error } = await supabase.from('processed_results').insert({
+    const { data, error } = await supabase.from('processed_results').insert({
       run_id: processedResult.run_id,
       event_id: String(processedResult.event_id),
       event_name: processedResult.event_name,
@@ -54,17 +56,17 @@ export const saveResultToDatabase = async (resultRow: ResultRow, runId: string):
       course_length: processedResult.course_length ? Number(processedResult.course_length) : null,
       organizer: processedResult.organizer,
       started: Number(processedResult.started) // One more forced conversion to be absolutely sure
-    });
+    }).select('id').single();
     
     if (error) {
       console.error(`Error inserting processed result for event ${resultRow.eventId}:`, error);
-      return false;
+      return { success: false };
     }
     
-    return true;
+    return { success: true, recordId: data?.id };
   } catch (err) {
     console.error(`Error saving processed result for event ${resultRow?.eventId}:`, err);
-    return false;
+    return { success: false };
   }
 };
 
