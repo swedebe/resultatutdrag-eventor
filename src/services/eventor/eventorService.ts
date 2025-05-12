@@ -113,7 +113,7 @@ export const fetchEventorData = async (
             includeSplitTimes: false
           })}`);
           
-          // Call the Render proxy with a POST request instead of GET
+          // Call the Render proxy with a POST request
           const response = await fetch(renderProxyUrl, {
             method: 'POST',
             headers: {

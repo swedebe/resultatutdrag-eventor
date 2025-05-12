@@ -34,16 +34,32 @@ serve(async (req) => {
       console.log("Handling /results/event POST endpoint");
       
       // Extract request body
-      const body = await req.json() as RequestBody;
+      let body;
+      try {
+        body = await req.json() as RequestBody;
+        console.log("Received POST request body:", JSON.stringify({
+          apiKey: body.apiKey ? "REDACTED" : undefined,
+          eventId: body.eventId,
+          includeSplitTimes: body.includeSplitTimes
+        }));
+      } catch (error) {
+        console.error("Failed to parse request body:", error);
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in request body' }),
+          { 
+            status: 400, 
+            headers: { 
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+      
       const { apiKey, eventId, includeSplitTimes = false } = body;
       
-      console.log("Received POST request body:", JSON.stringify({
-        apiKey: apiKey ? "REDACTED" : undefined,
-        eventId,
-        includeSplitTimes
-      }));
-      
       if (!apiKey) {
+        console.error("Missing API key in request body");
         return new Response(
           JSON.stringify({ error: 'API key is required' }),
           { 
@@ -57,6 +73,7 @@ serve(async (req) => {
       }
       
       if (!eventId) {
+        console.error("Missing event ID in request body");
         return new Response(
           JSON.stringify({ error: 'Event ID is required' }),
           { 
