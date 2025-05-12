@@ -21,17 +21,27 @@ serve(async (req) => {
 
   try {
     console.log("Edge Function: eventor-api - request received");
+    console.log("Request URL:", req.url);
+    console.log("Request method:", req.method);
     
     // Check if this is a request to the /results/event endpoint
     const url = new URL(req.url);
     const path = url.pathname;
     
+    console.log("Request path:", path);
+    
     if (path.endsWith('/results/event') && req.method === 'POST') {
-      console.log("Handling /results/event endpoint");
+      console.log("Handling /results/event POST endpoint");
       
       // Extract request body
       const body = await req.json() as RequestBody;
       const { apiKey, eventId, includeSplitTimes = false } = body;
+      
+      console.log("Received POST request body:", JSON.stringify({
+        apiKey: apiKey ? "REDACTED" : undefined,
+        eventId,
+        includeSplitTimes
+      }));
       
       if (!apiKey) {
         return new Response(
@@ -107,6 +117,36 @@ serve(async (req) => {
           }
         );
       }
+    } else if (path.endsWith('/results/event') && req.method === 'GET') {
+      // Handle the legacy GET request for backward compatibility
+      console.log("Handling legacy /results/event GET endpoint");
+      
+      // Extract query parameters from the URL
+      const eventId = url.searchParams.get('eventId');
+      const includeSplitTimes = url.searchParams.get('includeSplitTimes') === 'true';
+      
+      console.log("Received GET request with params:", { 
+        eventId, 
+        includeSplitTimes 
+      });
+      
+      // This is a legacy approach - we don't have the API key in the headers
+      console.log("WARNING: Using GET request without API key is not supported anymore");
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'API key is required. Please use POST method with apiKey in the request body',
+          method: 'GET',
+          path: path
+        }),
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
     }
     
     // Original logic for the dynamic endpoints

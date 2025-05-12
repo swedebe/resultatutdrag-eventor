@@ -98,6 +98,13 @@ export const fetchEventorData = async (
             await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Använder Render proxy för Eventor API-anrop`);
           }
           
+          // Create the POST request payload
+          const requestPayload = {
+            apiKey,
+            eventId: resultRow.eventId,
+            includeSplitTimes: false
+          };
+          
           // Log the full request details for debugging
           console.log(`Making POST request to Render proxy: ${renderProxyUrl}`);
           console.log(`Request payload: ${JSON.stringify({
@@ -106,17 +113,13 @@ export const fetchEventorData = async (
             includeSplitTimes: false
           })}`);
           
-          // Call the Render proxy directly with a POST request
+          // Call the Render proxy with a POST request instead of GET
           const response = await fetch(renderProxyUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              apiKey,
-              eventId: resultRow.eventId,
-              includeSplitTimes: false
-            }),
+            body: JSON.stringify(requestPayload),
           });
           
           console.log(`Response status from Render proxy: ${response.status}`);
