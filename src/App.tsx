@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import FileUploader from "./pages/FileUploader";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthWrapper from "./components/AuthWrapper";
@@ -28,14 +27,6 @@ const App = () => (
             element={
               <AuthWrapper>
                 <Index />
-              </AuthWrapper>
-            }
-          />
-          <Route
-            path="/file-upload"
-            element={
-              <AuthWrapper>
-                <FileUploader />
               </AuthWrapper>
             }
           />
