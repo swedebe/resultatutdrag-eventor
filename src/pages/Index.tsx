@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -6,7 +7,7 @@ import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
-import { Trash2, PlusCircle, Settings, Database } from "lucide-react";
+import { Trash2, PlusCircle, Settings, Database, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllAppTexts } from "@/hooks/useAppText";
 
@@ -100,6 +101,15 @@ const Index = () => {
 
   return (
     <div className="container py-8">
+      <div className="bg-green-100 border-l-4 border-green-500 p-4 mb-6 rounded shadow-sm">
+        <div className="flex items-center">
+          <RefreshCw className="h-5 w-5 mr-2 text-green-600" />
+          <p className="text-green-700 font-medium">
+            Ny version efter återställning från GitHub (commit 34ffa61)
+          </p>
+        </div>
+      </div>
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">
           {texts.main_title || "Resultatanalys"}
