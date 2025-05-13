@@ -1,9 +1,11 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
 import { BatchProcessingOptions } from '../FileProcessingService';
 import { sleep } from '../utils/processingUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { extractCourseInfo } from '@/lib/eventor-parser';
 
 // Export this for TypeScript since it's used in other files
 export let currentEventorUrl = "";
@@ -35,14 +37,63 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // Implement course length fetching logic here
-      // This is a placeholder - the actual implementation would depend on your scraping logic
-      enhancedResultRow.length = enhancedResultRow.length || Math.floor(Math.random() * 8000) + 3000; // Placeholder: Random length between 3000-11000 m
-      
-      addLog(resultRow.eventId, currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} m`);
-      
-      if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} m`);
+      // Fetch the HTML content from Eventor
+      try {
+        const response = await fetch(currentEventorUrl);
+        if (response.ok) {
+          const htmlContent = await response.text();
+          
+          // Use extractCourseInfo to get course length and participants count
+          const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
+          
+          if (courseInfo.length > 0) {
+            enhancedResultRow.length = courseInfo.length;
+            console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
+            
+            addLog(resultRow.eventId, currentEventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            }
+          } else {
+            console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
+            
+            addLog(resultRow.eventId, currentEventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            }
+          }
+          
+          // Update participants count if available and not already set
+          if (courseInfo.participants > 0 && (!enhancedResultRow.totalParticipants || enhancedResultRow.totalParticipants === 0)) {
+            enhancedResultRow.totalParticipants = courseInfo.participants;
+            enhancedResultRow.antalStartande = courseInfo.participants.toString();
+            
+            addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            }
+          }
+        } else {
+          const errorMessage = `HTTP Error: ${response.status} ${response.statusText}`;
+          console.error(`[ERROR] Failed to fetch Eventor HTML: ${errorMessage}`);
+          
+          addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML: ${errorMessage}`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML: ${errorMessage}`);
+          }
+        }
+      } catch (fetchError: any) {
+        console.error(`[ERROR] Error fetching HTML from Eventor: ${fetchError.message || fetchError}`);
+        
+        addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML: ${fetchError.message || fetchError}`);
+        
+        if (runId) {
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML: ${fetchError.message || fetchError}`);
+        }
       }
     }
     

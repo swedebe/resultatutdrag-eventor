@@ -9,7 +9,7 @@ import {
   fetchClassParticipantCounts, 
   updateResultsWithParticipantCounts 
 } from './excel/excelService';
-import { fetchEventorData } from './eventor/eventorService';
+import { fetchEventorData, currentEventorUrl } from './eventor/eventorService';
 import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveLogToDatabase } from './database/resultRepository';
 import { supabase } from '@/integrations/supabase/client';
 
