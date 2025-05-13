@@ -12,8 +12,10 @@ import RunDetail from "./pages/RunDetail";
 import Settings from "./pages/Settings";
 import EventorBatch from "./pages/EventorBatch";
 
+// Create a new QueryClient for React Query
 const queryClient = new QueryClient();
 
+// Main App component that sets up providers and routing
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
