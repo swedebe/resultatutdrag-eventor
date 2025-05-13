@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
 
-// Define the batch options type
+// Define and export the batch options type
 export interface BatchProcessingOptions {
   fetchCourseLength: boolean;
   fetchStarters: boolean;
@@ -31,7 +31,7 @@ export const processExcelFile = async (
   delaySeconds: number = 15,
   onPartialResults?: (results: ResultRow[]) => Promise<boolean>,
   runId?: string | null,
-  batchOptions?: BatchProcessingOptions // Make the batch options optional
+  batchOptions?: BatchProcessingOptions
 ): Promise<ResultRow[]> => {
   setProgress(0);
   setCurrentStatus("Läser in fil...");
