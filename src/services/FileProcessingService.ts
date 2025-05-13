@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -224,6 +223,3 @@ export const processExcelFile = async (
   
   return enrichedResults;
 };
-
-// Export this for TypeScript since it's used in the eventorService.ts
-export const currentEventorUrl = "";
