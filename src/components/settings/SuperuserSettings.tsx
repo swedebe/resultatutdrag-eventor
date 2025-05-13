@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +11,8 @@ import { AppTextService } from "@/services/appText/appTextService";
 import AddUserForm from "./AddUserForm";
 import UserManagement from "./UserManagement";
 
-// Updated to include 'eventorbatch' in the category order
-const CATEGORY_ORDER = ['homepage', 'fileupload', 'eventorbatch', 'settings', 'general', 'auth'];
+// Updated to remove 'fileupload' from the category order
+const CATEGORY_ORDER = ['homepage', 'eventorbatch', 'settings', 'general', 'auth'];
 
 const SuperuserSettings: React.FC = () => {
   const { toast } = useToast();

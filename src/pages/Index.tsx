@@ -6,7 +6,7 @@ import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
-import { Trash2, PlusCircle, Settings, Database } from "lucide-react";
+import { Trash2, Database, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllAppTexts } from "@/hooks/useAppText";
 
@@ -131,14 +131,8 @@ const Index = () => {
               {texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."}
             </p>
             <div className="flex justify-center gap-4 mt-4">
-              <Link to="/file-upload">
-                <Button className="flex items-center gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Skapa ny körning
-                </Button>
-              </Link>
               <Link to="/batch-processing">
-                <Button variant="secondary" className="flex items-center gap-2">
+                <Button className="flex items-center gap-2">
                   <Database className="h-4 w-4" />
                   Batch-bearbetning
                 </Button>
@@ -189,7 +183,7 @@ const Index = () => {
               <p className="text-muted-foreground mb-4">
                 Du har inga sparade körningar än
               </p>
-              <Link to="/file-upload">
+              <Link to="/batch-processing">
                 <Button>
                   Skapa din första körning
                 </Button>
