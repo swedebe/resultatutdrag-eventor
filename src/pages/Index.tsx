@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -7,9 +6,51 @@ import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
-import { Trash2, PlusCircle, Settings, Database, RefreshCw } from "lucide-react";
+import { Trash2, Settings, Database, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllAppTexts } from "@/hooks/useAppText";
+
+// Create a component for the version banner
+const VersionBanner = () => {
+  const { data, isLoading } = useQuery({
+    queryKey: ['deployment-info'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/.netlify/functions/get-deployment-info');
+        if (!response.ok) throw new Error('Failed to fetch deployment info');
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching deployment info:', error);
+        return { commit: 'unknown', timestamp: new Date().toISOString() };
+      }
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-green-100 border-l-4 border-green-500 p-4 mb-6 rounded shadow-sm">
+        <div className="flex items-center">
+          <RefreshCw className="h-5 w-5 mr-2 text-green-600 animate-spin" />
+          <p className="text-green-700 font-medium">Laddar versions-information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const commitHash = data?.commit?.substring(0, 7) || 'unknown';
+  const deployTime = data?.timestamp ? new Date(data.timestamp).toLocaleString('sv-SE') : 'okänd tidpunkt';
+
+  return (
+    <div className="bg-green-100 border-l-4 border-green-500 p-4 mb-6 rounded shadow-sm">
+      <div className="flex items-center">
+        <RefreshCw className="h-5 w-5 mr-2 text-green-600" />
+        <p className="text-green-700 font-medium">
+          Version {commitHash} (deployed {deployTime})
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const Index = () => {
   const { toast } = useToast();
@@ -101,14 +142,7 @@ const Index = () => {
 
   return (
     <div className="container py-8">
-      <div className="bg-green-100 border-l-4 border-green-500 p-4 mb-6 rounded shadow-sm">
-        <div className="flex items-center">
-          <RefreshCw className="h-5 w-5 mr-2 text-green-600" />
-          <p className="text-green-700 font-medium">
-            Ny version efter återställning från GitHub (commit 34ffa61)
-          </p>
-        </div>
-      </div>
+      <VersionBanner />
       
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">
@@ -141,14 +175,8 @@ const Index = () => {
               {texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."}
             </p>
             <div className="flex justify-center gap-4 mt-4">
-              <Link to="/file-upload">
-                <Button className="flex items-center gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Skapa ny körning
-                </Button>
-              </Link>
               <Link to="/batch-processing">
-                <Button variant="secondary" className="flex items-center gap-2">
+                <Button variant="default" className="flex items-center gap-2">
                   <Database className="h-4 w-4" />
                   Batch-bearbetning
                 </Button>
@@ -199,7 +227,7 @@ const Index = () => {
               <p className="text-muted-foreground mb-4">
                 Du har inga sparade körningar än
               </p>
-              <Link to="/file-upload">
+              <Link to="/batch-processing">
                 <Button>
                   Skapa din första körning
                 </Button>
