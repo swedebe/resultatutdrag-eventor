@@ -12,21 +12,21 @@ export const extractCourseLength = (lengthText: string): number => {
   // Log raw input for debugging
   console.log(`[DEBUG] Raw length text input: "${lengthText}"`);
   
-  // Rensa bort oönskade tecken och trimma
+  // Clean unwanted characters and trim
   const cleanedText = lengthText.replace(/[^\d\s.,km]/gi, '').trim();
   console.log(`[DEBUG] Cleaned length text: "${cleanedText}"`);
   
-  // Försök hitta km-format (t.ex. "4.5 km")
+  // Look for km format (e.g. "4.5 km")
   let kmMatch = cleanedText.match(/([\d.,]+)\s*km/i);
   if (kmMatch) {
-    // Hantera både punkt och komma som decimalavgränsare
+    // Handle both dot and comma as decimal separator
     const kmValue = kmMatch[1].replace(',', '.');
     const meters = Math.round(parseFloat(kmValue) * 1000);
     console.log(`[DEBUG] Extracted from km format: ${kmValue} km = ${meters} m`);
     return meters;
   }
   
-  // Försök hitta m-format (t.ex. "4 500 m" eller "4500m")
+  // Look for meter format (e.g. "4 500 m" or "4500m")
   let mMatch = cleanedText.match(/([\d\s]+)\s*m/i);
   if (mMatch) {
     const rawValue = mMatch[1].replace(/\s/g, '');
@@ -35,12 +35,12 @@ export const extractCourseLength = (lengthText: string): number => {
     return meters;
   }
   
-  // Sista försöket - hitta bara numret
+  // Last attempt - find just the number
   let numMatch = cleanedText.match(/[\d\s.,]+/);
   if (numMatch) {
     const numStr = numMatch[0].replace(/\s/g, '').replace(',', '.');
     const num = parseFloat(numStr);
-    // Om numret är litet, anta att det är i km
+    // If the number is small, assume it's in km
     if (num < 100) {
       const meters = Math.round(num * 1000);
       console.log(`[DEBUG] Extracted small number as km: ${num} km = ${meters} m`);
@@ -57,78 +57,110 @@ export const extractCourseLength = (lengthText: string): number => {
 /**
  * Extracts course length and participants from event class header
  * Format: "<h3>Class name</h3>2 190 m, 8 startande"
+ * 
+ * Updated to correctly handle the Eventor HTML structure where the course length
+ * appears immediately after the closing </h3> tag
  */
 export const extractCourseInfo = (html: string, className: string): {length: number, participants: number} => {
   const result = { length: 0, participants: 0 };
   
-  // Improved regex pattern targeting eventClassHeader divs more precisely
-  // This regex looks for a div with class="eventClassHeader" containing an h3 with the class name
-  // followed by the length and participants info
-  const eventClassHeaderRegex = new RegExp(
-    `<div class="eventClassHeader"><div><h3>(${className})[^<]*</h3>([^<]+)</div>`, 
-    'i'
-  );
-  
-  const match = eventClassHeaderRegex.exec(html);
-  
-  if (match) {
-    const infoText = match[2].trim();
-    console.log(`[DEBUG] Found matching class header: "${match[1]}" for class "${className}"`);
-    console.log(`[DEBUG] Info text: "${infoText}"`);
-    console.log(`[DEBUG] Extracted from node: <div class="eventClassHeader"><div><h3>${match[1]}...</h3>${infoText}</div>`);
+  try {
+    // Improved regex pattern targeting eventClassHeader divs with exact class name match
+    // This regex looks for: <div class="eventClassHeader">...<h3>className</h3>LENGTH m, PARTICIPANTS startande
+    const eventClassHeaderRegex = new RegExp(
+      `<div class="eventClassHeader">\\s*<div>\\s*<h3>\\s*(${className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\s*</h3>([^,<]+),\\s*(\\d+)\\s+startande`,
+      'i'
+    );
     
-    // Pattern: "2 190 m, 8 startande" or "4 160 m, 24 startande"
-    const lengthParticipantsRegex = /(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i;
-    const infoMatch = infoText.match(lengthParticipantsRegex);
+    console.log(`[DEBUG] Looking for class "${className}" in eventClassHeader divs`);
+    const match = eventClassHeaderRegex.exec(html);
     
-    if (infoMatch) {
-      const rawValue = infoMatch[1].replace(/\s/g, '');
-      result.length = parseInt(rawValue, 10);
-      result.participants = parseInt(infoMatch[2], 10);
-      console.log(`[DEBUG] Extracted length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
+    if (match) {
+      // match[1] = class name
+      // match[2] = course length text (e.g. "3 100 m")
+      // match[3] = number of participants
+      const lengthText = match[2].trim();
+      const participantsText = match[3];
+      
+      console.log(`[DEBUG] Found exact match for class "${match[1]}"`);
+      console.log(`[DEBUG] Raw extracted length text: "${lengthText}"`);
+      console.log(`[DEBUG] Raw participants text: "${participantsText}"`);
+      
+      // Log the full matched HTML context for debugging
+      const contextStart = Math.max(0, match.index - 50);
+      const contextEnd = Math.min(html.length, match.index + match[0].length + 50);
+      const htmlContext = html.substring(contextStart, contextEnd);
+      console.log(`[DEBUG] Extracted from HTML context: "${htmlContext}"`);
+      
+      // Extract the course length value
+      const lengthValue = extractCourseLength(lengthText);
+      result.length = lengthValue;
+      
+      // Extract participants count
+      result.participants = parseInt(participantsText, 10);
+      
+      console.log(`[DEBUG] Final extracted values - Length: ${result.length} m, Participants: ${result.participants}`);
       return result;
+    } else {
+      console.log(`[DEBUG] No exact match found for class "${className}" using primary regex pattern`);
     }
-  }
-  
-  // If no exact match found, try a more flexible approach
-  // Look for eventClassHeader divs containing the class name
-  const flexibleRegex = /<div class="eventClassHeader">[^<]*<h3>[^<]*?(?:${className})[^<]*?<\/h3>([^<]+)/gi;
-  const allMatches = [...html.matchAll(flexibleRegex)];
-  
-  for (const flexMatch of allMatches) {
-    if (flexMatch && flexMatch[1]) {
-      const infoText = flexMatch[1].trim();
-      console.log(`[DEBUG] Flexible match info text: "${infoText}"`);
-      console.log(`[DEBUG] Extracted from node: <div class="eventClassHeader">...<h3>...${className}...</h3>${infoText}`);
+    
+    // If no exact match found, try a more flexible approach
+    // This is a fallback that searches for class names that might be formatted slightly differently
+    const flexibleRegex = new RegExp(
+      `<div class="eventClassHeader">\\s*<div>\\s*<h3>\\s*([^<]*${className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*)\\s*</h3>([^,<]+),\\s*(\\d+)\\s+startande`,
+      'i'
+    );
+    
+    console.log(`[DEBUG] Trying flexible match for class containing "${className}"`);
+    const flexMatch = flexibleRegex.exec(html);
+    
+    if (flexMatch) {
+      const flexClassName = flexMatch[1].trim();
+      const flexLengthText = flexMatch[2].trim();
+      const flexParticipantsText = flexMatch[3];
       
-      // Pattern: "2 190 m, 8 startande"
-      const lengthParticipantsRegex = /(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i;
-      const infoMatch = infoText.match(lengthParticipantsRegex);
+      console.log(`[DEBUG] Found flexible match with class "${flexClassName}"`);
+      console.log(`[DEBUG] Flexible match raw length text: "${flexLengthText}"`);
+      console.log(`[DEBUG] Flexible match participants text: "${flexParticipantsText}"`);
       
-      if (infoMatch) {
-        const rawValue = infoMatch[1].replace(/\s/g, '');
-        result.length = parseInt(rawValue, 10);
-        result.participants = parseInt(infoMatch[2], 10);
-        console.log(`[DEBUG] Flexible extraction - raw length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
-        return result;
+      // Log the full matched HTML context for debugging
+      const contextStart = Math.max(0, flexMatch.index - 50);
+      const contextEnd = Math.min(html.length, flexMatch.index + flexMatch[0].length + 50);
+      const htmlContext = html.substring(contextStart, contextEnd);
+      console.log(`[DEBUG] Flexible match HTML context: "${htmlContext}"`);
+      
+      // Extract the course length value
+      const lengthValue = extractCourseLength(flexLengthText);
+      result.length = lengthValue;
+      
+      // Extract participants count
+      result.participants = parseInt(flexParticipantsText, 10);
+      
+      console.log(`[DEBUG] Flexible match final values - Length: ${result.length} m, Participants: ${result.participants}`);
+      return result;
+    } else {
+      console.log(`[DEBUG] No flexible match found for class containing "${className}"`);
+    }
+    
+    // Last resort: try to find any class header that looks similar
+    console.log(`[DEBUG] Trying to find any eventClassHeader divs`);
+    const allHeadersRegex = /<div class="eventClassHeader">\s*<div>\s*<h3>([^<]*)<\/h3>([^,<]+),\s*(\d+)\s+startande/gi;
+    let allMatches = [...html.matchAll(allHeadersRegex)];
+    
+    if (allMatches.length > 0) {
+      console.log(`[DEBUG] Found ${allMatches.length} total eventClassHeader divs`);
+      
+      // Log the first few headers found for debugging
+      for (let i = 0; i < Math.min(3, allMatches.length); i++) {
+        const headerMatch = allMatches[i];
+        console.log(`[DEBUG] Header #${i+1}: <h3>${headerMatch[1]}</h3>${headerMatch[2]}, ${headerMatch[3]} startande`);
       }
+    } else {
+      console.log(`[DEBUG] No eventClassHeader divs found in HTML`);
     }
-  }
-  
-  // If still not found, perform a general search for the pattern near the class name
-  const generalRegex = new RegExp(
-    `${className}[\\s\\S]{0,100}(\\d[\\d\\s]+)\\s*m,\\s*(\\d+)\\s+startande`,
-    'i'
-  );
-  
-  const generalMatch = html.match(generalRegex);
-  
-  if (generalMatch) {
-    const rawValue = generalMatch[1].replace(/\s/g, '');
-    result.length = parseInt(rawValue, 10);
-    result.participants = parseInt(generalMatch[2], 10);
-    console.log(`[DEBUG] General extraction - raw length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
-    console.log(`[DEBUG] Extracted from node containing text: ${className}...(${generalMatch[0].substring(0, 50)}...)`);
+  } catch (error) {
+    console.error(`[ERROR] Exception in extractCourseInfo:`, error);
   }
   
   return result;

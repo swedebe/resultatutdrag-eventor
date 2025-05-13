@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -7,8 +6,55 @@ import { sleep } from '../utils/processingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { extractCourseInfo } from '@/lib/eventor-parser';
 
-// Export this for TypeScript since it's used in other files
+// Current URL being processed, exported for access in other modules
 export let currentEventorUrl = "";
+
+// Maximum number of retries for network requests
+const MAX_RETRIES = 3;
+
+/**
+ * Implements a fetch with retry and exponential backoff
+ * @param url URL to fetch
+ * @param options Fetch options
+ * @param maxRetries Maximum number of retry attempts
+ * @returns Response object or throws error after max retries
+ */
+async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries = MAX_RETRIES): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`[DEBUG] Fetch attempt ${attempt + 1} for URL: ${url}`);
+      const response = await fetch(url, options);
+      
+      // If response is successful or it's a 400-level error (client error),
+      // don't retry as these are typically not transient
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        return response;
+      }
+      
+      // For server errors (500+), we'll retry
+      console.warn(`[WARNING] Server error on attempt ${attempt + 1}: HTTP ${response.status} ${response.statusText}`);
+      lastError = new Error(`HTTP error: ${response.status} ${response.statusText}`);
+      
+    } catch (error: any) {
+      // For network errors (connection issues), we'll retry
+      console.warn(`[WARNING] Network error on attempt ${attempt + 1}:`, error.message || error);
+      lastError = error;
+    }
+    
+    // Calculate backoff delay: 2^attempt * 1000ms + random jitter
+    // Example: 1st retry: ~1sec, 2nd: ~2sec, 3rd: ~4sec
+    if (attempt < maxRetries - 1) {
+      const backoffDelay = Math.floor(Math.pow(2, attempt) * 1000 + Math.random() * 1000);
+      console.log(`[DEBUG] Retrying in ${backoffDelay}ms...`);
+      await sleep(backoffDelay / 1000); // sleep takes seconds, not milliseconds
+    }
+  }
+  
+  // If we've exhausted all retries, throw the last error
+  throw lastError || new Error(`Failed after ${maxRetries} attempts`);
+}
 
 export const fetchEventorData = async (
   resultRow: ResultRow, 
@@ -37,9 +83,10 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // Fetch the HTML content from Eventor
+      // Fetch the HTML content from Eventor with retry mechanism
       try {
-        const response = await fetch(currentEventorUrl);
+        const response = await fetchWithRetry(currentEventorUrl);
+        
         if (response.ok) {
           const htmlContent = await response.text();
           
@@ -54,6 +101,25 @@ export const fetchEventorData = async (
             
             if (runId) {
               await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            }
+            
+            // Special verification for event ID 44635, class "Lätt 3 Dam"
+            if (resultRow.eventId.toString() === "44635" && resultRow.class === "Lätt 3 Dam") {
+              console.log(`[VERIFICATION] Event ID 44635, Class "Lätt 3 Dam": Extracted course length = ${courseInfo.length} m`);
+              console.log(`[VERIFICATION] Expected value: 3100 m, Actual value: ${courseInfo.length} m`);
+              console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
+              
+              const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
+              addLog(resultRow.eventId, currentEventorUrl, verificationMessage);
+              
+              if (runId) {
+                await saveLogToDatabase(
+                  runId, 
+                  resultRow.eventId.toString(), 
+                  currentEventorUrl, 
+                  verificationMessage
+                );
+              }
             }
           } else {
             console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
@@ -78,21 +144,21 @@ export const fetchEventorData = async (
           }
         } else {
           const errorMessage = `HTTP Error: ${response.status} ${response.statusText}`;
-          console.error(`[ERROR] Failed to fetch Eventor HTML: ${errorMessage}`);
+          console.error(`[ERROR] Failed to fetch Eventor HTML after retries: ${errorMessage}`);
           
-          addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML: ${errorMessage}`);
+          addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorMessage}`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML: ${errorMessage}`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorMessage}`);
           }
         }
       } catch (fetchError: any) {
-        console.error(`[ERROR] Error fetching HTML from Eventor: ${fetchError.message || fetchError}`);
+        console.error(`[ERROR] Error fetching HTML from Eventor after all retries: ${fetchError.message || fetchError}`);
         
-        addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML: ${fetchError.message || fetchError}`);
+        addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${fetchError.message || fetchError}`);
         
         if (runId) {
-          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML: ${fetchError.message || fetchError}`);
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${fetchError.message || fetchError}`);
         }
       }
     }
