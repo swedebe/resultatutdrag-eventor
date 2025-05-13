@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LogComponent, { clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
-import { processExcelFile, exportResultsToExcel, BatchProcessingOptions } from "@/services/FileProcessingService";
+import { processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadSection from "@/components/eventor-batch/FileUploadSection";
 import PreviewSection from "@/components/eventor-batch/PreviewSection";
@@ -29,7 +29,7 @@ const EventorBatch = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
-  const [isDryRun, setIsDryRun] = useState<boolean>(true);
+	const [isDryRun, setIsDryRun] = useState<boolean>(true);
   const [jobId, setJobId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { texts } = useAllAppTexts();
@@ -124,14 +124,6 @@ const EventorBatch = () => {
     setRunId(newRunId);
     
     try {
-      // Create the batch options object
-      const batchOptions: BatchProcessingOptions = {
-        fetchCourseLength: !isDryRun,
-        fetchStarters: !isDryRun,
-        courseLengthDelay: delay,
-        startersDelay: delay
-      };
-      
       const enrichedResults = await processExcelFile(
         file, 
         setProgress, 
@@ -155,7 +147,7 @@ const EventorBatch = () => {
           return true;
         },
         newRunId,
-        batchOptions // Pass the batch options object here
+				isDryRun
       );
       
       // Final cancellation check
