@@ -37,12 +37,12 @@ export const fetchEventorData = async (
       
       // Implement course length fetching logic here
       // This is a placeholder - the actual implementation would depend on your scraping logic
-      enhancedResultRow.length = enhancedResultRow.length || Math.floor(Math.random() * 8) + 3; // Placeholder: Random length between 3-10 km
+      enhancedResultRow.length = enhancedResultRow.length || Math.floor(Math.random() * 8000) + 3000; // Placeholder: Random length between 3000-11000 m
       
-      addLog(resultRow.eventId, currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} km`);
+      addLog(resultRow.eventId, currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} m`);
       
       if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} km`);
+        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${enhancedResultRow.length} m`);
       }
     }
     

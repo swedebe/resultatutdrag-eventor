@@ -1,3 +1,4 @@
+
 /**
  * Utilities for extracting course information
  */
@@ -8,21 +9,30 @@
 export const extractCourseLength = (lengthText: string): number => {
   if (!lengthText) return 0;
   
+  // Log raw input for debugging
+  console.log(`[DEBUG] Raw length text input: "${lengthText}"`);
+  
   // Rensa bort oönskade tecken och trimma
   const cleanedText = lengthText.replace(/[^\d\s.,km]/gi, '').trim();
+  console.log(`[DEBUG] Cleaned length text: "${cleanedText}"`);
   
   // Försök hitta km-format (t.ex. "4.5 km")
   let kmMatch = cleanedText.match(/([\d.,]+)\s*km/i);
   if (kmMatch) {
     // Hantera både punkt och komma som decimalavgränsare
     const kmValue = kmMatch[1].replace(',', '.');
-    return Math.round(parseFloat(kmValue) * 1000);
+    const meters = Math.round(parseFloat(kmValue) * 1000);
+    console.log(`[DEBUG] Extracted from km format: ${kmValue} km = ${meters} m`);
+    return meters;
   }
   
   // Försök hitta m-format (t.ex. "4 500 m" eller "4500m")
   let mMatch = cleanedText.match(/([\d\s]+)\s*m/i);
   if (mMatch) {
-    return parseInt(mMatch[1].replace(/\s/g, ''), 10);
+    const rawValue = mMatch[1].replace(/\s/g, '');
+    const meters = parseInt(rawValue, 10);
+    console.log(`[DEBUG] Extracted from meter format: ${rawValue} = ${meters} m`);
+    return meters;
   }
   
   // Sista försöket - hitta bara numret
@@ -32,11 +42,15 @@ export const extractCourseLength = (lengthText: string): number => {
     const num = parseFloat(numStr);
     // Om numret är litet, anta att det är i km
     if (num < 100) {
-      return Math.round(num * 1000);
+      const meters = Math.round(num * 1000);
+      console.log(`[DEBUG] Extracted small number as km: ${num} km = ${meters} m`);
+      return meters;
     }
+    console.log(`[DEBUG] Extracted raw number as meters: ${num} m`);
     return Math.round(num);
   }
   
+  console.log(`[DEBUG] Failed to extract course length from text: "${lengthText}"`);
   return 0;
 };
 
@@ -59,17 +73,19 @@ export const extractCourseInfo = (html: string, className: string): {length: num
   
   if (match) {
     const infoText = match[2].trim();
-    console.log(`Found matching class header: "${match[1]}" for class "${className}"`);
-    console.log(`Info text: "${infoText}"`);
+    console.log(`[DEBUG] Found matching class header: "${match[1]}" for class "${className}"`);
+    console.log(`[DEBUG] Info text: "${infoText}"`);
+    console.log(`[DEBUG] Extracted from node: <div class="eventClassHeader"><div><h3>${match[1]}...</h3>${infoText}</div>`);
     
     // Pattern: "2 190 m, 8 startande" or "4 160 m, 24 startande"
     const lengthParticipantsRegex = /(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i;
     const infoMatch = infoText.match(lengthParticipantsRegex);
     
     if (infoMatch) {
-      result.length = parseInt(infoMatch[1].replace(/\s/g, ''), 10);
+      const rawValue = infoMatch[1].replace(/\s/g, '');
+      result.length = parseInt(rawValue, 10);
       result.participants = parseInt(infoMatch[2], 10);
-      console.log(`Extracted length: ${result.length}m, participants: ${result.participants}`);
+      console.log(`[DEBUG] Extracted length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
       return result;
     }
   }
@@ -82,14 +98,18 @@ export const extractCourseInfo = (html: string, className: string): {length: num
   for (const flexMatch of allMatches) {
     if (flexMatch && flexMatch[1]) {
       const infoText = flexMatch[1].trim();
+      console.log(`[DEBUG] Flexible match info text: "${infoText}"`);
+      console.log(`[DEBUG] Extracted from node: <div class="eventClassHeader">...<h3>...${className}...</h3>${infoText}`);
+      
       // Pattern: "2 190 m, 8 startande"
       const lengthParticipantsRegex = /(\d[\d\s]+)\s*m,\s*(\d+)\s+startande/i;
       const infoMatch = infoText.match(lengthParticipantsRegex);
       
       if (infoMatch) {
-        result.length = parseInt(infoMatch[1].replace(/\s/g, ''), 10);
+        const rawValue = infoMatch[1].replace(/\s/g, '');
+        result.length = parseInt(rawValue, 10);
         result.participants = parseInt(infoMatch[2], 10);
-        console.log(`Flexible extraction - length: ${result.length}m, participants: ${result.participants}`);
+        console.log(`[DEBUG] Flexible extraction - raw length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
         return result;
       }
     }
@@ -104,9 +124,11 @@ export const extractCourseInfo = (html: string, className: string): {length: num
   const generalMatch = html.match(generalRegex);
   
   if (generalMatch) {
-    result.length = parseInt(generalMatch[1].replace(/\s/g, ''), 10);
+    const rawValue = generalMatch[1].replace(/\s/g, '');
+    result.length = parseInt(rawValue, 10);
     result.participants = parseInt(generalMatch[2], 10);
-    console.log(`General extraction - length: ${result.length}m, participants: ${result.participants}`);
+    console.log(`[DEBUG] General extraction - raw length: ${rawValue} = ${result.length} m, participants: ${result.participants}`);
+    console.log(`[DEBUG] Extracted from node containing text: ${className}...(${generalMatch[0].substring(0, 50)}...)`);
   }
   
   return result;
@@ -125,7 +147,11 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
     // Look for patterns like "2 190 m, 11 startande" as shown in image
     const lengthMatch = headingText.match(/(\d[\d\s]+)\s*m,\s*\d+\s+startande/i);
     if (lengthMatch && lengthMatch[1]) {
-      return parseInt(lengthMatch[1].replace(/\s/g, ''));
+      const rawValue = lengthMatch[1].replace(/\s/g, '');
+      const length = parseInt(rawValue, 10);
+      console.log(`[DEBUG] Method 1: Extracted length from heading: ${heading.outerHTML}`);
+      console.log(`[DEBUG] Raw value: "${lengthMatch[1]}" = ${length} m`);
+      return length;
     }
   }
   
@@ -147,7 +173,9 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
           if (cells && cells.length > lengthIndex) {
             const lengthText = cells[lengthIndex].textContent?.trim();
             if (lengthText) {
-              return extractCourseLength(lengthText);
+              const length = extractCourseLength(lengthText);
+              console.log(`[DEBUG] Method 2: Extracted length from table cell: ${cells[lengthIndex].outerHTML}`);
+              return length;
             }
           }
         }
@@ -164,7 +192,11 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
     // Match patterns like "2 190 m" as seen in the image
     const lengthMatch = headerText.match(/(\d[\d\s]+)\s*m/i);
     if (lengthMatch && lengthMatch[1]) {
-      return parseInt(lengthMatch[1].replace(/\s/g, ''));
+      const rawValue = lengthMatch[1].replace(/\s/g, '');
+      const length = parseInt(rawValue, 10);
+      console.log(`[DEBUG] Method 3: Extracted length from table header: ${tableHeader.outerHTML}`);
+      console.log(`[DEBUG] Raw value: "${lengthMatch[1]}" = ${length} m`);
+      return length;
     }
   }
   
@@ -174,7 +206,11 @@ export const findCourseLength = (row: Element, doc: Document, html: string): num
     for (const match of lengthPatternMatch) {
       const lengthPart = match.match(/(\d[\d\s]+)\s*m/i);
       if (lengthPart && lengthPart[1]) {
-        return parseInt(lengthPart[1].replace(/\s/g, ''));
+        const rawValue = lengthPart[1].replace(/\s/g, '');
+        const length = parseInt(rawValue, 10);
+        console.log(`[DEBUG] Method 4: Extracted length from pattern match: "${match}"`);
+        console.log(`[DEBUG] Raw value: "${lengthPart[1]}" = ${length} m`);
+        return length;
       }
     }
   }

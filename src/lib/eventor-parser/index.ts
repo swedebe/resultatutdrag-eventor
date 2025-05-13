@@ -1,4 +1,10 @@
 
 import { parseEventorResults } from "./parser";
+import { extractCourseLength, findCourseLength, extractCourseInfo } from "./course-utils";
 
-export { parseEventorResults };
+export { 
+  parseEventorResults,
+  extractCourseLength,
+  findCourseLength,
+  extractCourseInfo
+};

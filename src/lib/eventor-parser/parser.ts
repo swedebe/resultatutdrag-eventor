@@ -50,18 +50,22 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
       // Check previous element for class/length info
       if (prevElement && prevElement.textContent) {
         const prevText = prevElement.textContent.trim();
+        console.log(`[DEBUG] Examining table previous element: ${prevElement.outerHTML.substring(0, 100)}...`);
         
         // Look for class pattern (like "Mycket lätt 2 Dam" in image)
         if (/^(Mycket lätt|Lätt|Medelsvår|Svår)\s+\d+\s+(Dam|Herr)/.test(prevText) ||
             /^[HD]\d+/.test(prevText) ||
             /^Öppen \d+/i.test(prevText)) {
           tableClass = prevText;
+          console.log(`[DEBUG] Found class in previous element: ${tableClass}`);
         }
         
         // Look for length pattern (like "2 190 m, 11 startande" in image)
         const lengthMatch = prevText.match(/(\d[\d\s]+)\s*m/i);
         if (lengthMatch && lengthMatch[1]) {
-          tableLength = parseInt(lengthMatch[1].replace(/\s/g, ''));
+          const rawValue = lengthMatch[1].replace(/\s/g, '');
+          tableLength = parseInt(rawValue, 10);
+          console.log(`[DEBUG] Found length in previous element: "${lengthMatch[1]}" = ${tableLength} m`);
         }
       }
       
@@ -75,7 +79,8 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
         
         // Kontrollera om denna rad är för den angivna klubben
         if (rowText.includes(clubName)) {
-          console.log("Found row with club name:", rowText);
+          console.log("[DEBUG] Found row with club name:", rowText);
+          console.log(`[DEBUG] Row HTML: ${row.outerHTML.substring(0, 100)}...`);
           const cells = row.querySelectorAll("td");
           
           // Hoppa över rader med för få celler
@@ -92,14 +97,14 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           // If we don't have a class value from the table, try to extract it specifically
           if (!classValue) {
             classValue = extractClassInfo(doc, row);
-            console.log("Extracted class:", classValue);
+            console.log("[DEBUG] Extracted class:", classValue);
           }
           
           // For course length, first try table-level length, then per-row extraction
           let length = tableLength;
           if (!length) {
             length = findCourseLength(row, doc, html);
-            console.log("Extracted length:", length);
+            console.log("[DEBUG] Extracted length:", length, "m");
           }
           
           // Improved position extraction
@@ -156,7 +161,7 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           results.push({
             name,
             class: classValue,
-            length,
+            length,  // This is now consistently in meters as an integer
             time,
             diff,
             position,
