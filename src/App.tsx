@@ -5,17 +5,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import FileUploader from "./pages/FileUploader";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthWrapper from "./components/AuthWrapper";
 import RunDetail from "./pages/RunDetail";
 import Settings from "./pages/Settings";
-import EventorBatch from "./pages/EventorBatch";
+import EventorBatch from "./pages/EventorBatch"; // Import the new page
 
-// Create a new QueryClient for React Query
 const queryClient = new QueryClient();
 
-// Main App component that sets up providers and routing
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,6 +28,14 @@ const App = () => (
             element={
               <AuthWrapper>
                 <Index />
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/file-upload"
+            element={
+              <AuthWrapper>
+                <FileUploader />
               </AuthWrapper>
             }
           />

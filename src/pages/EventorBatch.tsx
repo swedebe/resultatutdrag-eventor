@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+
+import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import LogComponent, { clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
-import { processExcelFile, exportResultsToExcel, BatchProcessingOptions } from "@/services/FileProcessingService";
+import { Progress } from "@/components/ui/progress";
+import LogComponent, { LogEntry, clearLogs, setLogsUpdateFunction, addLog } from "@/components/LogComponent";
+import { ResultRow, processExcelFile, exportResultsToExcel } from "@/services/FileProcessingService";
 import { supabase } from "@/integrations/supabase/client";
-import FileUploadSection from "@/components/eventor-batch/FileUploadSection";
 import PreviewSection from "@/components/eventor-batch/PreviewSection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAllAppTexts } from "@/hooks/useAppText";
 import { saveLogToDatabase } from "@/services/database/resultRepository";
-import { ResultRow } from "@/types/results";
 
 const EventorBatch = () => {
   const { toast } = useToast();
@@ -23,23 +23,29 @@ const EventorBatch = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStatus, setCurrentStatus] = useState("");
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [delay, setDelay] = useState<number>(15);
   const [saveName, setSaveName] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
-  const [isDryRun, setIsDryRun] = useState<boolean>(true);
   const [jobId, setJobId] = useState<string | null>(null);
+  
+  // New states for batch processing options - updated default for fetchCourseLength to false
+  const [fetchCourseLength, setFetchCourseLength] = useState<boolean>(false);
+  const [fetchStarters, setFetchStarters] = useState<boolean>(true);
+  const [courseLengthDelay, setCourseLengthDelay] = useState<number>(15.00);
+  const [startersDelay, setStartersDelay] = useState<number>(1.00);
+  
   const navigate = useNavigate();
   const { texts } = useAllAppTexts();
-
+  
   useEffect(() => {
     setLogsUpdateFunction(updateLogs);
     return () => setLogsUpdateFunction(null);
   }, []);
 
-  const updateLogs = async (newLogs: any[]) => {
+  const updateLogs = async (newLogs: LogEntry[]) => {
     setLogs(newLogs);
   };
 
@@ -117,20 +123,43 @@ const EventorBatch = () => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     const timeStr = today.toTimeString().split(' ')[0];
-    const initialRunName = `Körning ${dateStr} ${timeStr}`;
+    const initialRunName = `Batch körning ${dateStr} ${timeStr}`;
     setSaveName(initialRunName);
     
     const newRunId = await createNewRun(initialRunName);
     setRunId(newRunId);
     
     try {
-      // Create the proper BatchProcessingOptions object
-      const batchOptions: BatchProcessingOptions = {
-        fetchCourseLength: !isDryRun,
-        fetchStarters: !isDryRun,
-        courseLengthDelay: delay,
-        startersDelay: delay
+      // Create a batch options object to pass to the processExcelFile function
+      const batchOptions = {
+        fetchCourseLength,
+        fetchStarters,
+        courseLengthDelay,
+        startersDelay
       };
+
+      // If we're fetching starters, first check if the user has an API key
+      if (fetchStarters) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: userData } = await supabase
+          .from('users')
+          .select('eventor_api_key')
+          .eq('id', user.id)
+          .single();
+        
+        if (!userData?.eventor_api_key) {
+          toast({
+            title: "Saknad API-nyckel",
+            description: "Du behöver ange en Eventor API-nyckel i din profil för att kunna hämta antal startande",
+            variant: "destructive",
+          });
+          
+          addLog("system", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+          if (newRunId) {
+            await saveLogToDatabase(newRunId, "system", "", "Ingen Eventor API-nyckel hittades. Kan inte hämta antal startande.");
+          }
+        }
+      }
       
       const enrichedResults = await processExcelFile(
         file, 
@@ -155,7 +184,7 @@ const EventorBatch = () => {
           return true;
         },
         newRunId,
-        batchOptions  // Pass the batchOptions object instead of isDryRun boolean
+        batchOptions
       );
       
       // Final cancellation check
@@ -170,12 +199,12 @@ const EventorBatch = () => {
         
         if (enrichedResults.length > 0) {
           toast({
-            title: "Filbearbetning slutförd",
-            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Slutför" för att slutföra körningen.`,
+            title: "Batch-bearbetning slutförd",
+            description: `${enrichedResults.length} resultat bearbetade. Klicka på "Se körningsresultat" för att slutföra körningen.`,
           });
         } else {
           toast({
-            title: "Filbearbetning slutförd",
+            title: "Batch-bearbetning slutförd",
             description: "Inga resultat hittades.",
           });
         }
@@ -225,7 +254,7 @@ const EventorBatch = () => {
       
       toast({
         title: "Avbryter körning",
-        description: "Begäran om att avbryta har skickats",
+        description: "Beg��ran om att avbryta har skickats",
       });
       
       addCancellationLog();
@@ -240,7 +269,7 @@ const EventorBatch = () => {
   };
 
   const addCancellationLog = () => {
-    const newLog: any = {
+    const newLog: LogEntry = {
       timestamp: new Date().toISOString().substring(11, 23),
       eventId: "system",
       url: "",
@@ -441,52 +470,164 @@ const EventorBatch = () => {
     });
   };
   
-  const handleDryRunChange = useCallback((checked: boolean) => {
-		setIsDryRun(checked);
-	}, []);
-	
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-4xl font-bold">Eventor Batch Processing</h1>
+        <h1 className="text-4xl font-bold">{texts.eventorbatch_title || "Resultatanalys - Batch-bearbetning"}</h1>
         <Link to="/">
           <Button variant="outline" className="flex items-center gap-2" disabled={isProcessing}>
-            <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
+            <ArrowLeft className="h-4 w-4" /> {texts.back_to_home || "Tillbaka till startsidan"}
           </Button>
         </Link>
       </div>
       
-      <FileUploadSection
-        isProcessing={isProcessing}
-        progress={progress}
-        currentStatus={currentStatus}
-        file={file}
-        onFileChange={setFile}
-        onProcessFile={handleProcessFile}
-        onClear={handleClearResults}
-        hasResults={results.length > 0}
-        delay={delay}
-        onDelayChange={setDelay}
-        onCancelProcessing={handleCancelProcessing}
-      />
-			
-			<Card className="mb-6">
-				<CardHeader>
-					<CardTitle>Dry Run</CardTitle>
-					<CardDescription>Kör en testkörning utan att spara data i Eventor</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div className="flex items-center space-x-2">
-						<Checkbox
-							id="dry-run"
-							checked={isDryRun}
-							onCheckedChange={handleDryRunChange}
-							disabled={isProcessing}
-						/>
-						<Label htmlFor="dry-run">Aktivera Dry Run</Label>
-					</div>
-				</CardContent>
-			</Card>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>{texts.eventorbatch_upload_title || "Filuppladdning och bearbetningsalternativ"}</CardTitle>
+          <CardDescription>{texts.eventorbatch_upload_description || "Ladda upp en Excel-fil med resultat för att automatiskt berika dem med data från Eventor."}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="file-upload">
+                {texts.eventorbatch_upload_label || "Ladda upp resultatfil (Excel)"}
+              </Label>
+              <input 
+                id="file-upload"
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setFile(e.target.files[0]);
+                    toast({
+                      title: "Fil vald",
+                      description: `Vald fil: ${e.target.files[0].name}`,
+                    });
+                  } else {
+                    setFile(null);
+                  }
+                }}
+                className="block w-full text-sm text-gray-500
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-md file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-primary file:text-white
+                  hover:file:bg-primary/90"
+              />
+            </div>
+            
+            <div className="space-y-4 mt-2">
+              <div className="space-y-2 border p-4 rounded-md">
+                <h3 className="text-lg font-medium">{texts.eventorbatch_options_title || "Bearbetningsalternativ"}</h3>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="fetch-course-length" 
+                    checked={fetchCourseLength}
+                    onCheckedChange={(checked) => {
+                      setFetchCourseLength(checked === true);
+                    }}
+                    disabled={isProcessing}
+                  />
+                  <Label htmlFor="fetch-course-length">{texts.eventorbatch_fetch_course_length || "Hämta banlängder (scraping)"}</Label>
+                  
+                  <div className="ml-4 flex items-center space-x-2">
+                    <Label htmlFor="course-length-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
+                    <Input 
+                      id="course-length-delay"
+                      type="number" 
+                      min="0"
+                      step="0.01"
+                      value={courseLengthDelay} 
+                      onChange={(e) => {
+                        const newDelay = parseFloat(e.target.value) || 0;
+                        if (newDelay >= 0) {
+                          setCourseLengthDelay(newDelay);
+                        }
+                      }}
+                      className="w-20"
+                      disabled={isProcessing || !fetchCourseLength}
+                    />
+                    <span className="text-sm">sekunder</span>
+                    <div className="text-xs text-muted-foreground">
+                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="fetch-starters" 
+                    checked={fetchStarters}
+                    onCheckedChange={(checked) => {
+                      setFetchStarters(checked === true);
+                    }}
+                    disabled={isProcessing}
+                  />
+                  <Label htmlFor="fetch-starters">{texts.eventorbatch_fetch_starters || "Hämta antal startande (API)"}</Label>
+                  
+                  <div className="ml-4 flex items-center space-x-2">
+                    <Label htmlFor="starters-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
+                    <Input 
+                      id="starters-delay"
+                      type="number" 
+                      min="0"
+                      step="0.01"
+                      value={startersDelay} 
+                      onChange={(e) => {
+                        const newDelay = parseFloat(e.target.value) || 0;
+                        if (newDelay >= 0) {
+                          setStartersDelay(newDelay);
+                        }
+                      }}
+                      className="w-20"
+                      disabled={isProcessing || !fetchStarters}
+                    />
+                    <span className="text-sm">sekunder</span>
+                    <div className="text-xs text-muted-foreground">
+                      {texts.eventorbatch_delay_hint || "(Högre värde förhindrar rate-limiting från Eventor)"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-2">
+              <Button 
+                onClick={handleProcessFile} 
+                disabled={isProcessing || !file}
+                className="w-40"
+              >
+                {isProcessing ? texts.eventorbatch_processing || "Bearbetar..." : texts.eventorbatch_process_file || "Bearbeta fil"}
+              </Button>
+              
+              {isProcessing ? (
+                <Button 
+                  variant="destructive" 
+                  onClick={handleCancelProcessing}
+                >
+                  {texts.eventorbatch_cancel || "Avbryt"}
+                </Button>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={handleClearResults}
+                  disabled={!results.length}
+                >
+                  {texts.eventorbatch_clear || "Rensa"}
+                </Button>
+              )}
+            </div>
+            
+            {isProcessing && (
+              <div className="mt-4 space-y-2">
+                <Progress value={progress} className="w-full" />
+                <p className="text-sm text-muted-foreground">{currentStatus}</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
       <LogComponent logs={logs} onClearLogs={clearLogs} />
       
