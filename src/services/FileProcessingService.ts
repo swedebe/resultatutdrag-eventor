@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -223,3 +224,6 @@ export const processExcelFile = async (
   
   return enrichedResults;
 };
+
+// The duplicate declaration has been removed as we're already importing it
+// export const currentEventorUrl = ""; 
