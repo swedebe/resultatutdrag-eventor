@@ -277,3 +277,6 @@ export const processExcelFile = async (
   
   return enrichedResults;
 };
+
+// The duplicate declaration has been removed as we're already importing it
+// export const currentEventorUrl = "";
