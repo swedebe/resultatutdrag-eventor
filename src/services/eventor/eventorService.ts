@@ -146,7 +146,7 @@ export const fetchEventorData = async (
           const errorMessage = `HTTP Error: ${response.status} ${response.statusText}`;
           console.error(`[ERROR] Failed to fetch Eventor HTML after retries: ${errorMessage}`);
           
-          // FIX: Renamed second errorMessage to detailedErrorMessage to avoid redefinition
+          // Fixed: Renamed to detailedErrorMessage to avoid redefinition
           const detailedErrorMessage = `[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts: ${errorMessage}`;
           console.error(detailedErrorMessage);
           
