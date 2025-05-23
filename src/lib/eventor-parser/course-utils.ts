@@ -1,3 +1,4 @@
+
 /**
  * Utilities for extracting course information
  */
@@ -262,5 +263,4 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
   return result;
 }
 
-// Export the extract functions
-export { extractCourseLength, extractCourseInfo };
+// Removed the duplicate export statement that was causing the error

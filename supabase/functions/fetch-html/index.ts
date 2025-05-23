@@ -13,8 +13,8 @@ serve(async (req) => {
     
     // Enhanced URL logging with better truncation
     // Display more of the URL (at least 100 chars) to ensure IDs are fully visible
-    const urlDisplay = url.length > 100 ? 
-      `${url.substring(0, 100)}...` : 
+    const urlDisplay = url.length > 120 ? 
+      `${url.substring(0, 120)}...` : 
       url;
     
     console.log(`[SERVER] Fetching HTML from: ${urlDisplay}`);
