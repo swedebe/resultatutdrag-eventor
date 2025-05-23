@@ -5,7 +5,7 @@
 
 import { timeToSeconds } from "./time-utils";
 import { extractEnhancedPositionInfo } from "./position-utils";
-import { findCourseLength, extractCourseInfo } from "./course-utils";
+import { extractCourseInfo } from "./course-utils";
 import { extractDate } from "./date-utils";
 import { extractEventAndOrganizerInfo } from "./event-utils";
 import { extractClassInfo } from "./class-utils";
@@ -59,14 +59,6 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
           tableClass = prevText;
           console.log(`[DEBUG] Found class in previous element: ${tableClass}`);
         }
-        
-        // Look for length pattern (like "2 190 m, 11 startande" in image)
-        const lengthMatch = prevText.match(/(\d[\d\s]+)\s*m/i);
-        if (lengthMatch && lengthMatch[1]) {
-          const rawValue = lengthMatch[1].replace(/\s/g, '');
-          tableLength = parseInt(rawValue, 10);
-          console.log(`[DEBUG] Found length in previous element: "${lengthMatch[1]}" = ${tableLength} m`);
-        }
       }
       
       // Get total participants for position calculations
@@ -100,11 +92,12 @@ export const parseEventorResults = (html: string, clubName: string): any[] => {
             console.log("[DEBUG] Extracted class:", classValue);
           }
           
-          // For course length, first try table-level length, then per-row extraction
+          // For course length, we'll use the extractCourseInfo function
           let length = tableLength;
-          if (!length) {
-            length = findCourseLength(row, doc, html);
-            console.log("[DEBUG] Extracted length:", length, "m");
+          if (!length && classValue) {
+            const courseInfo = extractCourseInfo(html, classValue);
+            length = courseInfo.length;
+            console.log("[DEBUG] Extracted length using extractCourseInfo:", length, "m");
           }
           
           // Improved position extraction
