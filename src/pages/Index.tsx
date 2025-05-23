@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -135,7 +134,7 @@ const Index = () => {
               <Link to="/batch-processing">
                 <Button variant="default" className="flex items-center gap-2">
                   <Database className="h-4 w-4" />
-                  Batch-bearbetning
+                  {texts.batch_processing_button || "Batch-bearbetning"}
                 </Button>
               </Link>
             </div>

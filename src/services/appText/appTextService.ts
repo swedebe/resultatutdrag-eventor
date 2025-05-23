@@ -145,6 +145,15 @@ export const AppTextService = {
    */
   async ensureRequiredAppTextsExist(): Promise<void> {
     const requiredTexts = [
+      // Homepage texts
+      { key: 'main_title', value: 'Resultatanalys', category: 'homepage' },
+      { key: 'welcome_message', value: 'Välkommen, {0}!', category: 'homepage' },
+      { key: 'tool_description', value: 'Med detta verktyg kan du använda en exportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil.', category: 'homepage' },
+      { key: 'file_instructions', value: 'Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil.', category: 'homepage' },
+      { key: 'your_runs_title', value: 'Dina sparade körningar', category: 'homepage' },
+      { key: 'your_runs_subtitle', value: 'Tidigare sparade körningar och analyser', category: 'homepage' },
+      { key: 'batch_processing_button', value: 'Batch-bearbetning', category: 'homepage' },
+      
       // EventorBatch page texts
       { key: 'eventorbatch_title', value: 'Resultatanalys - Batch-bearbetning', category: 'eventorbatch' },
       { key: 'eventorbatch_upload_title', value: 'Filuppladdning och bearbetningsalternativ', category: 'eventorbatch' },
