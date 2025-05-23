@@ -12,6 +12,7 @@ import {
 import { fetchEventorData, currentEventorUrl } from './eventor/eventorService';
 import { saveResultToDatabase, fetchProcessedResults, fetchProcessingLogs, saveLogToDatabase } from './database/resultRepository';
 import { supabase } from '@/integrations/supabase/client';
+import { truncateUrl } from '@/lib/utils';
 
 export type { ResultRow };
 export { exportResultsToExcel, fetchProcessedResults, fetchProcessingLogs };
@@ -168,10 +169,11 @@ export const processExcelFile = async (
           saveMessage = `Kunde inte spara resultat för tävling ${resultRow.eventId} i databasen`;
         }
           
-        addLog(resultRow.eventId, currentEventorUrl, saveMessage);
+        const displayUrl = truncateUrl(currentEventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, saveMessage);
         
         if (runId) {
-          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, saveMessage);
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, saveMessage);
         }
         
         if (!saveResult.success) {
@@ -184,24 +186,27 @@ export const processExcelFile = async (
         // Await the callback and check if processing should continue
         const shouldContinue = await onPartialResults([...enrichedResults]);
         if (shouldContinue === false) {
-          addLog("system", "", "Bearbetning avbruten av användaren");
+          const systemUrl = truncateUrl("system", 120);
+          addLog("system", systemUrl, "Bearbetning avbruten av användaren");
           
           if (runId) {
-            await saveLogToDatabase(runId, "system", "", "Bearbetning avbruten av användaren");
+            await saveLogToDatabase(runId, "system", systemUrl, "Bearbetning avbruten av användaren");
           }
           
           break; // Exit the loop if the callback returns false
         }
       }
       
-      // Use delay between calls to avoid rate limit (only if fetching course lengths)
+      // Use delay between calls to avoid rate limit - but only if not the last item in the array
       if (batchOptions?.fetchCourseLength && i < enrichedResults.length - 1 && batchOptions.courseLengthDelay > 0) {
         const waitMessage = `Väntar ${batchOptions.courseLengthDelay} sekunder innan nästa anrop (för att undvika rate limiting)...`;
         setCurrentStatus(waitMessage);
-        addLog(resultRow.eventId, currentEventorUrl, waitMessage);
+        
+        const displayUrl = truncateUrl(currentEventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, waitMessage);
         
         if (runId) {
-          await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, waitMessage);
+          await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, waitMessage);
         }
         
         await sleep(batchOptions.courseLengthDelay);

@@ -166,18 +166,14 @@ export const fetchEventorData = async (
       // Use the specified delay for course length or default to 15 seconds
       const courseDelay = batchOptions?.courseLengthDelay ?? 15.0;
       
-      // Use our new truncateUrl function to ensure IDs are fully visible
+      // Use our truncateUrl function to ensure IDs are fully visible
       const displayUrl = truncateUrl(currentEventorUrl, 120);
       
-      addLog(resultRow.eventId, displayUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
+      // FIXED: Removed waiting before fetch to eliminate redundancy
+      addLog(resultRow.eventId, displayUrl, `Hämtar banlängd...`);
       
       if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
-      }
-      
-      // Wait the specified delay before requesting course length
-      if (courseDelay > 0) {
-        await sleep(courseDelay);
+        await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Hämtar banlängd...`);
       }
       
       console.log(`[DEBUG] Environment check - Running in: ${typeof window === 'undefined' ? 'Server-side' : 'Browser'}`);
@@ -295,8 +291,6 @@ export const fetchEventorData = async (
               await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
             }
           }
-          
-          // Note: We no longer use HTML for participant counts
         } else {
           // Log final error if all fetch attempts failed
           console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);

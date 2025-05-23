@@ -11,7 +11,8 @@ serve(async (req) => {
   try {
     const { url, headers = {} } = await req.json();
     
-    // Enhanced URL logging - show more of the URL for debugging
+    // Enhanced URL logging with better truncation
+    // Display more of the URL (at least 100 chars) to ensure IDs are fully visible
     const urlDisplay = url.length > 100 ? 
       `${url.substring(0, 100)}...` : 
       url;
