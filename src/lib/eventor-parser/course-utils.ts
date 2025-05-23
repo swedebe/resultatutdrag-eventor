@@ -57,152 +57,235 @@ export const extractCourseLength = (lengthText: string): number => {
 /**
  * Extracts course length and participants from event class header
  * Format: "<div class="eventClassHeader"><div><h3>Class name</h3>2 190 m, 8 startande</div></div>"
- * 
- * Updated to focus specifically on extracting the text node immediately after the </h3> tag
- * and up to the first comma, to get the course length.
  */
 export const extractCourseInfo = (html: string, className: string): {length: number, participants: number} => {
   const result = { length: 0, participants: 0 };
   
   try {
+    // Check if we're in a browser or server environment
+    const isServerSide = typeof window === 'undefined';
+    console.log(`[DEBUG] Running in ${isServerSide ? 'server-side' : 'browser'} environment`);
+    
     // Create a DOM parser to properly parse the HTML structure
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    console.log(`[DEBUG] Looking for class "${className}" in eventClassHeader divs`);
-    
-    // Find all eventClassHeader divs
-    const eventClassHeaders = doc.querySelectorAll('div.eventClassHeader');
-    console.log(`[DEBUG] Found ${eventClassHeaders.length} eventClassHeader divs`);
-    
-    for (let i = 0; i < eventClassHeaders.length; i++) {
-      const header = eventClassHeaders[i];
+    let doc;
+    if (isServerSide) {
+      // Server-side parsing via regex for environments without DOM
+      console.log(`[DEBUG] Using regex-based parsing for server environment`);
+      return extractCourseInfoUsingRegex(html, className);
+    } else {
+      // Browser-side parsing
+      const parser = new DOMParser();
+      doc = parser.parseFromString(html, 'text/html');
       
-      // Find the h3 element inside this header
-      const h3 = header.querySelector('h3');
+      console.log(`[DEBUG] Looking for class "${className}" in eventClassHeader divs`);
       
-      if (h3 && h3.textContent && h3.textContent.trim() === className.trim()) {
-        console.log(`[DEBUG] Found exact match for class "${className}" in header ${i+1}`);
+      // Find all eventClassHeader divs
+      const eventClassHeaders = doc.querySelectorAll('div.eventClassHeader');
+      console.log(`[DEBUG] Found ${eventClassHeaders.length} eventClassHeader divs`);
+      
+      for (let i = 0; i < eventClassHeaders.length; i++) {
+        const header = eventClassHeaders[i];
         
-        // Log the full HTML of the matched header for debugging
-        console.log(`[DEBUG] Found eventClassHeader: ${header.outerHTML}`);
+        // Find the h3 element inside this header
+        const h3 = header.querySelector('h3');
         
-        // Get the parent div that contains both the h3 and the text node with the length
-        const parentDiv = h3.parentElement;
-        
-        if (parentDiv) {
-          // The HTML structure typically looks like:
-          // <div><h3>Class Name</h3>3 100 m, 17 startande</div>
-          // We need to extract the text node that comes after the h3
+        if (h3 && h3.textContent && h3.textContent.trim() === className.trim()) {
+          console.log(`[DEBUG] Found exact match for class "${className}" in header ${i+1}`);
           
-          // First get the innerHTML of the parent div
-          const innerHTML = parentDiv.innerHTML;
+          // Log the full HTML of the matched header for debugging
+          console.log(`[DEBUG] Found eventClassHeader: ${header.outerHTML}`);
           
-          // Extract the text after the closing </h3> tag and before the first comma
-          const afterH3Match = innerHTML.match(/<\/h3>([^,<]+)/);
+          // Get the parent div that contains both the h3 and the text node with the length
+          const parentDiv = h3.parentElement;
           
-          if (afterH3Match && afterH3Match[1]) {
-            const textAfterH3 = afterH3Match[1].trim();
-            console.log(`[DEBUG] Text after </h3>: "${textAfterH3}"`);
+          if (parentDiv) {
+            // The HTML structure typically looks like:
+            // <div><h3>Class Name</h3>3 100 m, 17 startande</div>
+            // We need to extract the text node that comes after the h3
             
-            // Use the extractCourseLength function to parse the length text
-            const lengthValue = extractCourseLength(textAfterH3);
-            result.length = lengthValue;
-            console.log(`[DEBUG] Extracted course length: ${result.length} m`);
-          } else {
-            console.log(`[DEBUG] Could not find text after </h3> in: ${innerHTML}`);
+            // First get the innerHTML of the parent div
+            const innerHTML = parentDiv.innerHTML;
+            
+            // Extract the text after the closing </h3> tag and before the first comma
+            const afterH3Match = innerHTML.match(/<\/h3>([^,<]+)/);
+            
+            if (afterH3Match && afterH3Match[1]) {
+              const textAfterH3 = afterH3Match[1].trim();
+              console.log(`[DEBUG] Text after </h3>: "${textAfterH3}"`);
+              
+              // Use the extractCourseLength function to parse the length text
+              const lengthValue = extractCourseLength(textAfterH3);
+              result.length = lengthValue;
+              console.log(`[DEBUG] Extracted course length: ${result.length} m`);
+            } else {
+              console.log(`[DEBUG] Could not find text after </h3> in: ${innerHTML}`);
+            }
+            
+            // Now extract the participants count from the text, typically "X startande"
+            const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
+            
+            if (participantsMatch && participantsMatch[1]) {
+              result.participants = parseInt(participantsMatch[1], 10);
+              console.log(`[DEBUG] Extracted participants count: ${result.participants}`);
+            } else {
+              console.log(`[DEBUG] Could not find participants count in: ${parentDiv.textContent}`);
+            }
+            
+            return result;
           }
+        }
+      }
+      
+      // If no exact match was found, log this and try a more flexible approach
+      console.log(`[DEBUG] No exact match found for class "${className}"`);
+      
+      // Second attempt: Try a more flexible match for the class name
+      for (let i = 0; i < eventClassHeaders.length; i++) {
+        const header = eventClassHeaders[i];
+        const h3 = header.querySelector('h3');
+        
+        if (h3 && h3.textContent && h3.textContent.includes(className)) {
+          console.log(`[DEBUG] Found partial match: "${h3.textContent}" for class "${className}"`);
           
-          // Now extract the participants count from the text, typically "X startande"
-          const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
+          // Log the full HTML of the matched header for debugging
+          console.log(`[DEBUG] Found eventClassHeader with partial match: ${header.outerHTML}`);
           
-          if (participantsMatch && participantsMatch[1]) {
-            result.participants = parseInt(participantsMatch[1], 10);
-            console.log(`[DEBUG] Extracted participants count: ${result.participants}`);
-          } else {
-            console.log(`[DEBUG] Could not find participants count in: ${parentDiv.textContent}`);
+          const parentDiv = h3.parentElement;
+          
+          if (parentDiv) {
+            const innerHTML = parentDiv.innerHTML;
+            const afterH3Match = innerHTML.match(/<\/h3>([^,<]+)/);
+            
+            if (afterH3Match && afterH3Match[1]) {
+              const textAfterH3 = afterH3Match[1].trim();
+              console.log(`[DEBUG] Text after </h3> in partial match: "${textAfterH3}"`);
+              
+              // Use the extractCourseLength function to parse the length text
+              const lengthValue = extractCourseLength(textAfterH3);
+              result.length = lengthValue;
+              console.log(`[DEBUG] Extracted course length from partial match: ${result.length} m`);
+            }
+            
+            const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
+            
+            if (participantsMatch && participantsMatch[1]) {
+              result.participants = parseInt(participantsMatch[1], 10);
+              console.log(`[DEBUG] Extracted participants count from partial match: ${result.participants}`);
+            }
+            
+            return result;
           }
-          
-          return result;
         }
       }
     }
     
-    // If no exact match was found, log this and try a more flexible approach
-    console.log(`[DEBUG] No exact match found for class "${className}"`);
+    // If no match was found or we're in a server environment, use regex
+    console.log(`[DEBUG] Falling back to regex extraction for class "${className}"`);
+    return extractCourseInfoUsingRegex(html, className);
     
-    // Second attempt: Try a more flexible match for the class name
-    for (let i = 0; i < eventClassHeaders.length; i++) {
-      const header = eventClassHeaders[i];
-      const h3 = header.querySelector('h3');
-      
-      if (h3 && h3.textContent && h3.textContent.includes(className)) {
-        console.log(`[DEBUG] Found partial match: "${h3.textContent}" for class "${className}"`);
-        
-        // Log the full HTML of the matched header for debugging
-        console.log(`[DEBUG] Found eventClassHeader with partial match: ${header.outerHTML}`);
-        
-        const parentDiv = h3.parentElement;
-        
-        if (parentDiv) {
-          const innerHTML = parentDiv.innerHTML;
-          const afterH3Match = innerHTML.match(/<\/h3>([^,<]+)/);
-          
-          if (afterH3Match && afterH3Match[1]) {
-            const textAfterH3 = afterH3Match[1].trim();
-            console.log(`[DEBUG] Text after </h3> in partial match: "${textAfterH3}"`);
-            
-            // Use the extractCourseLength function to parse the length text
-            const lengthValue = extractCourseLength(textAfterH3);
-            result.length = lengthValue;
-            console.log(`[DEBUG] Extracted course length from partial match: ${result.length} m`);
-          }
-          
-          const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
-          
-          if (participantsMatch && participantsMatch[1]) {
-            result.participants = parseInt(participantsMatch[1], 10);
-            console.log(`[DEBUG] Extracted participants count from partial match: ${result.participants}`);
-          }
-          
-          return result;
-        }
-      }
-    }
+  } catch (error) {
+    console.error(`[ERROR] Exception in extractCourseInfo:`, error);
     
-    // Last resort: regex-based approach for when DOM parsing might not be reliable
-    console.log(`[DEBUG] Attempting regex-based extraction for class "${className}"`);
+    // Try regex as a last resort after exception
+    console.log(`[DEBUG] Exception caught, falling back to regex parser`);
+    return extractCourseInfoUsingRegex(html, className);
+  }
+  
+  return result;
+};
+
+/**
+ * Extract course info using regex patterns, designed to work in both browser and server environments
+ */
+function extractCourseInfoUsingRegex(html: string, className: string): {length: number, participants: number} {
+  const result = { length: 0, participants: 0 };
+  console.log(`[DEBUG] Attempting regex-based extraction for class "${className}"`);
+  
+  try {
+    // Escape special regex characters in className
+    const escapedClassName = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    // Pattern to match: <div class="eventClassHeader">...<h3>className</h3>LENGTH m, PARTICIPANTS startande
+    // Pattern 1: Look for the exact structure with eventClassHeader
     const classHeaderPattern = new RegExp(
-      `<div class="eventClassHeader">.*?<h3>\\s*${className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*</h3>([^,<]+),\\s*(\\d+)\\s+startande`,
+      `<div[^>]*class="eventClassHeader"[^>]*>.*?<h3>\\s*${escapedClassName}\\s*</h3>([^,<]+),\\s*(\\d+)\\s+startande`,
       'is'
     );
     
+    // Pattern 2: More flexible pattern to find class name and length
+    const flexibleClassPattern = new RegExp(
+      `<h3>\\s*${escapedClassName}\\s*</h3>([^,<]+)`,
+      'is'
+    );
+    
+    // Pattern 3: Participants count pattern
+    const participantsPattern = new RegExp(
+      `<h3>\\s*${escapedClassName}\\s*</h3>[^,<]*,\\s*(\\d+)\\s+startande`,
+      'is'
+    );
+    
+    // Try the exact pattern first
     const match = classHeaderPattern.exec(html);
     if (match) {
       const lengthText = match[1].trim();
       const participantsText = match[2];
       
-      console.log(`[DEBUG] Regex match - Raw length: "${lengthText}", Participants: "${participantsText}"`);
+      console.log(`[DEBUG] Regex match 1 - Raw length: "${lengthText}", Participants: "${participantsText}"`);
       
-      // Log the context around the match
+      // Extract the context around the match for verification
       const matchStart = Math.max(0, match.index - 50);
       const matchEnd = Math.min(html.length, match.index + match[0].length + 50);
       const context = html.substring(matchStart, matchEnd);
       console.log(`[DEBUG] Regex match context: "${context}"`);
       
-      // Use the extractCourseLength function to parse the length text
+      // Extract length and participants
       result.length = extractCourseLength(lengthText);
       result.participants = parseInt(participantsText, 10);
       
-      console.log(`[DEBUG] Extracted through regex - Length: ${result.length} m, Participants: ${result.participants}`);
-    } else {
-      console.log(`[DEBUG] No regex match found for class "${className}"`);
+      console.log(`[DEBUG] Extracted through regex pattern 1 - Length: ${result.length} m, Participants: ${result.participants}`);
+      return result;
     }
+    
+    // Try flexible pattern for length
+    const lengthMatch = flexibleClassPattern.exec(html);
+    if (lengthMatch) {
+      const lengthText = lengthMatch[1].trim();
+      console.log(`[DEBUG] Regex match 2 - Raw length: "${lengthText}"`);
+      
+      result.length = extractCourseLength(lengthText);
+      console.log(`[DEBUG] Extracted length through regex pattern 2: ${result.length} m`);
+      
+      // Try to find participants separately
+      const participantsMatch = participantsPattern.exec(html);
+      if (participantsMatch) {
+        result.participants = parseInt(participantsMatch[1], 10);
+        console.log(`[DEBUG] Extracted participants through regex pattern 3: ${result.participants}`);
+      }
+      
+      return result;
+    }
+    
+    // Last resort: look for any header containing the class name
+    const lastResortPattern = new RegExp(`<h[1-6][^>]*>([^<]*${escapedClassName}[^<]*)</h[1-6]>.*?([\\d.,]+\\s*(?:m|km))`, 'is');
+    const lastResortMatch = lastResortPattern.exec(html);
+    
+    if (lastResortMatch) {
+      const foundClass = lastResortMatch[1].trim();
+      const lengthText = lastResortMatch[2].trim();
+      
+      console.log(`[DEBUG] Last resort match - Found class: "${foundClass}", Raw length: "${lengthText}"`);
+      
+      result.length = extractCourseLength(lengthText);
+      console.log(`[DEBUG] Extracted length through last resort pattern: ${result.length} m`);
+      
+      return result;
+    }
+    
+    // If we get here, we couldn't find the class information
+    console.log(`[DEBUG] No regex matches found for class "${className}"`);
+    
   } catch (error) {
-    console.error(`[ERROR] Exception in extractCourseInfo:`, error);
+    console.error(`[ERROR] Exception in regex extraction:`, error);
   }
   
   return result;
-};
+}

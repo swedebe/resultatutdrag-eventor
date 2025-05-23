@@ -64,6 +64,91 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
   throw lastError || new Error(`Failed after ${maxRetries} attempts`);
 }
 
+/**
+ * Fetches HTML content directly using enhanced browser-like headers
+ * @param url The URL to fetch HTML from
+ * @returns HTML content as string or throws an error
+ */
+async function fetchHtmlDirectly(url: string): Promise<string> {
+  console.log(`[DEBUG] Direct HTML fetch starting for URL: ${url}`);
+  
+  // Enhanced browser-like headers to avoid being blocked
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9,sv;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "max-age=0",
+    "Sec-Ch-Ua": '"Not.A/Brand";v="8", "Chromium";v="114", "Google Chrome";v="114"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "Connection": "keep-alive"
+  };
+  
+  try {
+    // Use our retry mechanism for robustness
+    const response = await fetchWithRetry(url, {
+      method: "GET",
+      headers,
+      redirect: "follow"
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch HTML: HTTP ${response.status} ${response.statusText}. Response: ${errorText.substring(0, 500)}`);
+    }
+    
+    const html = await response.text();
+    console.log(`[DEBUG] Successfully fetched HTML (${html.length} bytes)`);
+    console.log(`[DEBUG] HTML preview: ${html.substring(0, 200).replace(/\n/g, '\\n')}...`);
+    
+    return html;
+  } catch (error) {
+    console.error(`[ERROR] Failed to fetch HTML directly:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fallback to the edge function if direct fetch fails
+ * @param url The URL to fetch HTML from 
+ * @returns HTML content as string or throws an error
+ */
+async function fetchHtmlViaEdgeFunction(url: string): Promise<string> {
+  console.log(`[DEBUG] Falling back to edge function for HTML fetch from URL: ${url}`);
+  
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,sv;q=0.8"
+  };
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('fetch-html', {
+      body: { url, headers }
+    });
+    
+    if (error) {
+      throw new Error(`Edge function error: ${error.message}`);
+    }
+    
+    if (!data.success || !data.html) {
+      throw new Error(`Edge function returned error: ${data.error || 'Unknown error'}`);
+    }
+    
+    console.log(`[DEBUG] Successfully fetched HTML via edge function (${data.html.length} bytes)`);
+    return data.html;
+  } catch (error) {
+    console.error(`[ERROR] Failed to fetch HTML via edge function:`, error);
+    throw error;
+  }
+}
+
 export const fetchEventorData = async (
   resultRow: ResultRow, 
   runId?: string | null,
@@ -74,7 +159,7 @@ export const fetchEventorData = async (
   try {
     // Fetch course length if option is enabled (default to true if not specified)
     if (!batchOptions || batchOptions.fetchCourseLength) {
-      // Set URL for course length scraping - this is just for logging purposes
+      // Set URL for course length scraping
       const eventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${resultRow.eventId}&groupBy=EventClass&mode=2`;
       currentEventorUrl = eventorUrl;
       
@@ -92,166 +177,154 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // DIRECT SERVER-SIDE FETCH with detailed environment logging
       console.log(`[DEBUG] Environment check - Running in: ${typeof window === 'undefined' ? 'Server-side' : 'Browser'}`);
-      console.log(`[DEBUG] Direct fetch of HTML from URL: ${eventorUrl}`);
-      console.log(`[DEBUG] User-Agent header: Mozilla/5.0`);
+      console.log(`[DEBUG] Fetching HTML from URL: ${eventorUrl}`);
       
       let htmlContent = '';
       let fetchSuccess = false;
       let errorDetails = '';
       
       try {
-        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
-        
-        console.log(`[DEBUG] Starting direct HTML fetch with enhanced User-Agent: ${userAgent}`);
-        
-        const response = await fetchWithRetry(eventorUrl, {
-          method: "GET",
-          headers: {
-            "User-Agent": userAgent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-            "Accept-Language": "en-US,en;q=0.9,sv;q=0.8",
-            "Cache-Control": "no-cache"
-          }
-        });
-        
-        console.log(`[DEBUG] Fetch response status: ${response.status}`);
-        
-        if (response.ok) {
-          const responseData = await response.text();
-          
-          htmlContent = responseData;
-          
-          // Check if HTML content was retrieved successfully
-          if (htmlContent) {
-            console.log(`[DEBUG] Successfully fetched HTML (${htmlContent.length} bytes)`);
-            
-            // Show first 300 characters of HTML for debugging
-            if (htmlContent.length > 0) {
-              const previewHtml = htmlContent.substring(0, 300);
-              console.log(`[DEBUG] First 300 characters of HTML: ${previewHtml.replace(/\n/g, '\\n')}...`);
-            }
-            
-            addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat (${htmlContent.length} bytes)`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId, 
-                resultRow.eventId.toString(), 
-                eventorUrl, 
-                `HTML-innehåll hämtat (${htmlContent.length} bytes)`
-              );
-            }
-            
-            fetchSuccess = true;
-          } else {
-            errorDetails = `Server returned a response but no HTML content`;
-            console.error(`[ERROR] ${errorDetails}`);
-          }
-        } else {
-          // Get first 300 characters of response text for error logging
-          const responseText = await response.text();
-          const truncatedText = responseText.substring(0, 300);
-          
-          errorDetails = `Failed fetch: HTTP ${response.status} ${response.statusText}`;
-          console.error(`[ERROR] ${errorDetails}`);
-          console.error(`[ERROR] Response text: ${truncatedText}...`);
-          
-          addLog(resultRow.eventId, eventorUrl, `Fel vid hämtning: HTTP ${response.status} ${response.statusText}`);
+        // First try direct fetch
+        try {
+          htmlContent = await fetchHtmlDirectly(eventorUrl);
+          fetchSuccess = true;
+          addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
           
           if (runId) {
             await saveLogToDatabase(
               runId, 
               resultRow.eventId.toString(), 
               eventorUrl, 
-              `Fel vid hämtning: HTTP ${response.status} ${response.statusText}. Svar: ${truncatedText.substring(0, 100)}...`
+              `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`
             );
           }
-        }
-      } catch (error: any) {
-        errorDetails = `Network error: ${error.message || error}`;
-        console.error(`[ERROR] ${errorDetails}`);
-        console.error(`[ERROR] Error stack: ${error.stack || 'No stack available'}`);
-        
-        addLog(resultRow.eventId, eventorUrl, `Nätverksfel: ${error.message || error}`);
-        
-        if (runId) {
-          await saveLogToDatabase(
-            runId,
-            resultRow.eventId.toString(),
-            eventorUrl,
-            `Nätverksfel: ${error.message || error}`
-          );
-        }
-      }
-      
-      if (fetchSuccess) {
-        // Use extractCourseInfo to get course length and participants count
-        const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
-        
-        if (courseInfo.length > 0) {
-          enhancedResultRow.length = courseInfo.length;
-          console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
-          
-          addLog(resultRow.eventId, eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+        } catch (directFetchError: any) {
+          // Log the direct fetch failure
+          console.warn(`[WARNING] Direct fetch failed, trying edge function fallback:`, directFetchError);
+          addLog(resultRow.eventId, eventorUrl, `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            await saveLogToDatabase(
+              runId,
+              resultRow.eventId.toString(),
+              eventorUrl,
+              `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`
+            );
           }
           
-          // Special verification for event ID 44635, class "Lätt 3 Dam"
-          if (resultRow.eventId.toString() === "44635" && resultRow.class === "Lätt 3 Dam") {
-            console.log(`[VERIFICATION] Event ID 44635, Class "Lätt 3 Dam": Extracted course length = ${courseInfo.length} m`);
-            console.log(`[VERIFICATION] Expected value: 3100 m, Actual value: ${courseInfo.length} m`);
-            console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
-            
-            const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
-            addLog(resultRow.eventId, eventorUrl, verificationMessage);
+          // Try edge function as fallback
+          try {
+            htmlContent = await fetchHtmlViaEdgeFunction(eventorUrl);
+            fetchSuccess = true;
+            addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId, 
                 resultRow.eventId.toString(), 
                 eventorUrl, 
-                verificationMessage
+                `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`
+              );
+            }
+          } catch (edgeFunctionError: any) {
+            errorDetails = `Edge function fetch failed: ${edgeFunctionError.message || edgeFunctionError}`;
+            console.error(`[ERROR] ${errorDetails}`);
+            
+            addLog(resultRow.eventId, eventorUrl, `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`);
+            
+            if (runId) {
+              await saveLogToDatabase(
+                runId,
+                resultRow.eventId.toString(),
+                eventorUrl,
+                `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`
               );
             }
           }
+        }
+        
+        if (fetchSuccess) {
+          // Use extractCourseInfo to get course length and participants count
+          const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
+          
+          if (courseInfo.length > 0) {
+            enhancedResultRow.length = courseInfo.length;
+            console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
+            
+            addLog(resultRow.eventId, eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            }
+            
+            // Special verification for event ID 44635, class "Lätt 3 Dam"
+            if (resultRow.eventId.toString() === "44635" && resultRow.class === "Lätt 3 Dam") {
+              console.log(`[VERIFICATION] Event ID 44635, Class "Lätt 3 Dam": Extracted course length = ${courseInfo.length} m`);
+              console.log(`[VERIFICATION] Expected value: 3100 m, Actual value: ${courseInfo.length} m`);
+              console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
+              
+              const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
+              addLog(resultRow.eventId, eventorUrl, verificationMessage);
+              
+              if (runId) {
+                await saveLogToDatabase(
+                  runId, 
+                  resultRow.eventId.toString(), 
+                  eventorUrl, 
+                  verificationMessage
+                );
+              }
+            }
+          } else {
+            console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
+            
+            addLog(resultRow.eventId, eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            }
+          }
+          
+          // Update participants count if available and not already set
+          if (courseInfo.participants > 0 && (!enhancedResultRow.totalParticipants || enhancedResultRow.totalParticipants === 0)) {
+            enhancedResultRow.totalParticipants = courseInfo.participants;
+            enhancedResultRow.antalStartande = courseInfo.participants.toString();
+            
+            addLog(resultRow.eventId, eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            
+            if (runId) {
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            }
+          }
         } else {
-          console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
+          // Log final error if all fetch attempts failed
+          console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
+          console.error(`[ERROR] Last error details: ${errorDetails}`);
           
-          addLog(resultRow.eventId, eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
-          
-          if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
-          }
-        }
-        
-        // Update participants count if available and not already set
-        if (courseInfo.participants > 0 && (!enhancedResultRow.totalParticipants || enhancedResultRow.totalParticipants === 0)) {
-          enhancedResultRow.totalParticipants = courseInfo.participants;
-          enhancedResultRow.antalStartande = courseInfo.participants.toString();
-          
-          addLog(resultRow.eventId, eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+          addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            await saveLogToDatabase(
+              runId, 
+              resultRow.eventId.toString(), 
+              currentEventorUrl, 
+              `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`
+            );
           }
         }
-      } else {
-        // Log final error if all fetch attempts failed
-        console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
-        console.error(`[ERROR] Last error details: ${errorDetails}`);
+      } catch (error: any) {
+        console.error(`[ERROR] Exception in course length fetching:`, error);
+        console.error(`[ERROR] Stack: ${error.stack || 'No stack available'}`);
         
-        addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
+        addLog(resultRow.eventId, currentEventorUrl, `Exception i banlängdshämtning: ${error.message || error}`);
         
         if (runId) {
           await saveLogToDatabase(
-            runId, 
-            resultRow.eventId.toString(), 
-            currentEventorUrl, 
-            `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`
+            runId,
+            resultRow.eventId.toString(),
+            currentEventorUrl,
+            `Exception i banlängdshämtning: ${error.message || error}`
           );
         }
       }
