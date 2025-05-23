@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,11 @@ import SavedRunItem from "@/components/SavedRunItem";
 import { Trash2, Settings, Database, Trophy } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllAppTexts } from "@/hooks/useAppText";
+
+// Loading placeholder component 
+const TextPlaceholder = ({ width = "w-32", height = "h-6" }: { width?: string, height?: string }) => (
+  <div className={`animate-pulse bg-gray-200 rounded ${width} ${height}`}></div>
+);
 
 const Index = () => {
   const { toast } = useToast();
@@ -98,11 +104,14 @@ const Index = () => {
     refetchRuns();
   };
 
+  // Determine if we should show loading placeholders
+  const isLoading = loadingTexts || loadingUser;
+
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">
-          {texts.main_title || "Resultatanalys"}
+          {isLoading ? <TextPlaceholder width="w-60" /> : texts.main_title || "Resultatanalys"}
         </h1>
         <div className="flex gap-4">
           <Link to="/settings">
@@ -117,31 +126,49 @@ const Index = () => {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>
-            {loadingUser || loadingTexts
-              ? "Välkommen"
-              : processText('welcome_message', userData)}
+            {isLoading ? (
+              <TextPlaceholder width="w-64" />
+            ) : (
+              processText('welcome_message', userData)
+            )}
           </CardTitle>
           <CardDescription>
-            {texts.tool_description || "Med detta verktyg kan du använda en exportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil."}
+            {isLoading ? (
+              <TextPlaceholder width="w-full" height="h-8" />
+            ) : (
+              texts.tool_description || "Med detta verktyg kan du använda en exportfil från Eventor för att hämta banlängd och antal startande. Därefter kan du spara det som en ny excelfil."
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <p>
-              {texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."}
+              {isLoading ? (
+                <TextPlaceholder width="w-full" height="h-8" />
+              ) : (
+                texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."
+              )}
             </p>
             <div className="flex justify-center gap-4 mt-4">
               <div className="flex flex-row gap-4">
                 <Link to="/batch-processing">
                   <Button variant="default" className="flex items-center gap-2">
                     <Database className="h-4 w-4" />
-                    {texts.batch_processing_button || "Batch-bearbetning"}
+                    {isLoading ? (
+                      <span className="w-32 opacity-50">Loading...</span>
+                    ) : (
+                      texts.batch_processing_button || "Batch-bearbetning"
+                    )}
                   </Button>
                 </Link>
                 <Link to="/trophy">
                   <Button variant="default" className="flex items-center gap-2 bg-black hover:bg-gray-800">
                     <Trophy className="h-4 w-4" />
-                    {texts.trophy_button || "Vandringspris"}
+                    {isLoading ? (
+                      <span className="w-32 opacity-50">Loading...</span>
+                    ) : (
+                      texts.trophy_button || "Vandringspris"
+                    )}
                   </Button>
                 </Link>
               </div>
@@ -153,9 +180,19 @@ const Index = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>{texts.your_runs_title || "Dina sparade körningar"}</CardTitle>
+            <CardTitle>
+              {isLoading ? (
+                <TextPlaceholder width="w-48" />
+              ) : (
+                texts.your_runs_title || "Dina sparade körningar"
+              )}
+            </CardTitle>
             <CardDescription>
-              {texts.your_runs_subtitle || "Tidigare sparade körningar och analyser"}
+              {isLoading ? (
+                <TextPlaceholder width="w-64" />
+              ) : (
+                texts.your_runs_subtitle || "Tidigare sparade körningar och analyser"
+              )}
             </CardDescription>
           </div>
           {savedRuns && savedRuns.length > 0 && (

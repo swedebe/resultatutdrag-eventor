@@ -7,10 +7,22 @@ import { AppText } from "@/types/appText";
  * This bypasses TypeScript issues with the generated Supabase types
  */
 export const AppTextService = {
+  // Cache for app texts to reduce redundant requests
+  _cachedTexts: null as AppText[] | null,
+  _lastFetchTimestamp: 0,
+  _cacheMaxAge: 60000, // 1 minute cache validity
+
   /**
-   * Fetch all app texts
+   * Fetch all app texts, using cache if available and not expired
    */
-  async getAllAppTexts(): Promise<AppText[]> {
+  async getAllAppTexts(forceRefresh = false): Promise<AppText[]> {
+    // Return cached texts if they exist and are not expired
+    const now = Date.now();
+    if (!forceRefresh && this._cachedTexts && now - this._lastFetchTimestamp < this._cacheMaxAge) {
+      console.log(`Using cached app texts (${this._cachedTexts.length} items)`);
+      return this._cachedTexts;
+    }
+    
     try {
       // First try using the Supabase client directly
       const { data, error } = await supabase.from('app_texts').select('*');
@@ -22,7 +34,9 @@ export const AppTextService = {
       
       if (data && data.length > 0) {
         console.log(`Retrieved ${data.length} app texts with Supabase client`);
-        return data as AppText[];
+        this._cachedTexts = data as AppText[];
+        this._lastFetchTimestamp = now;
+        return this._cachedTexts;
       }
       
       // Fallback to direct REST API
@@ -43,7 +57,9 @@ export const AppTextService = {
 
       const restData = await response.json();
       console.log(`Retrieved ${restData?.length || 0} app texts with REST API`);
-      return restData as AppText[];
+      this._cachedTexts = restData as AppText[];
+      this._lastFetchTimestamp = now;
+      return this._cachedTexts;
     } catch (error) {
       console.error("All methods failed to fetch app texts:", error);
       // Return empty array instead of throwing to prevent cascading errors
@@ -53,8 +69,17 @@ export const AppTextService = {
 
   /**
    * Update an app text
+   * @param id Text ID to update
+   * @param value New text value 
+   * @param previousValue Previous text value to check if update is needed
    */
-  async updateAppText(id: string, value: string): Promise<void> {
+  async updateAppText(id: string, value: string, previousValue?: string): Promise<void> {
+    // Skip update if the value hasn't changed
+    if (previousValue !== undefined && value === previousValue) {
+      console.log(`Skipping update for app text ${id} - value unchanged`);
+      return;
+    }
+    
     try {
       // First try using the Supabase client directly
       const { error } = await supabase
@@ -68,6 +93,9 @@ export const AppTextService = {
       }
       
       console.log(`Updated app text ${id} successfully`);
+      
+      // Invalidate cache after update
+      this._cachedTexts = null;
       return;
     } catch (supabaseError) {
       console.warn("Supabase client update failed, trying REST API");
@@ -93,6 +121,8 @@ export const AppTextService = {
         }
         
         console.log(`Updated app text ${id} via REST API successfully`);
+        // Invalidate cache after update
+        this._cachedTexts = null;
       } catch (restError) {
         console.error("Both update methods failed:", restError);
         throw restError;
@@ -108,7 +138,7 @@ export const AppTextService = {
       // First check if the text exists
       const { data, error } = await supabase
         .from('app_texts')
-        .select('id')
+        .select('id, value')
         .eq('key', key)
         .maybeSingle();
       
@@ -118,8 +148,12 @@ export const AppTextService = {
       }
       
       if (data?.id) {
-        // Text exists, update it
-        return this.updateAppText(data.id, value);
+        // Text exists, update it only if value changed
+        if (data.value !== value) {
+          return this.updateAppText(data.id, value, data.value);
+        } else {
+          console.log(`Skipping update for app text ${key} - value unchanged`);
+        }
       } else {
         // Text doesn't exist, create it
         const { error: insertError } = await supabase
@@ -132,6 +166,8 @@ export const AppTextService = {
         }
         
         console.log(`Created app text ${key} successfully`);
+        // Invalidate cache after insert
+        this._cachedTexts = null;
       }
     } catch (error) {
       console.error(`Failed to create or update app text ${key}:`, error);
@@ -140,13 +176,14 @@ export const AppTextService = {
   },
 
   /**
-   * Ensure all required application texts exist in the database
-   * This method can be called during application initialization
+   * Check if required application texts exist in the database
+   * This method should be called during application initialization once
    * It will only insert missing texts, not update existing ones
    */
   async ensureRequiredAppTextsExist(): Promise<void> {
     // First, get all existing app texts to check which ones we need to create
-    const existingTexts = await this.getAllAppTexts();
+    const existingTexts = await this.getAllAppTexts(true); // Force refresh from DB
+    
     // Create a map of existing keys for faster lookup
     const existingKeysMap = new Map(existingTexts.map(text => [text.key, true]));
     
@@ -201,6 +238,8 @@ export const AppTextService = {
         }
       } else {
         console.log(`Successfully inserted ${textsToInsert.length} missing app texts`);
+        // Invalidate cache after insert
+        this._cachedTexts = null;
       }
     }
   }

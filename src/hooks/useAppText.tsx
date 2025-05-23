@@ -19,37 +19,32 @@ export function useAppText(key: string, defaultValue: string = '') {
     const fetchText = async () => {
       try {
         console.log(`Fetching app text for key: ${key}`);
-        // Try with direct query first
-        const { data, error } = await supabase
-          .from('app_texts')
-          .select('value')
-          .eq('key', key)
-          .single();
-
-        if (error) {
-          console.error(`Error fetching app text for key ${key}:`, error);
-          
-          // Try with service as fallback
-          try {
-            const allTexts = await AppTextService.getAllAppTexts();
-            const foundText = allTexts.find(t => t.key === key);
-            if (foundText) {
-              console.log(`Found app text for key ${key} via service:`, foundText.value);
-              setText(foundText.value);
-              return;
-            }
-          } catch (serviceError) {
-            console.error(`Service fallback failed for app text key ${key}:`, serviceError);
-          }
-          
-          setError(error.message);
-          setText(defaultValue);
-        } else if (data) {
-          console.log(`Found app text for key ${key}:`, data.value);
-          setText(data.value);
+        // Try using cached data first via the service
+        const allTexts = await AppTextService.getAllAppTexts();
+        const foundText = allTexts.find(t => t.key === key);
+        
+        if (foundText) {
+          console.log(`Found app text for key ${key} via service:`, foundText.value);
+          setText(foundText.value);
         } else {
-          console.log(`No app text found for key ${key}, using default: ${defaultValue}`);
-          setText(defaultValue);
+          // Fallback to direct query if not in cache
+          const { data, error } = await supabase
+            .from('app_texts')
+            .select('value')
+            .eq('key', key)
+            .maybeSingle();
+
+          if (error) {
+            console.error(`Error fetching app text for key ${key}:`, error);
+            setError(error.message);
+            setText(defaultValue);
+          } else if (data) {
+            console.log(`Found app text for key ${key}:`, data.value);
+            setText(data.value);
+          } else {
+            console.log(`No app text found for key ${key}, using default: ${defaultValue}`);
+            setText(defaultValue);
+          }
         }
       } catch (e: any) {
         console.error(`Exception fetching app text for key ${key}:`, e);
@@ -91,62 +86,47 @@ export function useAllAppTexts() {
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Only run this once during app initialization
+    if (!initialized) {
+      const initAppTexts = async () => {
+        try {
+          // Ensure all required texts exist in the database (but don't overwrite existing ones)
+          await AppTextService.ensureRequiredAppTextsExist();
+          setInitialized(true);
+        } catch (e) {
+          console.error("Error initializing app texts:", e);
+        }
+      };
+      
+      initAppTexts();
+    }
+  }, [initialized]);
 
   useEffect(() => {
     const fetchAllTexts = async () => {
       try {
         console.log('Fetching all app texts');
         
-        // First ensure all required texts exist in the database (but don't overwrite existing ones)
-        await AppTextService.ensureRequiredAppTextsExist();
+        // Use the service which supports caching
+        const allTexts = await AppTextService.getAllAppTexts();
         
-        // Try direct Supabase query first
-        const { data, error } = await supabase
-          .from('app_texts')
-          .select('key, value');
-
-        if (error) {
-          console.error('Error fetching app texts via direct query:', error);
-          throw error;
-        }
-        
-        if (data && data.length > 0) {
-          console.log('App texts fetched successfully via direct query:', data.length, 'texts');
+        if (allTexts.length > 0) {
+          console.log(`Loaded ${allTexts.length} texts from service`);
           const textMap: Record<string, string> = {};
-          data.forEach((item: AppText) => {
+          allTexts.forEach((item: AppText) => {
             textMap[item.key] = item.value;
           });
           setTexts(textMap);
+          setError(null);
         } else {
-          // Fallback to service
-          console.log('No app texts from direct query, trying service');
-          const serviceData = await AppTextService.getAllAppTexts();
-          console.log('App texts fetched via service:', serviceData.length, 'texts');
-          
-          const textMap: Record<string, string> = {};
-          serviceData.forEach((item: AppText) => {
-            textMap[item.key] = item.value;
-          });
-          setTexts(textMap);
+          console.warn('No app texts found');
         }
       } catch (e: any) {
         console.error('Exception fetching app texts:', e);
         setError(e.message);
-        
-        // As a final fallback, try with AppTextService
-        try {
-          const serviceData = await AppTextService.getAllAppTexts();
-          if (serviceData && serviceData.length > 0) {
-            const textMap: Record<string, string> = {};
-            serviceData.forEach((item: AppText) => {
-              textMap[item.key] = item.value;
-            });
-            setTexts(textMap);
-            setError(null); // Clear error if service succeeds
-          }
-        } catch (serviceError: any) {
-          console.error('All methods failed to fetch app texts:', serviceError);
-        }
       } finally {
         setIsLoading(false);
       }

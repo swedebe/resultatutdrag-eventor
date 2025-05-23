@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Save, AlertCircle } from "lucide-react";
+import { AlertCircle, Save } from "lucide-react";
 import { AppText } from "@/types/appText";
 import { AppTextService } from "@/services/appText/appTextService";
 import AddUserForm from "./AddUserForm";
@@ -20,6 +19,8 @@ const SuperuserSettings: React.FC = () => {
   const [appTexts, setAppTexts] = useState<AppText[]>([]);
   const [loadingTexts, setLoadingTexts] = useState(true);
   const [savingTexts, setSavingTexts] = useState(false);
+  // Track original text values to detect actual changes
+  const [originalTexts, setOriginalTexts] = useState<Record<string, string>>({});
 
   const groupedTexts = React.useMemo(() => {
     if (!appTexts.length) return {};
@@ -61,14 +62,18 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        // First ensure all required texts exist (but don't update existing ones)
-        await AppTextService.ensureRequiredAppTextsExist();
-        
-        // Then fetch all app texts
-        const allTexts = await AppTextService.getAllAppTexts();
+        // Force refresh from database to get latest values
+        const allTexts = await AppTextService.getAllAppTexts(true);
         if (allTexts.length > 0) {
           console.log("App texts fetched:", allTexts.length);
           setAppTexts(allTexts);
+          
+          // Store original values for comparison
+          const originals: Record<string, string> = {};
+          allTexts.forEach(text => {
+            originals[text.id] = text.value;
+          });
+          setOriginalTexts(originals);
         } else {
           console.error("No app texts found");
           toast({
@@ -101,15 +106,38 @@ const SuperuserSettings: React.FC = () => {
   const saveAppTexts = async () => {
     setSavingTexts(true);
     try {
-      const updatePromises = appTexts.map(text => 
-        AppTextService.updateAppText(text.id, text.value)
+      // Only update texts that have actually changed
+      const textsToUpdate = appTexts.filter(text => 
+        text.value !== originalTexts[text.id]
+      );
+      
+      if (textsToUpdate.length === 0) {
+        toast({
+          title: "Ingen ändring",
+          description: "Inga texter har ändrats, inget att spara",
+        });
+        setSavingTexts(false);
+        return;
+      }
+      
+      console.log(`Saving ${textsToUpdate.length} changed texts out of ${appTexts.length} total`);
+      
+      const updatePromises = textsToUpdate.map(text => 
+        AppTextService.updateAppText(text.id, text.value, originalTexts[text.id])
       );
 
       await Promise.all(updatePromises);
+      
+      // Update original texts to reflect the new values
+      const newOriginals = { ...originalTexts };
+      textsToUpdate.forEach(text => {
+        newOriginals[text.id] = text.value;
+      });
+      setOriginalTexts(newOriginals);
 
       toast({
         title: "Texter sparade",
-        description: "Applikationstexterna har uppdaterats",
+        description: `${textsToUpdate.length} applikationstexter har uppdaterats`,
       });
     } catch (error: any) {
       console.error("Error saving app texts:", error);
@@ -152,9 +180,16 @@ const SuperuserSettings: React.FC = () => {
                         title: "Texter skapade",
                         description: "Applikationstexter har skapats i databasen.",
                       });
-                      const allTexts = await AppTextService.getAllAppTexts();
+                      const allTexts = await AppTextService.getAllAppTexts(true);
                       if (allTexts.length > 0) {
                         setAppTexts(allTexts);
+                        
+                        // Store original values for comparison
+                        const originals: Record<string, string> = {};
+                        allTexts.forEach(text => {
+                          originals[text.id] = text.value;
+                        });
+                        setOriginalTexts(originals);
                       }
                     } catch (error: any) {
                       console.error("Error creating app texts:", error);
@@ -187,6 +222,7 @@ const SuperuserSettings: React.FC = () => {
                           id={`text-${text.id}`}
                           value={text.value}
                           onChange={(e) => handleTextChange(text.id, e.target.value)}
+                          className={text.value !== originalTexts[text.id] ? "border-amber-500" : ""}
                         />
                       </div>
                     ))}
@@ -195,7 +231,7 @@ const SuperuserSettings: React.FC = () => {
               ))}
               <Button 
                 onClick={saveAppTexts}
-                disabled={savingTexts}
+                disabled={savingTexts || appTexts.every(text => text.value === originalTexts[text.id])}
               >
                 <Save className="mr-2 h-4 w-4" />
                 {savingTexts ? "Sparar..." : "Spara texter"}
