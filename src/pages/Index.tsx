@@ -6,7 +6,7 @@ import AuthStatus from "@/components/AuthStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import SavedRunItem from "@/components/SavedRunItem";
-import { Trash2, Settings, Database } from "lucide-react";
+import { Trash2, Settings, Database, Trophy } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAllAppTexts } from "@/hooks/useAppText";
 
@@ -131,12 +131,20 @@ const Index = () => {
               {texts.file_instructions || "Exportfilen från Eventor måste redigeras först. Du ska ta bort fliken Deltagare och spara filen som en xlsx-fil."}
             </p>
             <div className="flex justify-center gap-4 mt-4">
-              <Link to="/batch-processing">
-                <Button variant="default" className="flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  {texts.batch_processing_button || "Batch-bearbetning"}
-                </Button>
-              </Link>
+              <div className="flex flex-row gap-4">
+                <Link to="/batch-processing">
+                  <Button variant="default" className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    {texts.batch_processing_button || "Batch-bearbetning"}
+                  </Button>
+                </Link>
+                <Link to="/trophy">
+                  <Button variant="default" className="flex items-center gap-2 bg-black hover:bg-gray-800">
+                    <Trophy className="h-4 w-4" />
+                    {texts.trophy_button || "Vandringspris"}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </CardContent>

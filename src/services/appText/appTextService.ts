@@ -159,6 +159,7 @@ export const AppTextService = {
       { key: 'your_runs_title', value: 'Dina sparade körningar', category: 'homepage' },
       { key: 'your_runs_subtitle', value: 'Tidigare sparade körningar och analyser', category: 'homepage' },
       { key: 'batch_processing_button', value: 'Batch-bearbetning', category: 'homepage' },
+      { key: 'trophy_button', value: 'Vandringspris', category: 'homepage' },
       
       // EventorBatch page texts
       { key: 'eventorbatch_title', value: 'Resultatanalys - Batch-bearbetning', category: 'eventorbatch' },
