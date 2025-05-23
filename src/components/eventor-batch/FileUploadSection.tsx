@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAllAppTexts } from "@/hooks/useAppText";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Copy } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
 
 interface FileUploadSectionProps {
   isProcessing: boolean;
@@ -21,6 +22,7 @@ interface FileUploadSectionProps {
   delay: number;
   onDelayChange: (delay: number) => void;
   onCancelProcessing: () => void;
+  logs?: Array<{timestamp: string; eventId: string | number; url: string; status: string}>;
 }
 
 const FileUploadSection: React.FC<FileUploadSectionProps> = ({
@@ -34,9 +36,11 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
   hasResults,
   delay,
   onDelayChange,
-  onCancelProcessing
+  onCancelProcessing,
+  logs = []
 }) => {
   const { texts } = useAllAppTexts();
+  const { toast } = useToast();
   const [edgeFunctionError, setEdgeFunctionError] = useState<boolean>(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,6 +66,31 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
       setEdgeFunctionError(false);
     }
   }, [currentStatus]);
+
+  // Function to copy logs to clipboard
+  const copyLogsToClipboard = () => {
+    if (!logs || logs.length === 0) return;
+    
+    const logText = logs.map(log => {
+      return `[${log.timestamp}] [ID ${log.eventId}] ${log.url} ${log.status}`;
+    }).join('\n');
+    
+    navigator.clipboard.writeText(logText)
+      .then(() => {
+        toast({
+          title: "URL-logg kopierad",
+          description: "URL-loggen har kopierats till urklipp",
+        });
+      })
+      .catch(err => {
+        console.error('Failed to copy logs:', err);
+        toast({
+          title: "Kunde inte kopiera logg",
+          description: "Ett fel uppstod när loggen skulle kopieras",
+          variant: "destructive"
+        });
+      });
+  };
 
   return (
     <Card className="mb-6">
@@ -147,6 +176,17 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
                 disabled={!hasResults && !isProcessing}
               >
                 Rensa
+              </Button>
+            )}
+            
+            {logs && logs.length > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={copyLogsToClipboard}
+                className="ml-auto"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Kopiera URL-logg
               </Button>
             )}
           </div>

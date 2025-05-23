@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -116,11 +115,12 @@ async function fetchHtmlDirectly(url: string): Promise<string> {
 }
 
 /**
- * Fallback to the edge function if direct fetch fails
+ * Fallback to the edge function if direct fetch fails - LEGACY FUNCTION, kept for reference only
  * @param url The URL to fetch HTML from 
  * @returns HTML content as string or throws an error
  */
 async function fetchHtmlViaEdgeFunction(url: string): Promise<string> {
+  console.warn(`[WARNING] Edge Function used for HTML scraping – this is not the expected production behavior`);
   console.log(`[DEBUG] Falling back to edge function for HTML fetch from URL: ${url}`);
   
   const headers = {
@@ -194,7 +194,7 @@ export const fetchEventorData = async (
       let errorDetails = '';
       
       try {
-        // First try direct fetch
+        // Only use direct fetch - no more edge function fallback for production
         try {
           htmlContent = await fetchHtmlDirectly(eventorUrl);
           fetchSuccess = true;
@@ -211,50 +211,23 @@ export const fetchEventorData = async (
           }
         } catch (directFetchError: any) {
           // Log the direct fetch failure
-          console.warn(`[WARNING] Direct fetch failed, trying edge function fallback:`, directFetchError);
+          errorDetails = `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`;
+          console.error(`[ERROR] ${errorDetails}`);
+          
           const displayUrl = truncateUrl(eventorUrl, 120);
-          addLog(resultRow.eventId, displayUrl, `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`);
+          addLog(resultRow.eventId, displayUrl, errorDetails);
           
           if (runId) {
             await saveLogToDatabase(
               runId,
               resultRow.eventId.toString(),
               displayUrl,
-              `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`
+              errorDetails
             );
           }
           
-          // Try edge function as fallback
-          try {
-            htmlContent = await fetchHtmlViaEdgeFunction(eventorUrl);
-            fetchSuccess = true;
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId, 
-                resultRow.eventId.toString(), 
-                displayUrl, 
-                `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`
-              );
-            }
-          } catch (edgeFunctionError: any) {
-            errorDetails = `Edge function fetch failed: ${edgeFunctionError.message || edgeFunctionError}`;
-            console.error(`[ERROR] ${errorDetails}`);
-            
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId,
-                resultRow.eventId.toString(),
-                displayUrl,
-                `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`
-              );
-            }
-          }
+          // No edge function fallback - we're using direct Node.js fetching only
+          throw new Error(errorDetails);
         }
         
         if (fetchSuccess) {

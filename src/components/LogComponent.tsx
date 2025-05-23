@@ -1,7 +1,9 @@
 
 import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Copy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
 
 export interface LogEntry {
   timestamp: string;
@@ -48,6 +50,7 @@ interface LogComponentProps {
 
 const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   // Scroll to bottom of logs when they change
   useEffect(() => {
@@ -68,6 +71,30 @@ const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
     };
   }, []);
 
+  const copyLogsToClipboard = () => {
+    if (!logs || logs.length === 0) return;
+    
+    const logText = logs.map(log => {
+      return `[${log.timestamp}] [ID ${log.eventId}] ${log.url} ${log.status}`;
+    }).join('\n');
+    
+    navigator.clipboard.writeText(logText)
+      .then(() => {
+        toast({
+          title: "URL-logg kopierad",
+          description: "URL-loggen har kopierats till urklipp",
+        });
+      })
+      .catch(err => {
+        console.error('Failed to copy logs:', err);
+        toast({
+          title: "Kunde inte kopiera logg",
+          description: "Ett fel uppstod när loggen skulle kopieras",
+          variant: "destructive"
+        });
+      });
+  };
+
   if (!logs || logs.length === 0) {
     return null;
   }
@@ -81,9 +108,19 @@ const LogComponent: React.FC<LogComponentProps> = ({ logs, onClearLogs }) => {
             Loggning av förfrågningar till Eventor
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={onClearLogs}>
-          Rensa logg
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={copyLogsToClipboard}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Kopiera URL-logg
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClearLogs}>
+            Rensa logg
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="bg-muted p-4 rounded-md max-h-[300px] overflow-y-auto text-xs font-mono">
