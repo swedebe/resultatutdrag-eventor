@@ -55,10 +55,11 @@ export const extractCourseLength = (lengthText: string): number => {
 };
 
 /**
- * Extracts course length and participants from event class header
+ * Extracts course length from event class header
  * Format: "<div class="eventClassHeader"><div><h3>Class name</h3>2 190 m, 8 startande</div></div>"
  */
 export const extractCourseInfo = (html: string, className: string): {length: number, participants: number} => {
+  // Initialize with default values
   const result = { length: 0, participants: 0 };
   
   try {
@@ -121,15 +122,7 @@ export const extractCourseInfo = (html: string, className: string): {length: num
               console.log(`[DEBUG] Could not find text after </h3> in: ${innerHTML}`);
             }
             
-            // Now extract the participants count from the text, typically "X startande"
-            const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
-            
-            if (participantsMatch && participantsMatch[1]) {
-              result.participants = parseInt(participantsMatch[1], 10);
-              console.log(`[DEBUG] Extracted participants count: ${result.participants}`);
-            } else {
-              console.log(`[DEBUG] Could not find participants count in: ${parentDiv.textContent}`);
-            }
+            // Note: We no longer extract participants count from HTML
             
             return result;
           }
@@ -166,12 +159,7 @@ export const extractCourseInfo = (html: string, className: string): {length: num
               console.log(`[DEBUG] Extracted course length from partial match: ${result.length} m`);
             }
             
-            const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
-            
-            if (participantsMatch && participantsMatch[1]) {
-              result.participants = parseInt(participantsMatch[1], 10);
-              console.log(`[DEBUG] Extracted participants count from partial match: ${result.participants}`);
-            }
+            // Note: We no longer extract participants count from HTML
             
             return result;
           }
@@ -197,7 +185,7 @@ export const extractCourseInfo = (html: string, className: string): {length: num
 /**
  * Extract course info using regex patterns, designed to work in both browser and server environments
  */
-function extractCourseInfoUsingRegex(html: string, className: string): {length: number, participants: number} {
+function extractCourseInfoUsingRegex(html: string, className: string): {length: number, participants: number} => {
   const result = { length: 0, participants: 0 };
   console.log(`[DEBUG] Attempting regex-based extraction for class "${className}"`);
   
@@ -207,7 +195,7 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
     
     // Pattern 1: Look for the exact structure with eventClassHeader
     const classHeaderPattern = new RegExp(
-      `<div[^>]*class="eventClassHeader"[^>]*>.*?<h3>\\s*${escapedClassName}\\s*</h3>([^,<]+),\\s*(\\d+)\\s+startande`,
+      `<div[^>]*class="eventClassHeader"[^>]*>.*?<h3>\\s*${escapedClassName}\\s*</h3>([^,<]+)`,
       'is'
     );
     
@@ -217,19 +205,12 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
       'is'
     );
     
-    // Pattern 3: Participants count pattern
-    const participantsPattern = new RegExp(
-      `<h3>\\s*${escapedClassName}\\s*</h3>[^,<]*,\\s*(\\d+)\\s+startande`,
-      'is'
-    );
-    
     // Try the exact pattern first
     const match = classHeaderPattern.exec(html);
     if (match) {
       const lengthText = match[1].trim();
-      const participantsText = match[2];
       
-      console.log(`[DEBUG] Regex match 1 - Raw length: "${lengthText}", Participants: "${participantsText}"`);
+      console.log(`[DEBUG] Regex match 1 - Raw length: "${lengthText}"`);
       
       // Extract the context around the match for verification
       const matchStart = Math.max(0, match.index - 50);
@@ -237,11 +218,10 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
       const context = html.substring(matchStart, matchEnd);
       console.log(`[DEBUG] Regex match context: "${context}"`);
       
-      // Extract length and participants
+      // Extract length
       result.length = extractCourseLength(lengthText);
-      result.participants = parseInt(participantsText, 10);
       
-      console.log(`[DEBUG] Extracted through regex pattern 1 - Length: ${result.length} m, Participants: ${result.participants}`);
+      console.log(`[DEBUG] Extracted through regex pattern 1 - Length: ${result.length} m`);
       return result;
     }
     
@@ -253,13 +233,6 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
       
       result.length = extractCourseLength(lengthText);
       console.log(`[DEBUG] Extracted length through regex pattern 2: ${result.length} m`);
-      
-      // Try to find participants separately
-      const participantsMatch = participantsPattern.exec(html);
-      if (participantsMatch) {
-        result.participants = parseInt(participantsMatch[1], 10);
-        console.log(`[DEBUG] Extracted participants through regex pattern 3: ${result.participants}`);
-      }
       
       return result;
     }

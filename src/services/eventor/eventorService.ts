@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -245,7 +244,7 @@ export const fetchEventorData = async (
         }
         
         if (fetchSuccess) {
-          // Use extractCourseInfo to get course length and participants count
+          // Use extractCourseInfo to get course length only
           const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
           
           if (courseInfo.length > 0) {
@@ -286,17 +285,7 @@ export const fetchEventorData = async (
             }
           }
           
-          // Update participants count if available and not already set
-          if (courseInfo.participants > 0 && (!enhancedResultRow.totalParticipants || enhancedResultRow.totalParticipants === 0)) {
-            enhancedResultRow.totalParticipants = courseInfo.participants;
-            enhancedResultRow.antalStartande = courseInfo.participants.toString();
-            
-            addLog(resultRow.eventId, eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
-            
-            if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
-            }
-          }
+          // Note: We no longer use HTML for participant counts
         } else {
           // Log final error if all fetch attempts failed
           console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
