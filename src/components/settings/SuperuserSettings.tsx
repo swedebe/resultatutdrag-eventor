@@ -61,24 +61,21 @@ const SuperuserSettings: React.FC = () => {
   useEffect(() => {
     const fetchAppTexts = async () => {
       try {
-        // Ensure required texts exist
+        // First ensure all required texts exist (but don't update existing ones)
         await AppTextService.ensureRequiredAppTextsExist();
         
-        const { data, error } = await supabase.from('app_texts').select('*');
-        
-        if (error) {
-          console.error("Error from direct Supabase query:", error);
-          throw error;
-        }
-        
-        if (data && data.length > 0) {
-          console.log("App texts fetched directly:", data);
-          setAppTexts(data);
+        // Then fetch all app texts
+        const allTexts = await AppTextService.getAllAppTexts();
+        if (allTexts.length > 0) {
+          console.log("App texts fetched:", allTexts.length);
+          setAppTexts(allTexts);
         } else {
-          console.log("No data from direct query, trying AppTextService");
-          const serviceData = await AppTextService.getAllAppTexts();
-          console.log("App texts fetched via service:", serviceData);
-          setAppTexts(serviceData);
+          console.error("No app texts found");
+          toast({
+            title: "Inga texter hittades",
+            description: "Kunde inte hitta några applikationstexter",
+            variant: "destructive",
+          });
         }
       } catch (error: any) {
         console.error("Error fetching app texts:", error);
@@ -150,14 +147,14 @@ const SuperuserSettings: React.FC = () => {
                   setLoadingTexts(true);
                   (async () => {
                     try {
-                      await supabase.rpc('populate_app_texts');
+                      await AppTextService.ensureRequiredAppTextsExist();
                       toast({
                         title: "Texter skapade",
                         description: "Applikationstexter har skapats i databasen.",
                       });
-                      const { data } = await supabase.from('app_texts').select('*');
-                      if (data) {
-                        setAppTexts(data);
+                      const allTexts = await AppTextService.getAllAppTexts();
+                      if (allTexts.length > 0) {
+                        setAppTexts(allTexts);
                       }
                     } catch (error: any) {
                       console.error("Error creating app texts:", error);

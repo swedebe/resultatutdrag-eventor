@@ -97,6 +97,9 @@ export function useAllAppTexts() {
       try {
         console.log('Fetching all app texts');
         
+        // First ensure all required texts exist in the database (but don't overwrite existing ones)
+        await AppTextService.ensureRequiredAppTextsExist();
+        
         // Try direct Supabase query first
         const { data, error } = await supabase
           .from('app_texts')

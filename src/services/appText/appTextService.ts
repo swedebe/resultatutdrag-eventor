@@ -142,8 +142,14 @@ export const AppTextService = {
   /**
    * Ensure all required application texts exist in the database
    * This method can be called during application initialization
+   * It will only insert missing texts, not update existing ones
    */
   async ensureRequiredAppTextsExist(): Promise<void> {
+    // First, get all existing app texts to check which ones we need to create
+    const existingTexts = await this.getAllAppTexts();
+    // Create a map of existing keys for faster lookup
+    const existingKeysMap = new Map(existingTexts.map(text => [text.key, true]));
+    
     const requiredTexts = [
       // Homepage texts
       { key: 'main_title', value: 'Resultatanalys', category: 'homepage' },
@@ -171,8 +177,30 @@ export const AppTextService = {
       { key: 'back_to_home', value: 'Tillbaka till startsidan', category: 'general' }
     ];
 
-    for (const text of requiredTexts) {
-      await this.createOrUpdateAppTextByKey(text.key, text.value, text.category);
+    // Only insert texts that don't already exist
+    const textsToInsert = requiredTexts.filter(text => !existingKeysMap.has(text.key));
+    
+    console.log(`Found ${existingTexts.length} existing app texts, need to insert ${textsToInsert.length} missing texts`);
+    
+    // Use a batch insert if there are texts to insert
+    if (textsToInsert.length > 0) {
+      const { error } = await supabase
+        .from('app_texts')
+        .insert(textsToInsert);
+        
+      if (error) {
+        console.error("Error inserting missing app texts:", error);
+        // Fall back to inserting one by one
+        for (const text of textsToInsert) {
+          try {
+            await this.createOrUpdateAppTextByKey(text.key, text.value, text.category);
+          } catch (err) {
+            console.error(`Failed to insert app text ${text.key}:`, err);
+          }
+        }
+      } else {
+        console.log(`Successfully inserted ${textsToInsert.length} missing app texts`);
+      }
     }
   }
 };
