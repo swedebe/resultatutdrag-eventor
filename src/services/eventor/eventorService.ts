@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -66,8 +67,9 @@ export const fetchEventorData = async (
   try {
     // Fetch course length if option is enabled (default to true if not specified)
     if (!batchOptions || batchOptions.fetchCourseLength) {
-      // Set URL for course length scraping
-      currentEventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${resultRow.eventId}&groupBy=EventClass&mode=2`;
+      // Set URL for course length scraping - this is just for logging purposes
+      const eventorUrl = `https://eventor.orientering.se/Events/ResultList?eventId=${resultRow.eventId}&groupBy=EventClass&mode=2`;
+      currentEventorUrl = eventorUrl;
       
       // Use the specified delay for course length or default to 15 seconds
       const courseDelay = batchOptions?.courseLengthDelay ?? 15.0;
@@ -83,81 +85,119 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // Define minimal headers for HTML fetch
-      const headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "text/html"
-      };
+      // IMPORTANT: Use the Supabase function to fetch HTML server-side
+      // This avoids CORS issues when fetching from the Eventor site
+      const proxyUrl = 'https://eventor-proxy.onrender.com/fetch-html';
       
-      // Log request metadata before sending
-      console.log(`[DEBUG] Scraping HTML from URL: ${currentEventorUrl}`);
-      console.log(`[DEBUG] Request headers:`, headers);
+      console.log(`[DEBUG] Requesting HTML via server proxy at: ${proxyUrl}`);
+      console.log(`[DEBUG] Target URL: ${eventorUrl}`);
       
-      // Fetch the HTML content with minimal headers
+      // Log the request is being made server-side
+      addLog(resultRow.eventId, eventorUrl, `Anropar server-proxy för att hämta HTML, undviker CORS-begränsningar`);
+      
+      if (runId) {
+        await saveLogToDatabase(
+          runId, 
+          resultRow.eventId.toString(), 
+          eventorUrl, 
+          `Anropar server-proxy för att hämta HTML, undviker CORS-begränsningar`
+        );
+      }
+      
       let htmlContent = '';
       let fetchSuccess = false;
       let errorDetails = '';
-      let responseStatus = 0;
       
       // Implement retry logic with MAX_RETRIES attempts
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
           if (attempt > 0) {
-            console.log(`[DEBUG] Retry attempt ${attempt + 1} for URL: ${currentEventorUrl}`);
+            console.log(`[DEBUG] Retry attempt ${attempt + 1} for HTML fetch via proxy`);
             // Add exponential backoff for retries
             const backoffDelay = Math.pow(2, attempt) * 1000;
             await sleep(backoffDelay / 1000); // sleep takes seconds
           }
           
-          const response = await fetch(currentEventorUrl, {
-            method: "GET",
-            headers: headers
+          // Call the server-side proxy with the Eventor URL as a parameter
+          const response = await fetch(proxyUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ 
+              url: eventorUrl,
+              headers: {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "text/html"
+              }
+            })
           });
           
-          responseStatus = response.status;
+          console.log(`[DEBUG] Proxy response status: ${response.status}`);
           
           if (response.ok) {
-            htmlContent = await response.text();
-            console.log(`[DEBUG] Successfully fetched HTML content (${htmlContent.length} bytes)`);
-            fetchSuccess = true;
-            break;
-          } else {
-            // Get first 300 characters of response text for error logging
-            const responseText = await response.text();
-            const truncatedText = responseText.substring(0, 300);
+            const responseData = await response.json();
             
-            errorDetails = `[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}: status ${response.status}`;
-            console.error(errorDetails);
-            console.error(`[ERROR] Response text: ${truncatedText}...`);
-            
-            // Only log to database on last attempt
-            if (attempt === 2) {
-              addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning: HTTP ${response.status}`);
+            // Check if the proxy returned HTML content successfully
+            if (responseData.html) {
+              htmlContent = responseData.html;
+              console.log(`[DEBUG] Successfully fetched HTML content via proxy (${htmlContent.length} bytes)`);
+              
+              addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat via server-proxy (${htmlContent.length} bytes)`);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId, 
                   resultRow.eventId.toString(), 
-                  currentEventorUrl, 
-                  `Fel vid hämtning: HTTP ${response.status}. Svar: ${truncatedText.substring(0, 100)}...`
+                  eventorUrl, 
+                  `HTML-innehåll hämtat via server-proxy (${htmlContent.length} bytes)`
+                );
+              }
+              
+              fetchSuccess = true;
+              break;
+            } else {
+              // The proxy returned a response but no HTML content
+              errorDetails = `[ERROR] Proxy returned no HTML content: ${JSON.stringify(responseData)}`;
+              console.error(errorDetails);
+            }
+          } else {
+            // Get first 300 characters of response text for error logging
+            const responseText = await response.text();
+            const truncatedText = responseText.substring(0, 300);
+            
+            errorDetails = `[ERROR] Failed proxy request: status ${response.status}`;
+            console.error(errorDetails);
+            console.error(`[ERROR] Proxy response text: ${truncatedText}...`);
+            
+            // Only log to database on last attempt
+            if (attempt === MAX_RETRIES - 1) {
+              addLog(resultRow.eventId, eventorUrl, `Fel vid proxy-anrop: HTTP ${response.status}`);
+              
+              if (runId) {
+                await saveLogToDatabase(
+                  runId, 
+                  resultRow.eventId.toString(), 
+                  eventorUrl, 
+                  `Fel vid proxy-anrop: HTTP ${response.status}. Svar: ${truncatedText.substring(0, 100)}...`
                 );
               }
             }
           }
         } catch (error: any) {
-          errorDetails = `[ERROR] Network error fetching HTML: ${error.message || error}`;
+          errorDetails = `[ERROR] Network error with proxy: ${error.message || error}`;
           console.error(errorDetails);
           
           // Only log to database on last attempt
-          if (attempt === 2) {
-            addLog(resultRow.eventId, currentEventorUrl, `Nätverksfel: ${error.message || error}`);
+          if (attempt === MAX_RETRIES - 1) {
+            addLog(resultRow.eventId, eventorUrl, `Nätverksfel med proxy: ${error.message || error}`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId, 
                 resultRow.eventId.toString(), 
-                currentEventorUrl, 
-                `Nätverksfel: ${error.message || error}`
+                eventorUrl, 
+                `Nätverksfel med proxy: ${error.message || error}`
               );
             }
           }
@@ -172,10 +212,10 @@ export const fetchEventorData = async (
           enhancedResultRow.length = courseInfo.length;
           console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
           
-          addLog(resultRow.eventId, currentEventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+          addLog(resultRow.eventId, eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
           }
           
           // Special verification for event ID 44635, class "Lätt 3 Dam"
@@ -185,13 +225,13 @@ export const fetchEventorData = async (
             console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
             
             const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
-            addLog(resultRow.eventId, currentEventorUrl, verificationMessage);
+            addLog(resultRow.eventId, eventorUrl, verificationMessage);
             
             if (runId) {
               await saveLogToDatabase(
                 runId, 
                 resultRow.eventId.toString(), 
-                currentEventorUrl, 
+                eventorUrl, 
                 verificationMessage
               );
             }
@@ -199,10 +239,10 @@ export const fetchEventorData = async (
         } else {
           console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
           
-          addLog(resultRow.eventId, currentEventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+          addLog(resultRow.eventId, eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
           }
         }
         
@@ -211,10 +251,10 @@ export const fetchEventorData = async (
           enhancedResultRow.totalParticipants = courseInfo.participants;
           enhancedResultRow.antalStartande = courseInfo.participants.toString();
           
-          addLog(resultRow.eventId, currentEventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+          addLog(resultRow.eventId, eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Antal startande hämtat från HTML: ${courseInfo.participants}`);
           }
         }
       } else {
