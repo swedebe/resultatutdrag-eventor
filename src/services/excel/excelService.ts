@@ -51,7 +51,8 @@ export const mapExcelRowToResultRow = (row: any): ResultRow => {
     eventType: row["Arrangemangstyp"] || "",
     personId: row["Person-id"] || "",
     birthYear: row["Födelseår"] || "",
-    started: row["Startat"] || "",
+    // Store the raw started value without any conversion
+    started: row["Startat"], // No conversion, keep original value exactly as is
     antalStartande: row["Antal startande"] || "" // Add new field for Swedish display
   };
   

@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -142,7 +141,7 @@ export const processExcelFile = async (
     const resultRow = enrichedResults[i];
     
     try {
-      // Log the original started value for debugging
+      // Log the original started value for debugging - no conversions
       console.log(`Row ${i+1}: Original 'started' value:`, resultRow.started, typeof resultRow.started);
       
       setProgress(30 + Math.floor(70 * (i / enrichedResults.length)));
@@ -151,7 +150,11 @@ export const processExcelFile = async (
       // Only fetch additional Eventor data if course length is needed
       if (batchOptions?.fetchCourseLength) {
         const enhancedResultRow = await fetchEventorData(resultRow, runId, batchOptions);
-        enrichedResults[i] = enhancedResultRow;
+        // Ensure we preserve the original started value from resultRow
+        enrichedResults[i] = {
+          ...enhancedResultRow,
+          started: resultRow.started // Preserve original started value
+        };
       }
       
       // Save processed result to database if runId is provided
@@ -231,4 +234,4 @@ export const processExcelFile = async (
 };
 
 // The duplicate declaration has been removed as we're already importing it
-// export const currentEventorUrl = ""; 
+// export const currentEventorUrl = "";

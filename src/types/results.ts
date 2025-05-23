@@ -20,7 +20,7 @@ export type ResultRow = {
   eventType?: string;       
   personId?: string | number;
   birthYear?: string | number;
-  started?: string | boolean;
+  started?: any; // Allow any type to preserve the original value exactly (could be 0, 1, string, empty, etc.)
   antalStartande?: string;
   [key: string]: any;
 };

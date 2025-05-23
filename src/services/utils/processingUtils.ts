@@ -29,7 +29,7 @@ export const dbRowToResultRow = (row: any): any => {
     eventType: row.event_type,
     personId: row.person_id,
     birthYear: row.birth_year,
-    started: row.started === 1
+    started: row.started // Keep original value from database
   };
 };
 
@@ -37,45 +37,10 @@ export const dbRowToResultRow = (row: any): any => {
  * Converts ResultRow to database format for saving
  */
 export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
-  // Make sure we have a clean number for started
-  // Force conversion to number to ensure database compatibility
-  const startedValue = (() => {
-    // Log incoming value for debugging
-    console.log(`Raw started value: ${resultRow.started}, type: ${typeof resultRow.started}`);
-    
-    // Handle undefined/null case
-    if (resultRow.started === undefined || resultRow.started === null) {
-      return 0;
-    }
-    
-    // Handle different possible text formats and types
-    const truePatterns = [
-      true, 
-      1, 
-      '1', 
-      'true', 
-      'True', 
-      'TRUE', 
-      'yes', 
-      'Yes', 
-      'YES', 
-      'J', 
-      'j'
-    ];
-    
-    // Perform the comparison and force a numeric 0 or 1
-    const isTrue = truePatterns.some(pattern => 
-      resultRow.started === pattern || 
-      String(resultRow.started).toLowerCase() === String(pattern).toLowerCase()
-    );
-    
-    // Force to number type with + operator
-    return isTrue ? 1 : 0;
-  })();
+  // No conversion for started value - store as-is
+  console.log(`Raw started value: ${resultRow.started}, type: ${typeof resultRow.started}`);
   
-  console.log(`Processed started value: ${startedValue}, type: ${typeof startedValue}`);
-  
-  // Return the processed result with started as a guaranteed number
+  // Return the processed result with original started value preserved
   return {
     run_id: runId,
     event_date: resultRow.date,
@@ -94,6 +59,6 @@ export const resultRowToDbFormat = (resultRow: any, runId: string): any => {
     time_after_seconds: resultRow.timeInSeconds,
     course_length: resultRow.length,
     organizer: resultRow.organizer,
-    started: Number(startedValue) // Force to number type again to be extra safe
+    started: resultRow.started // Store the original value without any conversion
   };
 };
