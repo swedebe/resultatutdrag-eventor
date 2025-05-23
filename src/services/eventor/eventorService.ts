@@ -65,11 +65,53 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
 }
 
 /**
- * Direct HTML fetching from Eventor using enhanced browser-like headers
- * This function completely bypasses the Edge Function and fetches HTML directly
+ * NEW: Use the Render proxy to fetch HTML from Eventor
+ * This uses a working Node.js environment with unrestricted network access
  */
-async function fetchEventorHtml(url: string): Promise<string> {
-  console.log(`[DEBUG] Direct HTML fetch starting for URL: ${url}`);
+async function fetchEventorHtmlViaNativeProxy(url: string): Promise<string> {
+  console.log(`[DEBUG] Fetching HTML via Render proxy for URL: ${url}`);
+  
+  try {
+    // Use the Render proxy service that runs in a standard Node.js environment
+    const proxyUrl = 'https://eventor-proxy.onrender.com/html/fetch';
+    
+    // Send the original Eventor URL to the proxy
+    const response = await fetchWithRetry(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Proxy failed to fetch HTML: HTTP ${response.status}. Response: ${errorText.substring(0, 500)}`);
+    }
+    
+    const responseData = await response.json();
+    
+    if (!responseData.html) {
+      throw new Error('Proxy returned empty HTML content');
+    }
+    
+    console.log(`[DEBUG] Successfully fetched HTML via proxy (${responseData.html.length} bytes)`);
+    console.log(`[DEBUG] HTML preview: ${responseData.html.substring(0, 200).replace(/\n/g, '\\n')}...`);
+    
+    return responseData.html;
+  } catch (error) {
+    console.error(`[ERROR] Failed to fetch HTML via proxy:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Legacy direct HTML fetching from Eventor using enhanced browser-like headers
+ * This function is NOT USED in production anymore but kept for reference
+ */
+async function fetchEventorHtmlDirect(url: string): Promise<string> {
+  console.log(`[DEBUG] [LEGACY] Direct HTML fetch starting for URL: ${url}`);
+  console.log(`[WARNING] Using legacy direct HTML fetching - this will likely fail in production!`);
   
   // Enhanced browser-like headers to avoid being blocked
   const headers = {
@@ -140,29 +182,29 @@ export const fetchEventorData = async (
       }
       
       console.log(`[DEBUG] Environment check - Running in: ${typeof window === 'undefined' ? 'Server-side' : 'Browser'}`);
-      console.log(`[DEBUG] Fetching HTML from URL: ${eventorUrl}`);
+      console.log(`[DEBUG] Fetching HTML for URL: ${eventorUrl}`);
       
       let htmlContent = '';
       let fetchSuccess = false;
       
       try {
-        // Using direct HTML fetching - bypassing the Edge Function entirely
-        htmlContent = await fetchEventorHtml(eventorUrl);
+        // Using the Render proxy service that runs in a standard Node.js environment
+        htmlContent = await fetchEventorHtmlViaNativeProxy(eventorUrl);
         fetchSuccess = true;
         
         const displayUrl = truncateUrl(eventorUrl, 120);
-        addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
+        addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat via Node.js proxy (${htmlContent.length} bytes)`);
         
         if (runId) {
           await saveLogToDatabase(
             runId, 
             resultRow.eventId.toString(), 
             displayUrl, 
-            `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`
+            `HTML-innehåll hämtat via Node.js proxy (${htmlContent.length} bytes)`
           );
         }
       } catch (fetchError: any) {
-        const errorMessage = `Fel vid direkthämtning av HTML: ${fetchError.message || fetchError}`;
+        const errorMessage = `Fel vid hämtning av HTML via proxy: ${fetchError.message || fetchError}`;
         console.error(`[ERROR] ${errorMessage}`);
         
         const displayUrl = truncateUrl(eventorUrl, 120);
@@ -228,6 +270,7 @@ export const fetchEventorData = async (
       }
     }
     
+    // The numberOfStarts API integration remains unchanged - keeping as is
     // Fetch number of starters if option is enabled (default to true if not specified)
     if (batchOptions?.fetchStarters) {
       // Get the user's session to obtain access token

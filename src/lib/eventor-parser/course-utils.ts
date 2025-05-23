@@ -262,5 +262,3 @@ function extractCourseInfoUsingRegex(html: string, className: string): {length: 
   
   return result;
 }
-
-// Removed the duplicate export statement that was causing the error

@@ -161,6 +161,14 @@ const EventorBatch = () => {
         }
       }
       
+      // If we're fetching course lengths, add an informative log
+      if (fetchCourseLength) {
+        addLog("system", "", "Banlängder kommer att hämtas via Node.js proxy.");
+        if (newRunId) {
+          await saveLogToDatabase(newRunId, "system", "", "Banlängder kommer att hämtas via Node.js proxy.");
+        }
+      }
+      
       const enrichedResults = await processExcelFile(
         file, 
         setProgress, 
@@ -529,7 +537,9 @@ const EventorBatch = () => {
                     }}
                     disabled={isProcessing}
                   />
-                  <Label htmlFor="fetch-course-length">{texts.eventorbatch_fetch_course_length || "Hämta banlängder (scraping)"}</Label>
+                  <Label htmlFor="fetch-course-length">
+                    {texts.eventorbatch_fetch_course_length || "Hämta banlängder"} (via Node.js proxy)
+                  </Label>
                   
                   <div className="ml-4 flex items-center space-x-2">
                     <Label htmlFor="course-length-delay">{texts.eventorbatch_delay_label || "Fördröjning:"}</Label>
