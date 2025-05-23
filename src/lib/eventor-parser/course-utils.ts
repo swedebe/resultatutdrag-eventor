@@ -1,4 +1,3 @@
-
 /**
  * Utilities for extracting course information
  */
@@ -185,7 +184,7 @@ export const extractCourseInfo = (html: string, className: string): {length: num
 /**
  * Extract course info using regex patterns, designed to work in both browser and server environments
  */
-function extractCourseInfoUsingRegex(html: string, className: string): {length: number, participants: number} => {
+function extractCourseInfoUsingRegex(html: string, className: string): {length: number, participants: number} {
   const result = { length: 0, participants: 0 };
   console.log(`[DEBUG] Attempting regex-based extraction for class "${className}"`);
   
