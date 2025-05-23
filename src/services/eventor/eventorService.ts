@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -66,11 +65,10 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
 }
 
 /**
- * Fetches HTML content directly using enhanced browser-like headers
- * @param url The URL to fetch HTML from
- * @returns HTML content as string or throws an error
+ * Direct HTML fetching from Eventor using enhanced browser-like headers
+ * This function completely bypasses the Edge Function and fetches HTML directly
  */
-async function fetchHtmlDirectly(url: string): Promise<string> {
+async function fetchEventorHtml(url: string): Promise<string> {
   console.log(`[DEBUG] Direct HTML fetch starting for URL: ${url}`);
   
   // Enhanced browser-like headers to avoid being blocked
@@ -105,56 +103,12 @@ async function fetchHtmlDirectly(url: string): Promise<string> {
     }
     
     const html = await response.text();
-    console.log(`[DEBUG] Successfully fetched HTML (${html.length} bytes)`);
+    console.log(`[DEBUG] Successfully fetched HTML directly (${html.length} bytes)`);
     console.log(`[DEBUG] HTML preview: ${html.substring(0, 200).replace(/\n/g, '\\n')}...`);
     
     return html;
   } catch (error) {
-    console.error(`[ERROR] Failed to fetch HTML directly:`, error);
-    throw error;
-  }
-}
-
-/**
- * Fallback to the edge function if direct fetch fails
- * @param url The URL to fetch HTML from 
- * @returns HTML content as string or throws an error
- */
-async function fetchHtmlViaEdgeFunction(url: string): Promise<string> {
-  console.log(`[DEBUG] Falling back to edge function for HTML fetch from URL: ${url}`);
-  
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9,sv;q=0.8"
-  };
-  
-  try {
-    // Check if function is properly deployed
-    console.log(`[DEBUG] Checking if edge function is correctly deployed...`);
-    
-    // Use the full absolute URL to the edge function, not a relative path
-    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-html`;
-    console.log(`[DEBUG] Edge function URL: ${edgeFunctionUrl}`);
-    
-    const { data, error } = await supabase.functions.invoke('fetch-html', {
-      body: { url, headers }
-    });
-    
-    if (error) {
-      console.error(`[ERROR] Edge function invocation failed:`, error);
-      throw new Error(`Edge function error: ${error.message}`);
-    }
-    
-    if (!data.success || !data.html) {
-      console.error(`[ERROR] Edge function returned error response:`, data);
-      throw new Error(`Edge function returned error: ${data.error || 'Unknown error'}`);
-    }
-    
-    console.log(`[DEBUG] Successfully fetched HTML via edge function (${data.html.length} bytes)`);
-    return data.html;
-  } catch (error) {
-    console.error(`[ERROR] Failed to fetch HTML via edge function:`, error);
+    console.error(`[ERROR] Failed to directly fetch HTML:`, error);
     throw error;
   }
 }
@@ -179,7 +133,6 @@ export const fetchEventorData = async (
       // Use our truncateUrl function to ensure IDs are fully visible
       const displayUrl = truncateUrl(currentEventorUrl, 120);
       
-      // FIXED: Removed waiting before fetch to eliminate redundancy
       addLog(resultRow.eventId, displayUrl, `Hämtar banlängd...`);
       
       if (runId) {
@@ -191,147 +144,86 @@ export const fetchEventorData = async (
       
       let htmlContent = '';
       let fetchSuccess = false;
-      let errorDetails = '';
       
       try {
-        // First try direct fetch
-        try {
-          htmlContent = await fetchHtmlDirectly(eventorUrl);
-          fetchSuccess = true;
-          const displayUrl = truncateUrl(eventorUrl, 120);
-          addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
-          
-          if (runId) {
-            await saveLogToDatabase(
-              runId, 
-              resultRow.eventId.toString(), 
-              displayUrl, 
-              `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`
-            );
-          }
-        } catch (directFetchError: any) {
-          // Log the direct fetch failure
-          console.warn(`[WARNING] Direct fetch failed, trying edge function fallback:`, directFetchError);
-          const displayUrl = truncateUrl(eventorUrl, 120);
-          addLog(resultRow.eventId, displayUrl, `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`);
-          
-          if (runId) {
-            await saveLogToDatabase(
-              runId,
-              resultRow.eventId.toString(),
-              displayUrl,
-              `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`
-            );
-          }
-          
-          // Try edge function as fallback
-          try {
-            htmlContent = await fetchHtmlViaEdgeFunction(eventorUrl);
-            fetchSuccess = true;
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId, 
-                resultRow.eventId.toString(), 
-                displayUrl, 
-                `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`
-              );
-            }
-          } catch (edgeFunctionError: any) {
-            errorDetails = `Edge function fetch failed: ${edgeFunctionError.message || edgeFunctionError}`;
-            console.error(`[ERROR] ${errorDetails}`);
-            
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`);
-            
-            if (runId) {
-              await saveLogToDatabase(
-                runId,
-                resultRow.eventId.toString(),
-                displayUrl,
-                `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`
-              );
-            }
-          }
-        }
+        // Using direct HTML fetching - bypassing the Edge Function entirely
+        htmlContent = await fetchEventorHtml(eventorUrl);
+        fetchSuccess = true;
         
-        if (fetchSuccess) {
-          // Use extractCourseInfo to get course length only
-          const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
-          
-          if (courseInfo.length > 0) {
-            enhancedResultRow.length = courseInfo.length;
-            console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
-            
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
-            
-            if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
-            }
-            
-            // Special verification for event ID 44635, class "Lätt 3 Dam"
-            if (resultRow.eventId.toString() === "44635" && resultRow.class === "Lätt 3 Dam") {
-              console.log(`[VERIFICATION] Event ID 44635, Class "Lätt 3 Dam": Extracted course length = ${courseInfo.length} m`);
-              console.log(`[VERIFICATION] Expected value: 3100 m, Actual value: ${courseInfo.length} m`);
-              console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
-              
-              const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
-              const displayUrl = truncateUrl(eventorUrl, 120);
-              addLog(resultRow.eventId, displayUrl, verificationMessage);
-              
-              if (runId) {
-                await saveLogToDatabase(
-                  runId, 
-                  resultRow.eventId.toString(), 
-                  displayUrl, 
-                  verificationMessage
-                );
-              }
-            }
-          } else {
-            console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
-            
-            const displayUrl = truncateUrl(eventorUrl, 120);
-            addLog(resultRow.eventId, displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
-            
-            if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
-            }
-          }
-        } else {
-          // Log final error if all fetch attempts failed
-          console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
-          console.error(`[ERROR] Last error details: ${errorDetails}`);
-          
-          const displayUrl = truncateUrl(currentEventorUrl, 120);
-          addLog(resultRow.eventId, displayUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
-          
-          if (runId) {
-            await saveLogToDatabase(
-              runId, 
-              resultRow.eventId.toString(), 
-              displayUrl, 
-              `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`
-            );
-          }
-        }
-      } catch (error: any) {
-        console.error(`[ERROR] Exception in course length fetching:`, error);
-        console.error(`[ERROR] Stack: ${error.stack || 'No stack available'}`);
+        const displayUrl = truncateUrl(eventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
         
-        const displayUrl = truncateUrl(currentEventorUrl, 120);
-        addLog(resultRow.eventId, displayUrl, `Exception i banlängdshämtning: ${error.message || error}`);
+        if (runId) {
+          await saveLogToDatabase(
+            runId, 
+            resultRow.eventId.toString(), 
+            displayUrl, 
+            `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`
+          );
+        }
+      } catch (fetchError: any) {
+        const errorMessage = `Fel vid direkthämtning av HTML: ${fetchError.message || fetchError}`;
+        console.error(`[ERROR] ${errorMessage}`);
+        
+        const displayUrl = truncateUrl(eventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, errorMessage);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             resultRow.eventId.toString(),
             displayUrl,
-            `Exception i banlängdshämtning: ${error.message || error}`
+            errorMessage
           );
+        }
+        
+        // We don't have a fallback anymore - fail fast
+        throw new Error(`Failed to fetch course length HTML: ${fetchError.message}`);
+      }
+      
+      if (fetchSuccess) {
+        // Use extractCourseInfo to get course length only
+        const courseInfo = extractCourseInfo(htmlContent, resultRow.class);
+        
+        if (courseInfo.length > 0) {
+          enhancedResultRow.length = courseInfo.length;
+          console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
+          
+          const displayUrl = truncateUrl(eventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+          }
+          
+          // Special verification for event ID 44635, class "Lätt 3 Dam"
+          if (resultRow.eventId.toString() === "44635" && resultRow.class === "Lätt 3 Dam") {
+            console.log(`[VERIFICATION] Event ID 44635, Class "Lätt 3 Dam": Extracted course length = ${courseInfo.length} m`);
+            console.log(`[VERIFICATION] Expected value: 3100 m, Actual value: ${courseInfo.length} m`);
+            console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
+            
+            const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
+            const displayUrl = truncateUrl(eventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, verificationMessage);
+            
+            if (runId) {
+              await saveLogToDatabase(
+                runId, 
+                resultRow.eventId.toString(), 
+                displayUrl, 
+                verificationMessage
+              );
+            }
+          }
+        } else {
+          console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
+          
+          const displayUrl = truncateUrl(eventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+          
+          if (runId) {
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+          }
         }
       }
     }
