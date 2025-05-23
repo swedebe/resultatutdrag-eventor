@@ -1,4 +1,3 @@
-
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -85,24 +84,9 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // IMPORTANT: Use the Supabase function to fetch HTML server-side
-      // This avoids CORS issues when fetching from the Eventor site
-      const proxyUrl = 'https://eventor-proxy.onrender.com/fetch-html';
-      
-      console.log(`[DEBUG] Requesting HTML via server proxy at: ${proxyUrl}`);
-      console.log(`[DEBUG] Target URL: ${eventorUrl}`);
-      
-      // Log the request is being made server-side
-      addLog(resultRow.eventId, eventorUrl, `Anropar server-proxy för att hämta HTML, undviker CORS-begränsningar`);
-      
-      if (runId) {
-        await saveLogToDatabase(
-          runId, 
-          resultRow.eventId.toString(), 
-          eventorUrl, 
-          `Anropar server-proxy för att hämta HTML, undviker CORS-begränsningar`
-        );
-      }
+      // DIRECT FETCH: Use direct server-side fetch instead of proxy
+      console.log(`[DEBUG] Direct fetch of HTML from URL: ${eventorUrl}`);
+      console.log(`[DEBUG] Request headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" }`);
       
       let htmlContent = '';
       let fetchSuccess = false;
@@ -112,92 +96,92 @@ export const fetchEventorData = async (
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
           if (attempt > 0) {
-            console.log(`[DEBUG] Retry attempt ${attempt + 1} for HTML fetch via proxy`);
+            console.log(`[DEBUG] Retry attempt ${attempt + 1} for HTML fetch`);
             // Add exponential backoff for retries
             const backoffDelay = Math.pow(2, attempt) * 1000;
             await sleep(backoffDelay / 1000); // sleep takes seconds
           }
           
-          // Call the server-side proxy with the Eventor URL as a parameter
-          const response = await fetch(proxyUrl, {
-            method: "POST",
+          // Direct fetch implementation with edge function
+          const response = await fetch(eventorUrl, {
+            method: "GET",
             headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ 
-              url: eventorUrl,
-              headers: {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "text/html"
-              }
-            })
+              "User-Agent": "Mozilla/5.0",
+              "Accept": "text/html"
+            }
           });
           
-          console.log(`[DEBUG] Proxy response status: ${response.status}`);
+          console.log(`[DEBUG] Fetch response status: ${response.status}`);
           
           if (response.ok) {
-            const responseData = await response.json();
+            const responseData = await response.text();
             
-            // Check if the proxy returned HTML content successfully
-            if (responseData.html) {
-              htmlContent = responseData.html;
-              console.log(`[DEBUG] Successfully fetched HTML content via proxy (${htmlContent.length} bytes)`);
+            htmlContent = responseData;
+            
+            // Check if HTML content was retrieved successfully
+            if (htmlContent) {
+              console.log(`[DEBUG] Successfully fetched HTML (${htmlContent.length} bytes)`);
               
-              addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat via server-proxy (${htmlContent.length} bytes)`);
+              // Show first 300 characters of HTML for debugging
+              if (htmlContent.length > 0) {
+                const previewHtml = htmlContent.substring(0, 300);
+                console.log(`[DEBUG] First 300 characters of HTML: ${previewHtml}...`);
+              }
+              
+              addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat (${htmlContent.length} bytes)`);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId, 
                   resultRow.eventId.toString(), 
                   eventorUrl, 
-                  `HTML-innehåll hämtat via server-proxy (${htmlContent.length} bytes)`
+                  `HTML-innehåll hämtat (${htmlContent.length} bytes)`
                 );
               }
               
               fetchSuccess = true;
               break;
             } else {
-              // The proxy returned a response but no HTML content
-              errorDetails = `[ERROR] Proxy returned no HTML content: ${JSON.stringify(responseData)}`;
-              console.error(errorDetails);
+              errorDetails = `Server returned a response but no HTML content: ${JSON.stringify(responseData)}`;
+              console.error(`[ERROR] ${errorDetails}`);
             }
           } else {
             // Get first 300 characters of response text for error logging
             const responseText = await response.text();
             const truncatedText = responseText.substring(0, 300);
             
-            errorDetails = `[ERROR] Failed proxy request: status ${response.status}`;
-            console.error(errorDetails);
-            console.error(`[ERROR] Proxy response text: ${truncatedText}...`);
+            errorDetails = `Failed fetch: HTTP ${response.status}`;
+            console.error(`[ERROR] ${errorDetails}`);
+            console.error(`[ERROR] Response text: ${truncatedText}...`);
             
             // Only log to database on last attempt
             if (attempt === MAX_RETRIES - 1) {
-              addLog(resultRow.eventId, eventorUrl, `Fel vid proxy-anrop: HTTP ${response.status}`);
+              addLog(resultRow.eventId, eventorUrl, `Fel vid hämtning: HTTP ${response.status}`);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId, 
                   resultRow.eventId.toString(), 
                   eventorUrl, 
-                  `Fel vid proxy-anrop: HTTP ${response.status}. Svar: ${truncatedText.substring(0, 100)}...`
+                  `Fel vid hämtning: HTTP ${response.status}. Svar: ${truncatedText.substring(0, 100)}...`
                 );
               }
             }
           }
         } catch (error: any) {
-          errorDetails = `[ERROR] Network error with proxy: ${error.message || error}`;
-          console.error(errorDetails);
+          errorDetails = `Network error: ${error.message || error}`;
+          console.error(`[ERROR] ${errorDetails}`);
           
           // Only log to database on last attempt
           if (attempt === MAX_RETRIES - 1) {
-            addLog(resultRow.eventId, eventorUrl, `Nätverksfel med proxy: ${error.message || error}`);
+            addLog(resultRow.eventId, eventorUrl, `Nätverksfel: ${error.message || error}`);
             
             if (runId) {
               await saveLogToDatabase(
-                runId, 
-                resultRow.eventId.toString(), 
-                eventorUrl, 
-                `Nätverksfel med proxy: ${error.message || error}`
+                runId,
+                resultRow.eventId.toString(),
+                eventorUrl,
+                `Nätverksfel: ${error.message || error}`
               );
             }
           }
