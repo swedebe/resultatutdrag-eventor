@@ -105,15 +105,10 @@ export const extractCourseInfo = (html: string, className: string): {length: num
             const textAfterH3 = afterH3Match[1].trim();
             console.log(`[DEBUG] Text after </h3>: "${textAfterH3}"`);
             
-            // Extract only the numeric part by removing all non-numeric characters
-            const numericOnly = textAfterH3.replace(/[^\d]/g, '');
-            if (numericOnly) {
-              const lengthValue = parseInt(numericOnly, 10);
-              result.length = lengthValue;
-              console.log(`[DEBUG] Extracted course length: ${result.length} m`);
-            } else {
-              console.log(`[DEBUG] Failed to extract numeric length from: "${textAfterH3}"`);
-            }
+            // Use the extractCourseLength function to parse the length text
+            const lengthValue = extractCourseLength(textAfterH3);
+            result.length = lengthValue;
+            console.log(`[DEBUG] Extracted course length: ${result.length} m`);
           } else {
             console.log(`[DEBUG] Could not find text after </h3> in: ${innerHTML}`);
           }
@@ -157,13 +152,10 @@ export const extractCourseInfo = (html: string, className: string): {length: num
             const textAfterH3 = afterH3Match[1].trim();
             console.log(`[DEBUG] Text after </h3> in partial match: "${textAfterH3}"`);
             
-            // Extract only the numeric part by removing all non-numeric characters
-            const numericOnly = textAfterH3.replace(/[^\d]/g, '');
-            if (numericOnly) {
-              const lengthValue = parseInt(numericOnly, 10);
-              result.length = lengthValue;
-              console.log(`[DEBUG] Extracted course length from partial match: ${result.length} m`);
-            }
+            // Use the extractCourseLength function to parse the length text
+            const lengthValue = extractCourseLength(textAfterH3);
+            result.length = lengthValue;
+            console.log(`[DEBUG] Extracted course length from partial match: ${result.length} m`);
           }
           
           const participantsMatch = parentDiv.textContent?.match(/,\s*(\d+)\s+startande/i);
@@ -200,13 +192,8 @@ export const extractCourseInfo = (html: string, className: string): {length: num
       const context = html.substring(matchStart, matchEnd);
       console.log(`[DEBUG] Regex match context: "${context}"`);
       
-      // Extract only the numeric part by removing all non-numeric characters
-      const numericOnly = lengthText.replace(/[^\d]/g, '');
-      if (numericOnly) {
-        const lengthValue = parseInt(numericOnly, 10);
-        result.length = lengthValue;
-      }
-      
+      // Use the extractCourseLength function to parse the length text
+      result.length = extractCourseLength(lengthText);
       result.participants = parseInt(participantsText, 10);
       
       console.log(`[DEBUG] Extracted through regex - Length: ${result.length} m, Participants: ${result.participants}`);
