@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -25,7 +26,10 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       console.log(`[DEBUG] Fetch attempt ${attempt + 1} for URL: ${url}`);
+      console.log(`[DEBUG] Request headers: ${JSON.stringify(options.headers || {})}`);
+      
       const response = await fetch(url, options);
+      console.log(`[DEBUG] Response status: ${response.status}`);
       
       // If response is successful or it's a 400-level error (client error),
       // don't retry as these are typically not transient
@@ -34,12 +38,16 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries
       }
       
       // For server errors (500+), we'll retry
+      const responseText = await response.text();
       console.warn(`[WARNING] Server error on attempt ${attempt + 1}: HTTP ${response.status} ${response.statusText}`);
+      console.warn(`[WARNING] Response body preview: ${responseText.substring(0, 300)}...`);
+      
       lastError = new Error(`HTTP error: ${response.status} ${response.statusText}`);
       
     } catch (error: any) {
       // For network errors (connection issues), we'll retry
       console.warn(`[WARNING] Network error on attempt ${attempt + 1}:`, error.message || error);
+      console.warn(`[WARNING] Error details:`, error.stack || JSON.stringify(error));
       lastError = error;
     }
     
@@ -84,107 +92,97 @@ export const fetchEventorData = async (
         await sleep(courseDelay);
       }
       
-      // DIRECT FETCH: Use direct server-side fetch instead of proxy
+      // DIRECT SERVER-SIDE FETCH with detailed environment logging
+      console.log(`[DEBUG] Environment check - Running in: ${typeof window === 'undefined' ? 'Server-side' : 'Browser'}`);
       console.log(`[DEBUG] Direct fetch of HTML from URL: ${eventorUrl}`);
-      console.log(`[DEBUG] Request headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" }`);
+      console.log(`[DEBUG] User-Agent header: Mozilla/5.0`);
       
       let htmlContent = '';
       let fetchSuccess = false;
       let errorDetails = '';
       
-      // Implement retry logic with MAX_RETRIES attempts
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-          if (attempt > 0) {
-            console.log(`[DEBUG] Retry attempt ${attempt + 1} for HTML fetch`);
-            // Add exponential backoff for retries
-            const backoffDelay = Math.pow(2, attempt) * 1000;
-            await sleep(backoffDelay / 1000); // sleep takes seconds
+      try {
+        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
+        
+        console.log(`[DEBUG] Starting direct HTML fetch with enhanced User-Agent: ${userAgent}`);
+        
+        const response = await fetchWithRetry(eventorUrl, {
+          method: "GET",
+          headers: {
+            "User-Agent": userAgent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+            "Accept-Language": "en-US,en;q=0.9,sv;q=0.8",
+            "Cache-Control": "no-cache"
           }
+        });
+        
+        console.log(`[DEBUG] Fetch response status: ${response.status}`);
+        
+        if (response.ok) {
+          const responseData = await response.text();
           
-          // Direct fetch implementation with edge function
-          const response = await fetch(eventorUrl, {
-            method: "GET",
-            headers: {
-              "User-Agent": "Mozilla/5.0",
-              "Accept": "text/html"
+          htmlContent = responseData;
+          
+          // Check if HTML content was retrieved successfully
+          if (htmlContent) {
+            console.log(`[DEBUG] Successfully fetched HTML (${htmlContent.length} bytes)`);
+            
+            // Show first 300 characters of HTML for debugging
+            if (htmlContent.length > 0) {
+              const previewHtml = htmlContent.substring(0, 300);
+              console.log(`[DEBUG] First 300 characters of HTML: ${previewHtml.replace(/\n/g, '\\n')}...`);
             }
-          });
-          
-          console.log(`[DEBUG] Fetch response status: ${response.status}`);
-          
-          if (response.ok) {
-            const responseData = await response.text();
             
-            htmlContent = responseData;
-            
-            // Check if HTML content was retrieved successfully
-            if (htmlContent) {
-              console.log(`[DEBUG] Successfully fetched HTML (${htmlContent.length} bytes)`);
-              
-              // Show first 300 characters of HTML for debugging
-              if (htmlContent.length > 0) {
-                const previewHtml = htmlContent.substring(0, 300);
-                console.log(`[DEBUG] First 300 characters of HTML: ${previewHtml}...`);
-              }
-              
-              addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat (${htmlContent.length} bytes)`);
-              
-              if (runId) {
-                await saveLogToDatabase(
-                  runId, 
-                  resultRow.eventId.toString(), 
-                  eventorUrl, 
-                  `HTML-innehåll hämtat (${htmlContent.length} bytes)`
-                );
-              }
-              
-              fetchSuccess = true;
-              break;
-            } else {
-              errorDetails = `Server returned a response but no HTML content: ${JSON.stringify(responseData)}`;
-              console.error(`[ERROR] ${errorDetails}`);
-            }
-          } else {
-            // Get first 300 characters of response text for error logging
-            const responseText = await response.text();
-            const truncatedText = responseText.substring(0, 300);
-            
-            errorDetails = `Failed fetch: HTTP ${response.status}`;
-            console.error(`[ERROR] ${errorDetails}`);
-            console.error(`[ERROR] Response text: ${truncatedText}...`);
-            
-            // Only log to database on last attempt
-            if (attempt === MAX_RETRIES - 1) {
-              addLog(resultRow.eventId, eventorUrl, `Fel vid hämtning: HTTP ${response.status}`);
-              
-              if (runId) {
-                await saveLogToDatabase(
-                  runId, 
-                  resultRow.eventId.toString(), 
-                  eventorUrl, 
-                  `Fel vid hämtning: HTTP ${response.status}. Svar: ${truncatedText.substring(0, 100)}...`
-                );
-              }
-            }
-          }
-        } catch (error: any) {
-          errorDetails = `Network error: ${error.message || error}`;
-          console.error(`[ERROR] ${errorDetails}`);
-          
-          // Only log to database on last attempt
-          if (attempt === MAX_RETRIES - 1) {
-            addLog(resultRow.eventId, eventorUrl, `Nätverksfel: ${error.message || error}`);
+            addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat (${htmlContent.length} bytes)`);
             
             if (runId) {
               await saveLogToDatabase(
-                runId,
-                resultRow.eventId.toString(),
-                eventorUrl,
-                `Nätverksfel: ${error.message || error}`
+                runId, 
+                resultRow.eventId.toString(), 
+                eventorUrl, 
+                `HTML-innehåll hämtat (${htmlContent.length} bytes)`
               );
             }
+            
+            fetchSuccess = true;
+          } else {
+            errorDetails = `Server returned a response but no HTML content`;
+            console.error(`[ERROR] ${errorDetails}`);
           }
+        } else {
+          // Get first 300 characters of response text for error logging
+          const responseText = await response.text();
+          const truncatedText = responseText.substring(0, 300);
+          
+          errorDetails = `Failed fetch: HTTP ${response.status} ${response.statusText}`;
+          console.error(`[ERROR] ${errorDetails}`);
+          console.error(`[ERROR] Response text: ${truncatedText}...`);
+          
+          addLog(resultRow.eventId, eventorUrl, `Fel vid hämtning: HTTP ${response.status} ${response.statusText}`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId, 
+              resultRow.eventId.toString(), 
+              eventorUrl, 
+              `Fel vid hämtning: HTTP ${response.status} ${response.statusText}. Svar: ${truncatedText.substring(0, 100)}...`
+            );
+          }
+        }
+      } catch (error: any) {
+        errorDetails = `Network error: ${error.message || error}`;
+        console.error(`[ERROR] ${errorDetails}`);
+        console.error(`[ERROR] Error stack: ${error.stack || 'No stack available'}`);
+        
+        addLog(resultRow.eventId, eventorUrl, `Nätverksfel: ${error.message || error}`);
+        
+        if (runId) {
+          await saveLogToDatabase(
+            runId,
+            resultRow.eventId.toString(),
+            eventorUrl,
+            `Nätverksfel: ${error.message || error}`
+          );
         }
       }
       
@@ -244,6 +242,7 @@ export const fetchEventorData = async (
       } else {
         // Log final error if all fetch attempts failed
         console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
+        console.error(`[ERROR] Last error details: ${errorDetails}`);
         
         addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
         
@@ -608,6 +607,8 @@ export const fetchEventorData = async (
 
   } catch (error: any) {
     console.error(`Error fetching data from Eventor for event ${resultRow.eventId}:`, error);
+    console.error(`Error stack: ${error.stack || 'No stack available'}`);
+    
     addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av data: ${error.message || error}`);
     
     if (runId) {

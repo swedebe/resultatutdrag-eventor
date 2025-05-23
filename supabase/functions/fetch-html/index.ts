@@ -14,10 +14,12 @@ serve(async (req) => {
     console.log(`[SERVER] Fetching HTML from: ${url}`);
     console.log(`[SERVER] Using headers:`, headers);
     
-    // Add default headers if not provided
+    // Add enhanced headers for better browser emulation
     const fetchHeaders = {
-      "User-Agent": headers["User-Agent"] || "Mozilla/5.0",
-      "Accept": headers["Accept"] || "text/html",
+      "User-Agent": headers["User-Agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+      "Accept": headers["Accept"] || "text/html,application/xhtml+xml,application/xml;q=0.9",
+      "Accept-Language": "en-US,en;q=0.9,sv;q=0.8", 
+      "Cache-Control": "no-cache",
       ...headers
     };
     
@@ -28,6 +30,7 @@ serve(async (req) => {
     });
     
     console.log(`[SERVER] Response status: ${response.status}`);
+    console.log(`[SERVER] Response headers:`, Object.fromEntries([...response.headers]));
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -38,6 +41,7 @@ serve(async (req) => {
         JSON.stringify({
           error: `Failed to fetch HTML: ${response.status} ${response.statusText}`,
           statusCode: response.status,
+          statusText: response.statusText,
           errorText: truncatedError
         }),
         {
@@ -49,6 +53,7 @@ serve(async (req) => {
     
     const html = await response.text();
     console.log(`[SERVER] Successfully fetched HTML (${html.length} bytes)`);
+    console.log(`[SERVER] HTML preview: ${html.substring(0, 200)}...`);
     
     return new Response(
       JSON.stringify({
@@ -69,6 +74,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error.message || String(error),
+        stack: error.stack || 'No stack available',
         success: false
       }),
       {
