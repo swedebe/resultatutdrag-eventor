@@ -1,11 +1,13 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAllAppTexts } from "@/hooks/useAppText";
+import { AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface FileUploadSectionProps {
   isProcessing: boolean;
@@ -35,6 +37,7 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
   onCancelProcessing
 }) => {
   const { texts } = useAllAppTexts();
+  const [edgeFunctionError, setEdgeFunctionError] = useState<boolean>(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -50,6 +53,15 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
       onDelayChange(newDelay);
     }
   };
+
+  // Monitor current status for edge function errors
+  React.useEffect(() => {
+    if (currentStatus && currentStatus.includes("Edge function error")) {
+      setEdgeFunctionError(true);
+    } else if (currentStatus === "Klar!") {
+      setEdgeFunctionError(false);
+    }
+  }, [currentStatus]);
 
   return (
     <Card className="mb-6">
@@ -78,6 +90,21 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
                 hover:file:bg-primary/90"
             />
           </div>
+          
+          {edgeFunctionError && (
+            <Alert variant="destructive" className="my-2">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              <AlertDescription>
+                Edge function för HTML-hämtning verkar inte fungera. Detta kan bero på att:
+                <ul className="list-disc ml-5 mt-2">
+                  <li>Edge function har inte deployas korrekt</li>
+                  <li>Det är problem med nätverk eller CORS konfiguration</li>
+                  <li>Supabase-projektet behöver startas om</li>
+                </ul>
+                Systemet kommer försöka med direkta anrop till Eventor istället.
+              </AlertDescription>
+            </Alert>
+          )}
           
           <div className="flex gap-3 items-center">
             <Label htmlFor="delay-input">

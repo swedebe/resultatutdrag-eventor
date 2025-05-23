@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../../components/LogComponent';
 import { saveLogToDatabase } from '../database/resultRepository';
@@ -129,15 +130,24 @@ async function fetchHtmlViaEdgeFunction(url: string): Promise<string> {
   };
   
   try {
+    // Check if function is properly deployed
+    console.log(`[DEBUG] Checking if edge function is correctly deployed...`);
+    
+    // Use the full absolute URL to the edge function, not a relative path
+    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-html`;
+    console.log(`[DEBUG] Edge function URL: ${edgeFunctionUrl}`);
+    
     const { data, error } = await supabase.functions.invoke('fetch-html', {
       body: { url, headers }
     });
     
     if (error) {
+      console.error(`[ERROR] Edge function invocation failed:`, error);
       throw new Error(`Edge function error: ${error.message}`);
     }
     
     if (!data.success || !data.html) {
+      console.error(`[ERROR] Edge function returned error response:`, data);
       throw new Error(`Edge function returned error: ${data.error || 'Unknown error'}`);
     }
     
@@ -327,7 +337,7 @@ export const fetchEventorData = async (
     }
     
     // Fetch number of starters if option is enabled (default to true if not specified)
-    if (!batchOptions || batchOptions.fetchStarters) {
+    if (batchOptions?.fetchStarters) {
       // Get the user's session to obtain access token
       let apiKey = "";
       

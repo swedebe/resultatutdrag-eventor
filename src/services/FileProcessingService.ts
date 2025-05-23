@@ -1,3 +1,4 @@
+
 import { ResultRow } from '@/types/results';
 import { addLog } from '../components/LogComponent';
 import { sleep } from './utils/processingUtils';
@@ -64,6 +65,10 @@ export const processExcelFile = async (
     }
   }
   
+  // Track which rows have already received participant counts
+  // This will prevent redundant API calls later
+  const classesWithParticipants = new Map<string, boolean>();
+  
   // Check if we need to fetch starter counts
   if (batchOptions?.fetchStarters) {
     setProgress(15);
@@ -95,6 +100,15 @@ export const processExcelFile = async (
         // Update all results with participant counts
         if (participantCountMap.size > 0) {
           enrichedResults = updateResultsWithParticipantCounts(mappedRows, participantCountMap);
+          
+          // Mark which event+class combinations have been processed
+          enrichedResults.forEach(row => {
+            const key = `${row.eventId}_${row.class}`;
+            if (row.totalParticipants && row.totalParticipants > 0) {
+              classesWithParticipants.set(key, true);
+            }
+          });
+          
           setProgress(30);
           addLog("system", "", `Hämtade antal startande för ${participantCountMap.size} klasser`);
           
@@ -147,9 +161,40 @@ export const processExcelFile = async (
       setProgress(30 + Math.floor(70 * (i / enrichedResults.length)));
       setCurrentStatus(`Hämtar information för tävling ${resultRow.eventId} (${i+1}/${enrichedResults.length})...`);
       
-      // Only fetch additional Eventor data if course length is needed
-      if (batchOptions?.fetchCourseLength) {
-        const enhancedResultRow = await fetchEventorData(resultRow, runId, batchOptions);
+      // Prepare modified batch options to prevent redundant participant count fetching
+      const modifiedBatchOptions = { ...batchOptions };
+      
+      // Only fetch starters if specifically needed for this row and not already fetched
+      if (batchOptions?.fetchStarters) {
+        const key = `${resultRow.eventId}_${resultRow.class}`;
+        if (classesWithParticipants.has(key)) {
+          // This class already has participant count data from batch operation
+          modifiedBatchOptions.fetchStarters = false;
+          
+          const displayUrl = truncateUrl(currentEventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Använder redan hämtade antal startande för klass ${resultRow.class}`);
+          
+          if (runId) {
+            await saveLogToDatabase(
+              runId, 
+              resultRow.eventId.toString(), 
+              displayUrl, 
+              `Använder redan hämtade antal startande för klass ${resultRow.class}`
+            );
+          }
+        }
+      }
+      
+      // Only fetch additional Eventor data if course length is needed or starters still needed
+      if (modifiedBatchOptions?.fetchCourseLength || modifiedBatchOptions?.fetchStarters) {
+        const enhancedResultRow = await fetchEventorData(resultRow, runId, modifiedBatchOptions);
+        
+        // If we successfully fetched starters now (as a fallback), mark this class
+        if (enhancedResultRow.totalParticipants && enhancedResultRow.totalParticipants > 0) {
+          const key = `${enhancedResultRow.eventId}_${enhancedResultRow.class}`;
+          classesWithParticipants.set(key, true);
+        }
+        
         // Ensure we preserve the original started value from resultRow
         enrichedResults[i] = {
           ...enhancedResultRow,
