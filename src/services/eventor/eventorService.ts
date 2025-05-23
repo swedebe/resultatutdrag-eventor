@@ -5,6 +5,7 @@ import { BatchProcessingOptions } from '../FileProcessingService';
 import { sleep } from '../utils/processingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { extractCourseInfo } from '@/lib/eventor-parser';
+import { truncateUrl } from '@/lib/utils';
 
 // Current URL being processed, exported for access in other modules
 export let currentEventorUrl = "";
@@ -165,10 +166,13 @@ export const fetchEventorData = async (
       // Use the specified delay for course length or default to 15 seconds
       const courseDelay = batchOptions?.courseLengthDelay ?? 15.0;
       
-      addLog(resultRow.eventId, currentEventorUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
+      // Use our new truncateUrl function to ensure IDs are fully visible
+      const displayUrl = truncateUrl(currentEventorUrl, 120);
+      
+      addLog(resultRow.eventId, displayUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
       
       if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
+        await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Hämtar banlängd (väntar ${courseDelay} sekunder)...`);
       }
       
       // Wait the specified delay before requesting course length
@@ -188,26 +192,28 @@ export const fetchEventorData = async (
         try {
           htmlContent = await fetchHtmlDirectly(eventorUrl);
           fetchSuccess = true;
-          addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
+          const displayUrl = truncateUrl(eventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`);
           
           if (runId) {
             await saveLogToDatabase(
               runId, 
               resultRow.eventId.toString(), 
-              eventorUrl, 
+              displayUrl, 
               `HTML-innehåll hämtat direkt (${htmlContent.length} bytes)`
             );
           }
         } catch (directFetchError: any) {
           // Log the direct fetch failure
           console.warn(`[WARNING] Direct fetch failed, trying edge function fallback:`, directFetchError);
-          addLog(resultRow.eventId, eventorUrl, `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`);
+          const displayUrl = truncateUrl(eventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`);
           
           if (runId) {
             await saveLogToDatabase(
               runId,
               resultRow.eventId.toString(),
-              eventorUrl,
+              displayUrl,
               `Direkt hämtning misslyckades: ${directFetchError.message || directFetchError}`
             );
           }
@@ -216,13 +222,14 @@ export const fetchEventorData = async (
           try {
             htmlContent = await fetchHtmlViaEdgeFunction(eventorUrl);
             fetchSuccess = true;
-            addLog(resultRow.eventId, eventorUrl, `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`);
+            const displayUrl = truncateUrl(eventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId, 
                 resultRow.eventId.toString(), 
-                eventorUrl, 
+                displayUrl, 
                 `HTML-innehåll hämtat via edge function (${htmlContent.length} bytes)`
               );
             }
@@ -230,13 +237,14 @@ export const fetchEventorData = async (
             errorDetails = `Edge function fetch failed: ${edgeFunctionError.message || edgeFunctionError}`;
             console.error(`[ERROR] ${errorDetails}`);
             
-            addLog(resultRow.eventId, eventorUrl, `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`);
+            const displayUrl = truncateUrl(eventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId,
                 resultRow.eventId.toString(),
-                eventorUrl,
+                displayUrl,
                 `Edge function hämtning misslyckades: ${edgeFunctionError.message || edgeFunctionError}`
               );
             }
@@ -251,10 +259,11 @@ export const fetchEventorData = async (
             enhancedResultRow.length = courseInfo.length;
             console.log(`[DEBUG] Successfully extracted course length: ${courseInfo.length} m for class "${resultRow.class}"`);
             
-            addLog(resultRow.eventId, eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+            const displayUrl = truncateUrl(eventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
             
             if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Banlängd hämtad: ${courseInfo.length} m`);
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Banlängd hämtad: ${courseInfo.length} m`);
             }
             
             // Special verification for event ID 44635, class "Lätt 3 Dam"
@@ -264,13 +273,14 @@ export const fetchEventorData = async (
               console.log(`[VERIFICATION] Result: ${courseInfo.length === 3100 ? "PASS" : "FAIL"}`);
               
               const verificationMessage = `Verification for Event ID 44635, Class "Lätt 3 Dam": Length ${courseInfo.length} m (Expected: 3100 m)`;
-              addLog(resultRow.eventId, eventorUrl, verificationMessage);
+              const displayUrl = truncateUrl(eventorUrl, 120);
+              addLog(resultRow.eventId, displayUrl, verificationMessage);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId, 
                   resultRow.eventId.toString(), 
-                  eventorUrl, 
+                  displayUrl, 
                   verificationMessage
                 );
               }
@@ -278,10 +288,11 @@ export const fetchEventorData = async (
           } else {
             console.log(`[DEBUG] Failed to extract course length for class "${resultRow.class}"`);
             
-            addLog(resultRow.eventId, eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+            const displayUrl = truncateUrl(eventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
             
             if (runId) {
-              await saveLogToDatabase(runId, resultRow.eventId.toString(), eventorUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
+              await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Kunde inte hitta banlängd för klassen "${resultRow.class}"`);
             }
           }
           
@@ -291,13 +302,14 @@ export const fetchEventorData = async (
           console.error(`[ERROR] Failed to fetch HTML for eventId ${resultRow.eventId}, class ${resultRow.class} after multiple attempts`);
           console.error(`[ERROR] Last error details: ${errorDetails}`);
           
-          addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
+          const displayUrl = truncateUrl(currentEventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`);
           
           if (runId) {
             await saveLogToDatabase(
               runId, 
               resultRow.eventId.toString(), 
-              currentEventorUrl, 
+              displayUrl, 
               `Fel vid hämtning av HTML (efter flera försök): ${errorDetails}`
             );
           }
@@ -306,13 +318,14 @@ export const fetchEventorData = async (
         console.error(`[ERROR] Exception in course length fetching:`, error);
         console.error(`[ERROR] Stack: ${error.stack || 'No stack available'}`);
         
-        addLog(resultRow.eventId, currentEventorUrl, `Exception i banlängdshämtning: ${error.message || error}`);
+        const displayUrl = truncateUrl(currentEventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, `Exception i banlängdshämtning: ${error.message || error}`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             resultRow.eventId.toString(),
-            currentEventorUrl,
+            displayUrl,
             `Exception i banlängdshämtning: ${error.message || error}`
           );
         }
@@ -346,13 +359,16 @@ export const fetchEventorData = async (
       const renderProxyUrl = 'https://eventor-proxy.onrender.com/results/event';
       currentEventorUrl = renderProxyUrl;
       
+      // Use our new truncateUrl function
+      const displayUrl = truncateUrl(currentEventorUrl, 120);
+      
       // Use the specified delay for starters or default to 1 second
       const startersDelay = batchOptions?.startersDelay ?? 1.0;
       
-      addLog(resultRow.eventId, currentEventorUrl, `Hämtar antal startande (väntar ${startersDelay} sekunder)...`);
+      addLog(resultRow.eventId, displayUrl, `Hämtar antal startande (väntar ${startersDelay} sekunder)...`);
       
       if (runId) {
-        await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Hämtar antal startande (väntar ${startersDelay} sekunder)...`);
+        await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Hämtar antal startande (väntar ${startersDelay} sekunder)...`);
       }
       
       // Wait the specified delay before requesting starters
@@ -364,10 +380,11 @@ export const fetchEventorData = async (
       if (apiKey) {
         try {
           // Update the log message to use the direct approach
-          addLog(resultRow.eventId, currentEventorUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
+          const displayUrl = truncateUrl(currentEventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Anropar Render proxy direkt för Eventor API-anrop`);
           }
           
           // Create the POST request payload
@@ -408,13 +425,14 @@ export const fetchEventorData = async (
             const responseData = await response.json();
             console.log(`Response from Render proxy:`, responseData);
             
-            addLog(resultRow.eventId, currentEventorUrl, `API-anrop lyckades. Bearbetar svar...`);
+            const displayUrl = truncateUrl(currentEventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, `API-anrop lyckades. Bearbetar svar...`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId,
                 resultRow.eventId.toString(),
-                currentEventorUrl,
+                displayUrl,
                 `API-anrop lyckades. Bearbetar svar...`
               );
             }
@@ -456,28 +474,30 @@ export const fetchEventorData = async (
                     enhancedResultRow.antalStartande = numberOfStarts.toString();
                     classesWithStartsCount++;
                     
-                    addLog(resultRow.eventId, currentEventorUrl, 
+                    const displayUrl = truncateUrl(currentEventorUrl, 120);
+                    addLog(resultRow.eventId, displayUrl, 
                       `Antal startande hämtat (numberOfStarts för klass ${resultClass}): ${numberOfStarts}`);
                     
                     if (runId) {
                       await saveLogToDatabase(
                         runId,
                         resultRow.eventId.toString(),
-                        currentEventorUrl,
+                        displayUrl,
                         `Antal startande hämtat (numberOfStarts för klass ${resultClass}): ${numberOfStarts}`
                       );
                     }
                     break;
                   } else {
                     // Missing numberOfStarts attribute
-                    addLog(resultRow.eventId, currentEventorUrl, 
+                    const displayUrl = truncateUrl(currentEventorUrl, 120);
+                    addLog(resultRow.eventId, displayUrl, 
                       `Ogiltig svardata: numberOfStarts saknas för klass ${resultClass} i tävling ${resultRow.eventId}`);
                     
                     if (runId) {
                       await saveLogToDatabase(
                         runId,
                         resultRow.eventId.toString(),
-                        currentEventorUrl,
+                        displayUrl,
                         `Ogiltig svardata: numberOfStarts saknas för klass ${resultClass} i tävling ${resultRow.eventId}`
                       );
                     }
@@ -487,13 +507,14 @@ export const fetchEventorData = async (
               
               // Add summary log if classes were found
               const summaryMsg = `Hittade ${totalClassesCount} klasser, varav ${classesWithStartsCount} med numberOfStarts`;
-              addLog(resultRow.eventId, currentEventorUrl, summaryMsg);
+              const displayUrl = truncateUrl(currentEventorUrl, 120);
+              addLog(resultRow.eventId, displayUrl, summaryMsg);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId,
                   resultRow.eventId.toString(),
-                  currentEventorUrl,
+                  displayUrl,
                   summaryMsg
                 );
               }
@@ -527,28 +548,30 @@ export const fetchEventorData = async (
                     enhancedResultRow.antalStartande = numberOfStarts.toString();
                     classesWithStartsCount++;
                     
-                    addLog(resultRow.eventId, currentEventorUrl, 
+                    const displayUrl = truncateUrl(currentEventorUrl, 120);
+                    addLog(resultRow.eventId, displayUrl, 
                       `Antal startande hämtat (numberOfStarts för klass ${resultClass}): ${numberOfStarts}`);
                     
                     if (runId) {
                       await saveLogToDatabase(
                         runId,
                         resultRow.eventId.toString(),
-                        currentEventorUrl,
+                        displayUrl,
                         `Antal startande hämtat (numberOfStarts för klass ${resultClass}): ${numberOfStarts}`
                       );
                     }
                     break;
                   } else {
                     // Missing numberOfStarts attribute
-                    addLog(resultRow.eventId, currentEventorUrl, 
+                    const displayUrl = truncateUrl(currentEventorUrl, 120);
+                    addLog(resultRow.eventId, displayUrl, 
                       `Ogiltig svardata: numberOfStarts saknas för klass ${resultClass} i tävling ${resultRow.eventId}`);
                     
                     if (runId) {
                       await saveLogToDatabase(
                         runId,
                         resultRow.eventId.toString(),
-                        currentEventorUrl,
+                        displayUrl,
                         `Ogiltig svardata: numberOfStarts saknas för klass ${resultClass} i tävling ${resultRow.eventId}`
                       );
                     }
@@ -558,13 +581,14 @@ export const fetchEventorData = async (
               
               // Add summary log if classes were found
               const summaryMsg = `Hittade ${totalClassesCount} klasser, varav ${classesWithStartsCount} med numberOfStarts`;
-              addLog(resultRow.eventId, currentEventorUrl, summaryMsg);
+              const displayUrl = truncateUrl(currentEventorUrl, 120);
+              addLog(resultRow.eventId, displayUrl, summaryMsg);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId,
                   resultRow.eventId.toString(),
-                  currentEventorUrl,
+                  displayUrl,
                   summaryMsg
                 );
               }
@@ -575,25 +599,27 @@ export const fetchEventorData = async (
               
               // Check if we can find any useful information in the response
               if (responseData.Event && responseData.Event.Name) {
-                addLog(resultRow.eventId, currentEventorUrl, 
+                const displayUrl = truncateUrl(currentEventorUrl, 120);
+                addLog(resultRow.eventId, displayUrl, 
                   `Hittade event "${responseData.Event.Name}" men inga ClassResult element i förväntad struktur`);
                 
                 if (runId) {
                   await saveLogToDatabase(
                     runId,
                     resultRow.eventId.toString(),
-                    currentEventorUrl,
+                    displayUrl,
                     `Hittade event "${responseData.Event.Name}" men inga ClassResult element i förväntad struktur`
                   );
                 }
               } else {
-                addLog(resultRow.eventId, currentEventorUrl, `Ogiltig svardata: Inga klasser hittades`);
+                const displayUrl = truncateUrl(currentEventorUrl, 120);
+                addLog(resultRow.eventId, displayUrl, `Ogiltig svardata: Inga klasser hittades`);
                 
                 if (runId) {
                   await saveLogToDatabase(
                     runId,
                     resultRow.eventId.toString(),
-                    currentEventorUrl,
+                    displayUrl,
                     `Ogiltig svardata: Inga klasser hittades`
                   );
                 }
@@ -602,14 +628,15 @@ export const fetchEventorData = async (
             
             // If class was not found in the response, log this
             if (totalClassesCount > 0 && !classFound) {
-              addLog(resultRow.eventId, currentEventorUrl, 
+              const displayUrl = truncateUrl(currentEventorUrl, 120);
+              addLog(resultRow.eventId, displayUrl, 
                 `Klassen "${enhancedResultRow.class}" hittades inte i svaret som innehöll ${totalClassesCount} klasser`);
               
               if (runId) {
                 await saveLogToDatabase(
                   runId,
                   resultRow.eventId.toString(),
-                  currentEventorUrl,
+                  displayUrl,
                   `Klassen "${enhancedResultRow.class}" hittades inte i svaret som innehöll ${totalClassesCount} klasser`
                 );
               }
@@ -618,24 +645,26 @@ export const fetchEventorData = async (
             const errorText = await response.text();
             console.error(`Error response from Render proxy: ${response.status} - ${errorText}`);
             
-            addLog(resultRow.eventId, currentEventorUrl, 
+            const displayUrl = truncateUrl(currentEventorUrl, 120);
+            addLog(resultRow.eventId, displayUrl, 
               `Render proxy anrop misslyckades: HTTP ${response.status} - ${errorText}`);
             
             if (runId) {
               await saveLogToDatabase(
                 runId,
                 resultRow.eventId.toString(),
-                currentEventorUrl,
+                displayUrl,
                 `Render proxy anrop misslyckades: HTTP ${response.status} - ${errorText}`
               );
             }
           }
         } catch (apiError: any) {
           console.error("Error calling Eventor API via Render proxy:", apiError);
-          addLog(resultRow.eventId, currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
+          const displayUrl = truncateUrl(currentEventorUrl, 120);
+          addLog(resultRow.eventId, displayUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
           
           if (runId) {
-            await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
+            await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Fel vid API-anrop: ${apiError.message || apiError}`);
           }
         }
       }
@@ -646,13 +675,14 @@ export const fetchEventorData = async (
         enhancedResultRow.totalParticipants = enhancedResultRow.totalParticipants || Math.floor(Math.random() * 100) + 10;
         enhancedResultRow.antalStartande = enhancedResultRow.antalStartande || enhancedResultRow.totalParticipants.toString();
         
-        addLog(resultRow.eventId, currentEventorUrl, `Antal startande (fallback): ${enhancedResultRow.totalParticipants}`);
+        const displayUrl = truncateUrl(currentEventorUrl, 120);
+        addLog(resultRow.eventId, displayUrl, `Antal startande (fallback): ${enhancedResultRow.totalParticipants}`);
         
         if (runId) {
           await saveLogToDatabase(
             runId,
             resultRow.eventId.toString(),
-            currentEventorUrl,
+            displayUrl,
             `Antal startande (fallback): ${enhancedResultRow.totalParticipants}`
           );
         }
@@ -671,10 +701,11 @@ export const fetchEventorData = async (
     console.error(`Error fetching data from Eventor for event ${resultRow.eventId}:`, error);
     console.error(`Error stack: ${error.stack || 'No stack available'}`);
     
-    addLog(resultRow.eventId, currentEventorUrl, `Fel vid hämtning av data: ${error.message || error}`);
+    const displayUrl = truncateUrl(currentEventorUrl, 120);
+    addLog(resultRow.eventId, displayUrl, `Fel vid hämtning av data: ${error.message || error}`);
     
     if (runId) {
-      await saveLogToDatabase(runId, resultRow.eventId.toString(), currentEventorUrl, `Fel vid hämtning av data: ${error.message || error}`);
+      await saveLogToDatabase(runId, resultRow.eventId.toString(), displayUrl, `Fel vid hämtning av data: ${error.message || error}`);
     }
   }
 

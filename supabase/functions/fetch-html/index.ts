@@ -11,7 +11,12 @@ serve(async (req) => {
   try {
     const { url, headers = {} } = await req.json();
     
-    console.log(`[SERVER] Fetching HTML from: ${url}`);
+    // Enhanced URL logging - show more of the URL for debugging
+    const urlDisplay = url.length > 100 ? 
+      `${url.substring(0, 100)}...` : 
+      url;
+    
+    console.log(`[SERVER] Fetching HTML from: ${urlDisplay}`);
     console.log(`[SERVER] Using headers:`, headers);
     
     // Add enhanced headers to better emulate a real browser
@@ -68,7 +73,7 @@ serve(async (req) => {
             errorText: truncatedError,
             requestHeaders: Object.fromEntries(Object.entries(fetchHeaders).map(([k, v]) => 
               [k, typeof v === 'string' ? v : JSON.stringify(v)])),
-            url: url
+            url: urlDisplay  // Use the enhanced URL display
           }),
           {
             status: response.status,
@@ -111,7 +116,7 @@ serve(async (req) => {
           stack: errorStack,
           requestHeaders: Object.fromEntries(Object.entries(fetchHeaders).map(([k, v]) => 
             [k, typeof v === 'string' ? v : JSON.stringify(v)])),
-          url: url,
+          url: urlDisplay,  // Use the enhanced URL display
           success: false
         }),
         {
