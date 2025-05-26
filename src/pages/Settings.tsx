@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -131,17 +130,19 @@ const Settings = () => {
 
   if (loading) {
     return (
-      <div className="container py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold">{settingsTitle}</h1>
-          <Link to="/">
-            <Button variant="outline" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" /> Tillbaka
-            </Button>
-          </Link>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Laddar användarinformation...</p>
+      <div className="min-h-screen bg-yellow-50">
+        <div className="container py-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-4xl font-bold">{settingsTitle}</h1>
+            <Link to="/">
+              <Button variant="outline" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" /> Tillbaka
+              </Button>
+            </Link>
+          </div>
+          <div className="flex items-center justify-center h-64">
+            <p className="text-muted-foreground">Laddar användarinformation...</p>
+          </div>
         </div>
       </div>
     );
@@ -149,45 +150,49 @@ const Settings = () => {
 
   if (!userProfile) {
     return (
-      <div className="container py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold">{settingsTitle}</h1>
-          <Link to="/">
-            <Button variant="outline" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" /> Tillbaka
-            </Button>
-          </Link>
+      <div className="min-h-screen bg-yellow-50">
+        <div className="container py-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-4xl font-bold">{settingsTitle}</h1>
+            <Link to="/">
+              <Button variant="outline" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" /> Tillbaka
+              </Button>
+            </Link>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground">Ingen användarinformation hittades.</p>
+            </CardContent>
+          </Card>
         </div>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Ingen användarinformation hittades.</p>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-4xl font-bold">{settingsTitle}</h1>
-        <Link to="/">
-          <Button variant="outline" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
-          </Button>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-yellow-50">
+      <div className="container py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-4xl font-bold">{settingsTitle}</h1>
+          <Link to="/">
+            <Button variant="outline" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" /> Tillbaka till startsidan
+            </Button>
+          </Link>
+        </div>
 
-      <div className="space-y-6">
-        {userProfile && <UserProfileSettings userProfile={userProfile} />}
-        
-        <EventorApiKeySection />
-        
-        <ExpiredRunsSection />
-        
-        {userProfile && userProfile.role === UserRole.SUPERUSER && (
-          <SuperuserSettings />
-        )}
+        <div className="space-y-6">
+          {userProfile && <UserProfileSettings userProfile={userProfile} />}
+          
+          <EventorApiKeySection />
+          
+          <ExpiredRunsSection />
+          
+          {userProfile && userProfile.role === UserRole.SUPERUSER && (
+            <SuperuserSettings />
+          )}
+        </div>
       </div>
     </div>
   );
